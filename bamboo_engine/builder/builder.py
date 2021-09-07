@@ -146,9 +146,7 @@ def __grow(tree, elem):
     elif elem.type() == "SubProcess":
         outgoing = unique_id("f")
 
-        subprocess_param = (
-            elem.params.to_dict() if isinstance(elem.params, Params) else elem.params
-        )
+        subprocess_param = elem.params.to_dict() if isinstance(elem.params, Params) else elem.params
 
         subprocess = {
             "id": elem.id,
@@ -159,9 +157,7 @@ def __grow(tree, elem):
             "params": subprocess_param,
         }
 
-        subprocess["pipeline"] = build_tree(
-            start_elem=elem.start, id=elem.id, data=elem.data
-        )
+        subprocess["pipeline"] = build_tree(start_elem=elem.start, id=elem.id, data=elem.data)
 
         tree["activities"][elem.id] = subprocess
 

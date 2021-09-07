@@ -11,13 +11,10 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-集合类工具
-"""
+# 集合类工具
 
 
 from typing import Any
-from collections import UserDict
 
 
 class FancyDict(dict):
@@ -53,6 +50,4 @@ class ConstantDict(dict):
     """
 
     def __setitem__(self, key: str, value: Any):
-        raise TypeError(
-            "'%s' object does not support item assignment" % self.__class__.__name__
-        )
+        raise TypeError("'%s' object does not support item assignment" % self.__class__.__name__)

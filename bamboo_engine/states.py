@@ -11,9 +11,9 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-引擎内部状态及状态相关数据定义模块
-"""
+
+# 引擎内部状态及状态相关数据定义模块
+
 
 from enum import Enum
 

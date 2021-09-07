@@ -24,11 +24,7 @@ from .utils import format_pipeline_tree_io_to_list
 
 
 def validate_and_process_pipeline(pipeline: dict, cycle_tolerate=False):
-    for subproc in [
-        act
-        for act in pipeline["activities"].values()
-        if act["type"] == NodeType.SubProcess.value
-    ]:
+    for subproc in [act for act in pipeline["activities"].values() if act["type"] == NodeType.SubProcess.value]:
         validate_and_process_pipeline(subproc["pipeline"], cycle_tolerate)
 
     format_pipeline_tree_io_to_list(pipeline)

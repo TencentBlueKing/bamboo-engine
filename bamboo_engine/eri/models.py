@@ -11,14 +11,13 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-ERI 中相关的模型对象
-"""
+
+# ERI 中相关的模型对象
+
 
 from enum import Enum
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from abc import ABCMeta, abstractmethod
 
 from bamboo_engine.utils.object import Representable
 from bamboo_engine.utils.collections import FancyDict

@@ -5,6 +5,7 @@ ignore =
     ;This behaviour may raise E203 whitespace before ':' warnings in style guide enforcement tools like Flake8.
     ;Since E203 is not PEP 8 compliant, you should tell Flake8 to ignore these warnings.
     E203,
+    C901
 
 max-line-length = 120
 max-complexity = 25

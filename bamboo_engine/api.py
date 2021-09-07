@@ -11,15 +11,14 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
-"""
+
+# API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
+
 
 import logging
 import functools
 import traceback
 from typing import Optional, Any, List
-from contextlib import contextmanager
 
 from .utils.object import Representable
 from .eri import EngineRuntimeInterface, ContextValue
@@ -605,10 +604,7 @@ def preview_node_inputs(
     if subprocess_stack:
         subprocess = subprocess_stack[0]
         child_pipeline = pipeline["activities"][subprocess]["pipeline"]
-        param_data = {
-            key: info["value"]
-            for key, info in pipeline["activities"][subprocess]["params"].items()
-        }
+        param_data = {key: info["value"] for key, info in pipeline["activities"][subprocess]["params"].items()}
         hydrated_context = context.hydrate(deformat=True)
         hydrated_param_data = Template(param_data).render(hydrated_context)
         formatted_param_data = {key: {"value": value, "type": "plain"} for key, value in hydrated_param_data.items()}

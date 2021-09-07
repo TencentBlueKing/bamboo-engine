@@ -11,9 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-Mako 安全工具
-"""
+# Mako 安全工具
+
 
 from ast import NodeVisitor
 
@@ -53,6 +52,4 @@ class SingleLinCodeExtractor(MakoNodeCodeExtractor):
         elif isinstance(node, parsetree.Text):
             return None
         else:
-            raise ForbiddenMakoTemplateException(
-                "Unsupported node: [{}]".format(node.__class__.__name__)
-            )
+            raise ForbiddenMakoTemplateException("Unsupported node: [{}]".format(node.__class__.__name__))

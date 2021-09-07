@@ -17,12 +17,12 @@ specific language governing permissions and limitations under the License.
 
 
 def register():
-    from .conditional_parallel_gateway import ConditionalParallelGatewayHandler
-    from .converge_gateway import ConvergeGatewayHandler
-    from .empty_end_event import EmptyEndEventHandler
-    from .empty_start_event import EmptyStartEventHandler
-    from .exclusive_gateway import ExclusiveGatewayHandler
-    from .executable_end_event import ExecutableEndEventHandler
-    from .parallel_gateway import ParallelGatewayHandler
-    from .service_activity import ServiceActivityHandler
-    from .subprocess import SubProcessHandler
+    from .conditional_parallel_gateway import ConditionalParallelGatewayHandler  # noqa
+    from .converge_gateway import ConvergeGatewayHandler  # noqa
+    from .empty_end_event import EmptyEndEventHandler  # noqa
+    from .empty_start_event import EmptyStartEventHandler  # noqa
+    from .exclusive_gateway import ExclusiveGatewayHandler  # noqa
+    from .executable_end_event import ExecutableEndEventHandler  # noqa
+    from .parallel_gateway import ParallelGatewayHandler  # noqa
+    from .service_activity import ServiceActivityHandler  # noqa
+    from .subprocess import SubProcessHandler  # noqa

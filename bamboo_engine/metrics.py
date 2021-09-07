@@ -16,7 +16,7 @@ import time
 
 from functools import wraps
 
-from prometheus_client import Gauge, Histogram, Counter
+from prometheus_client import Gauge, Histogram
 
 
 def decode_buckets(buckets_list):
@@ -86,12 +86,8 @@ def setup_histogram(*histograms):
 
 
 # engine metrics
-ENGINE_RUNNING_PROCESSES = Gauge(
-    "engine_running_processes", "count running state processes"
-)
-ENGINE_RUNNING_SCHEDULES = Gauge(
-    "engine_running_schedules", "count running state schedules"
-)
+ENGINE_RUNNING_PROCESSES = Gauge("engine_running_processes", "count running state processes")
+ENGINE_RUNNING_SCHEDULES = Gauge("engine_running_schedules", "count running state schedules")
 ENGINE_PROCESS_RUNNING_TIME = Histogram(
     "engine_process_running_time",
     "time spent running process",
@@ -165,24 +161,12 @@ ENGINE_RUNTIME_CALLBACK_DATA_READ_TIME = Histogram(
     "time spent reading node callback data",
 )
 
-ENGINE_RUNTIME_SCHEDULE_READ_TIME = Histogram(
-    "engine_runtime_schedule_read_time", "time spent reading schedule"
-)
-ENGINE_RUNTIME_SCHEDULE_WRITE_TIME = Histogram(
-    "engine_runtime_schedule_write_time", "time spent writing schedule"
-)
+ENGINE_RUNTIME_SCHEDULE_READ_TIME = Histogram("engine_runtime_schedule_read_time", "time spent reading schedule")
+ENGINE_RUNTIME_SCHEDULE_WRITE_TIME = Histogram("engine_runtime_schedule_write_time", "time spent writing schedule")
 
-ENGINE_RUNTIME_STATE_READ_TIME = Histogram(
-    "engine_runtime_state_read_time", "time spent reading state"
-)
-ENGINE_RUNTIME_STATE_WRITE_TIME = Histogram(
-    "engine_runtime_state_write_time", "time spent writing state"
-)
+ENGINE_RUNTIME_STATE_READ_TIME = Histogram("engine_runtime_state_read_time", "time spent reading state")
+ENGINE_RUNTIME_STATE_WRITE_TIME = Histogram("engine_runtime_state_write_time", "time spent writing state")
 
-ENGINE_RUNTIME_NODE_READ_TIME = Histogram(
-    "engine_runtime_node_read_time", "time spent reading node"
-)
+ENGINE_RUNTIME_NODE_READ_TIME = Histogram("engine_runtime_node_read_time", "time spent reading node")
 
-ENGINE_RUNTIME_PROCESS_READ_TIME = Histogram(
-    "engine_runtime_process_read_time", "time spent reading process"
-)
+ENGINE_RUNTIME_PROCESS_READ_TIME = Histogram("engine_runtime_process_read_time", "time spent reading process")

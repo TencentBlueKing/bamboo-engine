@@ -224,7 +224,8 @@ class Engine:
 
         if data is not None:
             self.runtime.set_data_inputs(
-                node_id, {k: DataInput(need_render=True, value=v) for k, v in data.items()},
+                node_id,
+                {k: DataInput(need_render=True, value=v) for k, v in data.items()},
             )
 
         self._add_history(node_id, state)
@@ -311,7 +312,11 @@ class Engine:
         self._add_history(node_id, state)
 
         self.runtime.set_state(
-            node_id=node_id, to_state=states.FINISHED, is_skip=True, refresh_version=True, set_archive_time=True,
+            node_id=node_id,
+            to_state=states.FINISHED,
+            is_skip=True,
+            refresh_version=True,
+            set_archive_time=True,
         )
 
         # 跳过节点时不再做节点输出提取到上下文的操作
@@ -346,7 +351,11 @@ class Engine:
         self._add_history(node_id, state)
 
         self.runtime.set_state(
-            node_id=node_id, to_state=states.FINISHED, is_skip=True, refresh_version=True, set_archive_time=True,
+            node_id=node_id,
+            to_state=states.FINISHED,
+            is_skip=True,
+            refresh_version=True,
+            set_archive_time=True,
         )
 
         self.runtime.execute(process_id, next_node_id)
@@ -388,7 +397,10 @@ class Engine:
 
         old_ver = state.version
         new_ver = self.runtime.set_state(
-            node_id=node_id, to_state=states.FAILED, refresh_version=True, set_archive_time=True,
+            node_id=node_id,
+            to_state=states.FAILED,
+            refresh_version=True,
+            set_archive_time=True,
         )
 
         self.runtime.set_execution_data_outputs(node_id, outputs)
@@ -488,7 +500,9 @@ class Engine:
                 if node_state_map[process_info.root_pipeline_id] == states.REVOKED:
                     self.runtime.die(process_id)
                     logger.info(
-                        "[%s] root pipeline revoked checked at node %s", process_info.root_pipeline_id, current_node_id,
+                        "[%s] root pipeline revoked checked at node %s",
+                        process_info.root_pipeline_id,
+                        current_node_id,
                     )
                     return
 
@@ -523,7 +537,9 @@ class Engine:
 
                         self.runtime.set_execution_data_outputs(current_node_id, exec_outputs)
                         self.runtime.set_state(
-                            node_id=current_node_id, to_state=states.FAILED, set_archive_time=True,
+                            node_id=current_node_id,
+                            to_state=states.FAILED,
+                            set_archive_time=True,
                         )
                         self.runtime.sleep(process_id)
 
@@ -666,7 +682,11 @@ class Engine:
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)
     def schedule(
-        self, process_id: int, node_id: str, schedule_id: str, callback_data_id: Optional[int] = None,
+        self,
+        process_id: int,
+        node_id: str,
+        schedule_id: str,
+        callback_data_id: Optional[int] = None,
     ):
         """
         在某个进程上开始某个节点的调度
@@ -776,7 +796,10 @@ class Engine:
                 type_label = self._get_metrics_node_type(node)
 
                 logger.info(
-                    "[%s] before schedule node %s with data %s", root_pipeline_id, node, callback_data,
+                    "[%s] before schedule node %s with data %s",
+                    root_pipeline_id,
+                    node,
+                    callback_data,
                 )
                 schedule_start = time.time()
                 schedule_result = handler.schedule(process_info, state.loop, state.inner_loop, schedule, callback_data)
@@ -784,7 +807,10 @@ class Engine:
 
                 if schedule_result.has_next_schedule:
                     self.runtime.set_next_schedule(
-                        process_info.process_id, node_id, schedule_id, schedule_result.schedule_after,
+                        process_info.process_id,
+                        node_id,
+                        schedule_id,
+                        schedule_result.schedule_after,
                     )
 
                 if schedule_result.schedule_done:
@@ -793,7 +819,10 @@ class Engine:
         except Exception as e:
             ex_data = traceback.format_exc()
             logger.warning(
-                "[%s]schedule exception catch at node(%s): %s", root_pipeline_id, node_id, ex_data,
+                "[%s]schedule exception catch at node(%s): %s",
+                root_pipeline_id,
+                node_id,
+                ex_data,
             )
 
             # state version already changed, so give up this schedule
@@ -823,7 +852,10 @@ class Engine:
         self.runtime.release_schedule_lock(schedule_id)
 
     def _add_history(
-        self, node_id: str, state: Optional[State] = None, exec_data: Optional[ExecutionData] = None,
+        self,
+        node_id: str,
+        state: Optional[State] = None,
+        exec_data: Optional[ExecutionData] = None,
     ) -> int:
         if not state:
             state = self.runtime.get_state(node_id)

@@ -11,12 +11,12 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-bool 表达式解析工具模块
-"""
 
-from .boolrule import (
+# bool 表达式解析工具模块
+
+
+from .boolrule import (  # noqa
     BoolRule,
     MissingVariableException,
     UnknownOperatorException,
-)  # noqa
+)

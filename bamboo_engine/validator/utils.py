@@ -84,11 +84,7 @@ def get_nodes_dict(data):
         node["incoming"] = format_to_list(node["incoming"])
         node["outgoing"] = format_to_list(node["outgoing"])
 
-        node["source"] = [
-            data["flows"][incoming]["source"] for incoming in node["incoming"]
-        ]
-        node["target"] = [
-            data["flows"][outgoing]["target"] for outgoing in node["outgoing"]
-        ]
+        node["source"] = [data["flows"][incoming]["source"] for incoming in node["incoming"]]
+        node["target"] = [data["flows"][outgoing]["target"] for outgoing in node["outgoing"]]
 
     return nodes
