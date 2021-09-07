@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  py3.6:
+  py_3_6:
 
     runs-on: ubuntu-latest
 
@@ -28,7 +28,7 @@ jobs:
       run: |
         black
 
-  py3.7:
+  py_3_7:
 
     runs-on: ubuntu-latest
 
