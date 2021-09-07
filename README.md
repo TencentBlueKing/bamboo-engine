@@ -2,14 +2,14 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/TencentBlueKing/bamboo-engine/pulls)
 [![Python 3.6](https://img.shields.io/badge/python-v3.6-blue)](https://github.com/TencentBlueKing/bamboo-engine/)
 [![Python 3.7](https://img.shields.io/badge/python-v3.7-blue)](https://github.com/TencentBlueKing/bamboo-engine/)
-[![BK Pipelines Status](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/bkapppipeline/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/bkapppipeline/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)
+[![BK Pipelines Status](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/bkapppipeline/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/blueapps/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)
 
 bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度由用户创建的流程任务，并提供了如暂停，撤销，跳过，强制失败，重试和重入等等灵活的控制能力和并行、子流程等进阶特性，并可通过水平扩展来进一步提升任务的并发处理能力。
 
 > bamboo_engine 与 bamboo_pipeline 的性能对比: [性能对比](./docs/upgrade/bamboo_pipeline_vs_bamboo_engine.md)
 
 <!-- TOC -->
-
+blueapps
 - [整体设计](#整体设计)
 - [Quick start](#quick-start)
   - [1. 安装依赖](#1-安装依赖)
