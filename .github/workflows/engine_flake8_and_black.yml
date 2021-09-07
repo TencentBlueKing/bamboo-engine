@@ -23,10 +23,10 @@ jobs:
         pip install flake8 black
     - name: Lint with flake8
       run: |
-        flake8
+        flake8 bamboo_engine/
     - name: Format with black
       run: |
-        black
+        black bamboo_engine/
 
   py_3_7:
 
@@ -44,7 +44,7 @@ jobs:
         pip install flake8 black
     - name: Lint with flake8
       run: |
-        flake8
+        flake8 bamboo_engine/
     - name: Format with black
       run: |
-        black
+        black bamboo_engine/
