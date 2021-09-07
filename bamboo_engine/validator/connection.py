@@ -33,24 +33,16 @@ def validate_graph_connection(data):
         for j in nodes[i]["target"]:
             if nodes[j]["type"] not in rule["allowed_out"]:
                 message += "不能连接%s类型节点\n" % nodes[i]["type"]
-            if (
-                rule["min_in"] > len(nodes[i]["source"])
-                or len(nodes[i]["source"]) > rule["max_in"]
-            ):
+            if rule["min_in"] > len(nodes[i]["source"]) or len(nodes[i]["source"]) > rule["max_in"]:
                 message += "节点的入度最大为%s，最小为%s\n" % (rule["max_in"], rule["min_in"])
-            if (
-                rule["min_out"] > len(nodes[i]["target"])
-                or len(nodes[i]["target"]) > rule["max_out"]
-            ):
+            if rule["min_out"] > len(nodes[i]["target"]) or len(nodes[i]["target"]) > rule["max_out"]:
                 message += "节点的出度最大为%s，最小为%s\n" % (rule["max_out"], rule["min_out"])
         if message:
             result["failed_nodes"].append(i)
             result["message"][i] = message
 
         if result["failed_nodes"]:
-            raise ConnectionValidateError(
-                failed_nodes=result["failed_nodes"], detail=result["message"]
-            )
+            raise ConnectionValidateError(failed_nodes=result["failed_nodes"], detail=result["message"])
 
 
 def validate_graph_without_circle(data):
@@ -66,9 +58,7 @@ def validate_graph_without_circle(data):
 
     nodes = [data["start_event"]["id"], data["end_event"]["id"]]
     nodes += list(data["gateways"].keys()) + list(data["activities"].keys())
-    flows = [
-        [flow["source"], flow["target"]] for _, flow in list(data["flows"].items())
-    ]
+    flows = [[flow["source"], flow["target"]] for _, flow in list(data["flows"].items())]
     cycle = Graph(nodes, flows).get_cycle()
     if cycle:
         return {

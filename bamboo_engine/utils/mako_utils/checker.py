@@ -45,9 +45,7 @@ def parse_template_nodes(
             parse_template_nodes(node.nodes, node_visitor)
 
 
-def check_mako_template_safety(
-    text: str, node_visitor: ast.NodeVisitor, code_extractor: MakoNodeCodeExtractor
-) -> bool:
+def check_mako_template_safety(text: str, node_visitor: ast.NodeVisitor, code_extractor: MakoNodeCodeExtractor) -> bool:
     """
     检查mako模板是否安全，若不安全直接抛出异常，安全则返回True
     :param text: mako模板内容
@@ -56,8 +54,6 @@ def check_mako_template_safety(
     try:
         lexer_template = Lexer(text).parse()
     except MakoException as mako_error:
-        raise ForbiddenMakoTemplateException(
-            "非mako模板，解析失败, {err_msg}".format(err_msg=mako_error.__class__.__name__)
-        )
+        raise ForbiddenMakoTemplateException("非mako模板，解析失败, {err_msg}".format(err_msg=mako_error.__class__.__name__))
     parse_template_nodes(lexer_template.nodes, node_visitor, code_extractor)
     return True

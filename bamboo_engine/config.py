@@ -11,9 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-引擎内部配置模块
-"""
+# 引擎内部配置模块
 
 
 class Settings:

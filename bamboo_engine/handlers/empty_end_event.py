@@ -15,7 +15,7 @@ import logging
 
 from bamboo_engine import states
 from bamboo_engine.config import Settings
-from bamboo_engine.eri import ProcessInfo, ContextValue, ContextValueType, NodeType
+from bamboo_engine.eri import ProcessInfo, NodeType
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.context import Context
 

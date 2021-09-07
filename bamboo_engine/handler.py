@@ -11,9 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-节点处理器逻辑封装模块
-"""
+# 节点处理器逻辑封装模块
 
 from typing import Optional, List
 from abc import ABCMeta, abstractmethod
@@ -30,7 +28,7 @@ from .eri import (
     ProcessInfo,
     NodeType,
 )
-from .exceptions import NotFoundError
+from .exceptions import NotFoundError, InvalidOperationError
 
 
 def register_handler(type: NodeType):
@@ -183,9 +181,7 @@ class NodeHandler(metaclass=ABCMeta):
     def _execute_fail(self, ex_data: str) -> ExecuteResult:
         exec_outputs = self.runtime.get_execution_data_outputs(self.node.id)
 
-        self.runtime.set_state(
-            node_id=self.node.id, to_state=states.FAILED, set_archive_time=True
-        )
+        self.runtime.set_state(node_id=self.node.id, to_state=states.FAILED, set_archive_time=True)
 
         exec_outputs["ex_data"] = ex_data
 
@@ -201,9 +197,7 @@ class NodeHandler(metaclass=ABCMeta):
         )
 
     def _get_plain_inputs(self, node_id: str):
-        return {
-            key: di.value for key, di in self.runtime.get_data_inputs(node_id).items()
-        }
+        return {key: di.value for key, di in self.runtime.get_data_inputs(node_id).items()}
 
 
 class HandlerFactory:
@@ -226,9 +220,7 @@ class HandlerFactory:
         """
         if not issubclass(handler_cls, NodeHandler):
             raise InvalidOperationError(
-                "register handler err: {} is not subclass of {}".format(
-                    handler_cls, "NodeHandler"
-                )
+                "register handler err: {} is not subclass of {}".format(handler_cls, "NodeHandler")
             )
         cls._handlers[type.value] = handler_cls
 
@@ -246,8 +238,6 @@ class HandlerFactory:
         :rtype: NodeHandler
         """
         if node.type.value not in cls._handlers:
-            raise NotFoundError(
-                "can not find handler for {} type node".format(node.type.value)
-            )
+            raise NotFoundError("can not find handler for {} type node".format(node.type.value))
 
         return cls._handlers[node.type.value](node, runtime)

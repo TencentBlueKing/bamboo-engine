@@ -123,9 +123,7 @@ def match_converge(
                     target[i] = None
                     break
                 else:
-                    raise exceptions.ConvergeMatchError(
-                        cur_index, "并行网关中的分支网关必须将所有分支汇聚到一个汇聚网关"
-                    )
+                    raise exceptions.ConvergeMatchError(cur_index, "并行网关中的分支网关必须将所有分支汇聚到一个汇聚网关")
 
             converge_id, shared = match_converge(
                 converges=converges,
@@ -150,10 +148,7 @@ def match_converge(
                 # can't find corresponding converge gateway, which means this gateway will reach end event directly
                 target[i] = end_event_id
 
-        if (
-            target[i] in converges
-            and dist_from_start[target[i]] < dist_from_start[cur_index]
-        ):
+        if target[i] in converges and dist_from_start[target[i]] < dist_from_start[cur_index]:
             # do not match previous converge
             target[i] = None
 
@@ -181,9 +176,7 @@ def match_converge(
             if not_in_parallel_gateway(stack):
                 converge_end = True
             else:
-                raise exceptions.ConvergeMatchError(
-                    cur_index, "并行网关中的分支网关必须将所有分支汇聚到一个汇聚网关"
-                )
+                raise exceptions.ConvergeMatchError(cur_index, "并行网关中的分支网关必须将所有分支汇聚到一个汇聚网关")
 
         # exclusive gateway point back to self
         elif is_exg and target[i] == current_gateway["id"]:
@@ -209,10 +202,7 @@ def match_converge(
         if converge_id in converges:
             # this converge is shared by multiple gateway
             # only compare to the number of positive incoming
-            shared = (
-                converge_in_len[converge_id] > cur_to_converge
-                or converge_id in converged
-            )
+            shared = converge_in_len[converge_id] > cur_to_converge or converge_id in converged
     else:
         # for parallel gateway
 
@@ -223,9 +213,7 @@ def match_converge(
             for gateway_id in converged.get(converge_id, []):
                 # find another parallel gateway
                 if gateways[gateway_id]["type"] in PARALLEL_GATEWAYS:
-                    raise exceptions.ConvergeMatchError(
-                        converge_id, "汇聚网关只能汇聚来自同一个并行网关的分支"
-                    )
+                    raise exceptions.ConvergeMatchError(converge_id, "汇聚网关只能汇聚来自同一个并行网关的分支")
 
             shared = True
 
@@ -272,9 +260,7 @@ def distance_from(origin, node, tree, marked, visited=None):
         prev_node = get_node_for_sequence(incoming, tree, "source")
 
         # get incoming node's distance recursively
-        dist = distance_from(
-            origin=origin, node=prev_node, tree=tree, marked=marked, visited=visited
-        )
+        dist = distance_from(origin=origin, node=prev_node, tree=tree, marked=marked, visited=visited)
 
         # if this incoming do not trace back to current node
         if dist is not None:
@@ -305,12 +291,8 @@ def validate_gateways(tree):
     # data preparation
     for i, item in list(tree["gateways"].items()):
         node = {
-            "incoming": item["incoming"]
-            if isinstance(item["incoming"], list)
-            else [item["incoming"]],
-            "outgoing": item["outgoing"]
-            if isinstance(item["outgoing"], list)
-            else [item["outgoing"]],
+            "incoming": item["incoming"] if isinstance(item["incoming"], list) else [item["incoming"]],
+            "outgoing": item["outgoing"] if isinstance(item["outgoing"], list) else [item["outgoing"]],
             "type": item["type"],
             "target": [],
             "source": [],
@@ -329,9 +311,7 @@ def validate_gateways(tree):
             node["target"].append(index)
 
         # get current node's distance from start event
-        if not distance_from(
-            node=node, origin=tree["start_event"], tree=tree, marked=distances
-        ):
+        if not distance_from(node=node, origin=tree["start_event"], tree=tree, marked=distances):
             raise exceptions.ConvergeMatchError(node["id"], "无法获取该网关距离开始节点的距离")
 
         if item["type"] == "ConvergeGateway":
@@ -402,9 +382,7 @@ def blend(source, target, custom_stream=None):
         return
 
     if len(source[STREAM]) == 0:
-        raise exceptions.InvalidOperationException(
-            "stream validation error, node(%s) stream is empty" % source["id"]
-        )
+        raise exceptions.InvalidOperationException("stream validation error, node(%s) stream is empty" % source["id"])
 
     # blend
     for s in source[STREAM]:
@@ -449,9 +427,7 @@ def flowing(where, to, parallel_converges):
 
         if target_id in parallel_converges:
 
-            is_valid_branch = where[STREAM].issubset(
-                parallel_converges[target_id][P_STREAM]
-            )
+            is_valid_branch = where[STREAM].issubset(parallel_converges[target_id][P_STREAM])
             is_direct_connect = where.get("converge_gateway_id") == target_id
 
             if is_valid_branch or is_direct_connect:

@@ -11,9 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-封装模板处理，渲染逻辑的相关模块
-"""
+# 封装模板处理，渲染逻辑的相关模块
 
 import copy
 import re
@@ -116,9 +114,7 @@ class Template:
         try:
             node = lex.parse()
         except MakoException as e:
-            logger.warning(
-                "pipeline get template[{}] reference error[{}]".format(template, e)
-            )
+            logger.warning("pipeline get template[{}] reference error[{}]".format(template, e))
             return []
 
         # Dummy compiler. _Identifiers class requires one
@@ -147,11 +143,7 @@ class Template:
         templates = self._get_string_templates(string)
 
         # TODO keep render return object, here only process simple situation
-        if (
-            len(templates) == 1
-            and templates[0] == string
-            and deformat_var_key(string) in context
-        ):
+        if len(templates) == 1 and templates[0] == string and deformat_var_key(string) in context:
             return context[deformat_var_key(string)]
 
         for tpl in templates:
@@ -188,9 +180,7 @@ class Template:
         data.update(sandbox.get())
         data.update(context)
         if not isinstance(template, str):
-            raise TypeError(
-                "constant resolve error, template[%s] is not a string" % template
-            )
+            raise TypeError("constant resolve error, template[%s] is not a string" % template)
         try:
             tm = MakoTemplate(template)
         except (MakoException, SyntaxError) as e:
@@ -199,11 +189,7 @@ class Template:
         try:
             resolved = tm.render_unicode(**data)
         except Exception as e:
-            logger.warning(
-                "constant content({}) is invalid, data({}), error: {}".format(
-                    template, data, e
-                )
-            )
+            logger.warning("constant content({}) is invalid, data({}), error: {}".format(template, data, e))
             return template
         else:
             return resolved

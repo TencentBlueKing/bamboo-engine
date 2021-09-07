@@ -42,6 +42,4 @@ class StrictMakoNodeCodeExtractor(MakoNodeCodeExtractor):
         elif isinstance(node, parsetree.Text):
             return None
         else:
-            raise ForbiddenMakoTemplateException(
-                "不支持[{}]节点".format(node.__class__.__name__)
-            )
+            raise ForbiddenMakoTemplateException("不支持[{}]节点".format(node.__class__.__name__))

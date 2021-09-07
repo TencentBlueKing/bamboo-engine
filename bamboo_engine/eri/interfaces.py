@@ -11,7 +11,6 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from weakref import WeakValueDictionary
 from datetime import datetime
 from abc import ABCMeta, abstractmethod
 from typing import List, Optional, Dict, Set, Any

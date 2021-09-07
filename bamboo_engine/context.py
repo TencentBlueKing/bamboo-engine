@@ -11,9 +11,9 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-流程上下文相关逻辑封装模块
-"""
+
+# 流程上下文相关逻辑封装模块
+
 
 import logging
 from weakref import WeakValueDictionary
@@ -21,13 +21,12 @@ from typing import List, Dict, Any
 
 from bamboo_engine.eri import (
     ContextValue,
-    ExecutionData,
     EngineRuntimeInterface,
     Variable,
     ContextValueType,
 )
 from .template.template import Template
-from .utils.string import format_var_key, deformat_var_key
+from .utils.string import deformat_var_key
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -55,7 +54,6 @@ class SpliceVariable(Variable):
         self.value = value
         self.pool = pool
         self.refs = [k for k in Template(value).get_reference()]
-        import pdb
 
     def get(self):
         context = {}

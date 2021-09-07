@@ -11,9 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-"""
-字符串处理类工具
-"""
+# 字符串处理类工具
+
 
 import uuid
 

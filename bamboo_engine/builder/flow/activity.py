@@ -11,7 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from .base import *  # noqa
+from .base import Element
 from bamboo_engine.eri import NodeType
 from bamboo_engine.utils.collections import FancyDict
 
@@ -20,14 +20,7 @@ __all__ = ["ServiceActivity", "SubProcess"]
 
 class ServiceActivity(Element):
     def __init__(
-        self,
-        component_code=None,
-        error_ignorable=False,
-        timeout=None,
-        skippable=True,
-        retryable=True,
-        *args,
-        **kwargs
+        self, component_code=None, error_ignorable=False, timeout=None, skippable=True, retryable=True, *args, **kwargs
     ):
         self.component = FancyDict({"code": component_code, "inputs": FancyDict({})})
         self.error_ignorable = error_ignorable
@@ -42,16 +35,12 @@ class ServiceActivity(Element):
     def component_dict(self):
         return {
             "code": self.component.code,
-            "inputs": {
-                key: var.to_dict() for key, var in list(self.component.inputs.items())
-            },
+            "inputs": {key: var.to_dict() for key, var in list(self.component.inputs.items())},
         }
 
 
 class SubProcess(Element):
-    def __init__(
-        self, start=None, data=None, params=None, global_outputs=None, *args, **kwargs
-    ):
+    def __init__(self, start=None, data=None, params=None, global_outputs=None, *args, **kwargs):
         self.start = start
         self.data = data
         self.params = params or {}

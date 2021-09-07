@@ -42,8 +42,7 @@ class StrictNodeVisitor(ast.NodeVisitor):
         "pty": dir(__import__("pty")),
         "glob": dir(__import__("glob")),
         "tempfile": dir(__import__("tempfile")),
-        "types": dir(import_string("types.CodeType"))
-        + dir(import_string("types.FrameType")),
+        "types": dir(import_string("types.CodeType")) + dir(import_string("types.FrameType")),
         "builtins": [
             "getattr",
             "hasattr",

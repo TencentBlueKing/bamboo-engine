@@ -25,9 +25,7 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.ExecutableEndEvent)
 class ExecutableEndEventHandler(EmptyEndEventHandler):
-    def execute(
-        self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str
-    ) -> ExecuteResult:
+    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -61,13 +59,9 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
                 ex_data,
             )
 
-            self.runtime.set_execution_data_outputs(
-                node_id=self.node.id, outputs={"ex_data": ex_data}
-            )
+            self.runtime.set_execution_data_outputs(node_id=self.node.id, outputs={"ex_data": ex_data})
 
-            self.runtime.set_state(
-                node_id=self.node.id, to_state=states.FAILED, set_archive_time=True
-            )
+            self.runtime.set_state(node_id=self.node.id, to_state=states.FAILED, set_archive_time=True)
 
             return ExecuteResult(
                 should_sleep=True,

@@ -18,9 +18,7 @@ from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 
 @register_handler(NodeType.ParallelGateway)
 class ParallelGatewayHandler(NodeHandler):
-    def execute(
-        self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str
-    ) -> ExecuteResult:
+    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -43,9 +41,7 @@ class ParallelGatewayHandler(NodeHandler):
             from_to=from_to,
         )
 
-        self.runtime.set_state(
-            node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True
-        )
+        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
 
         return ExecuteResult(
             should_sleep=True,

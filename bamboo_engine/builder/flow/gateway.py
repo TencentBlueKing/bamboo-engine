@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 
 from bamboo_engine.eri import NodeType
 
-from .base import *  # noqa
+from .base import Element
 
 __all__ = [
     "ParallelGateway",
