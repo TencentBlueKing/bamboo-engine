@@ -34,10 +34,10 @@ setup(
     description="bamboo-engine",
     long_description=long_description,
     # The project's main homepage.
-    url="https://github.com/Tencent/bk-sops/tree/sdk/sdk/bamboo-engine",
+    url="https://github.com/TencentBlueKing/bamboo-engine",
     # Author details
     author="Blueking",
-    author_email="howellliang@tencent.com",
+    author_email="contactus_bk@tencent.com",
     include_package_data=True,
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
