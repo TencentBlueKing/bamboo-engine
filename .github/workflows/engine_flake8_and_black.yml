@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  Flake8 and Black:
+  flake8_and_black:
 
     runs-on: ubuntu-latest
 
