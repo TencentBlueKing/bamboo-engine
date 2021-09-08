@@ -35,8 +35,8 @@ setup(
     # Author details
     author="Blueking",
     author_email="contactus_bk@tencent.com",
-    package_dir={"": "bamboo_engine"},
-    packages=find_packages(where="bamboo_engine"),
+    include_package_data=True,
+    packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
         "Werkzeug>=1.0.1,<2.0",
         "pyparsing>=2.2.0,<3.0",
