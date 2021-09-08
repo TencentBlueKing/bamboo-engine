@@ -21,11 +21,12 @@ from pipeline.core.flow import EndEvent, FlowNodeClsFactory
 class FlowNodeClsFactoryTestCase(TestCase):
     @patch("pipeline.core.flow.post_new_end_event_register", MagicMock())
     def test_register_node__is_not_end_event(self):
-        node_cls = MagicMock()
+        class NotEndEvent:
+            pass
 
-        FlowNodeClsFactory.register_node("key", node_cls)
+        FlowNodeClsFactory.register_node("key", NotEndEvent)
 
-        self.assertEqual(FlowNodeClsFactory.get_node_cls("key"), node_cls)
+        self.assertEqual(FlowNodeClsFactory.get_node_cls("key"), NotEndEvent)
         flow.post_new_end_event_register.send.assert_not_called()
 
         FlowNodeClsFactory.nodes_cls.pop("key")
