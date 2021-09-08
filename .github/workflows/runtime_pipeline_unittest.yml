@@ -38,10 +38,13 @@ jobs:
         coverage run --source="." manage.py test pipeline.tests
         coverage report -m
 
-    - name: "Convert coverage"
-      run: "python -m coverage xml"
+    - name: Convert coverage
+      run: | 
+        cd runtime/bamboo-pipeline/test
+        python -m coverage xml
 
-    - name: "Upload coverage to Codecov"
-      uses: "codecov/codecov-action@v1"
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
       with:
         fail_ci_if_error: true
+        directory: runtime/bamboo-pipeline/test
