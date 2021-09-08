@@ -32,4 +32,4 @@ jobs:
         cp -r bamboo_engine runtime/bamboo-pipeline/test
         cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
         cd runtime/bamboo-pipeline/test
-        coverage run -m python manage.py test pipeline.tests
+        coverage run --source="." manage.py test pipeline.tests
