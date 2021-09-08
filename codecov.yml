@@ -20,5 +20,5 @@ comment:
   require_changes: no
 
 ignore:
-  - "test/*"
-  - "tests/*"
+  - "*/test/*"
+  - "*/tests/*"
