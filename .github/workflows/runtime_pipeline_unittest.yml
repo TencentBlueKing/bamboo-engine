@@ -36,6 +36,7 @@ jobs:
         cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
         cd runtime/bamboo-pipeline/test
         coverage run --source="." manage.py test pipeline.tests
+        coverage report -m
 
     - name: "Convert coverage"
       run: "python -m coverage xml"
