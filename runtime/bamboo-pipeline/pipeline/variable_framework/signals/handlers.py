@@ -11,13 +11,17 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from django.db.utils import ProgrammingError
+import logging
+
+from django.db.utils import ProgrammingError, OperationalError
 from django.dispatch import receiver
 
 from pipeline.core.data.var import LazyVariable
 from pipeline.core.signals import pre_variable_register
 from pipeline.variable_framework.models import VariableModel
 from pipeline.variable_framework import context
+
+logger = logging.getLogger("root")
 
 
 @receiver(pre_variable_register, sender=LazyVariable)
@@ -31,6 +35,6 @@ def pre_variable_register_handler(sender, variable_cls, **kwargs):
         if not created and not obj.status:
             obj.status = True
             obj.save()
-    except ProgrammingError:
+    except (ProgrammingError, OperationalError):
         # first migrate
-        pass
+        logger.exception("update variable model fail")

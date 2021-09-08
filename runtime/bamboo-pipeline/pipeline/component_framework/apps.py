@@ -64,9 +64,9 @@ class ComponentFrameworkConfig(AppConfig):
                     status=True
                 )
             print("update component models finish")
-        except InternalError as e:
+        except InternalError:
             # version field migration
-            logger.exception(e)
-        except (ProgrammingError, OperationalError) as e:
+            logger.exception("update component model fail")
+        except (ProgrammingError, OperationalError):
             # first migrate
-            logger.exception(e)
+            logger.exception("update component model fail")
