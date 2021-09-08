@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 from django.test import TestCase
 
 from pipeline import exceptions
+from pipeline.core.data.var import LazyVariable
 from pipeline.core.data.context import Context
 from pipeline.core.data.converter import get_variable
 
@@ -34,6 +35,12 @@ class TestConverter(TestCase):
         }
 
     def test_get_variable(self):
+        class VarIpPickerVariable(LazyVariable):
+            code = "ip"
+
+            def get_value(self):
+                return self.value
+
         variable = get_variable(self.key, self.info, self.context, self.pipeline_data)
         self.assertEqual(variable.name, "bk_timing")
         self.assertEqual(variable.value, "1")
@@ -47,7 +54,6 @@ class TestConverter(TestCase):
         self.key = "${ip}"
         self.info = {
             "custom_type": "ip",
-            "source_tag": "var_ip_picker.ip_picker",
             "type": "lazy",
             "value": {"var_ip_custom_value": "1.1.1.11.1", "var_ip_method": "custom", "var_ip_tree": ""},
         }
