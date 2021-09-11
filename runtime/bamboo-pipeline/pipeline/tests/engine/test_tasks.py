@@ -279,7 +279,7 @@ class EngineTaskTestCase(TestCase):
             tasks.batch_wake_up(process_id_list, self.alive_process.root_pipeline.id)
 
             self.transit_success.assert_called_with(
-                self.alive_process.root_pipeline.id, to_state=states.RUNNING, is_pipeline=True
+                self.alive_process.root_pipeline.id, to_state=states.RUNNING, is_pipeline=True, unchanged_pass=True
             )
 
             tasks.wake_up.apply_async.assert_has_calls([mock.call(args=[pid]) for pid in process_id_list])
@@ -294,7 +294,7 @@ class EngineTaskTestCase(TestCase):
             tasks.batch_wake_up(process_id_list, self.alive_process.root_pipeline.id)
 
             self.transit_fail.assert_called_with(
-                self.alive_process.root_pipeline.id, to_state=states.RUNNING, is_pipeline=True
+                self.alive_process.root_pipeline.id, to_state=states.RUNNING, is_pipeline=True, unchanged_pass=True
             )
 
             tasks.wake_up.apply_async.assert_not_called()
