@@ -116,7 +116,7 @@ def wake_up(process_id):
 
 @task(ignore_result=True)
 def batch_wake_up(process_id_list, pipeline_id):
-    action_result = Status.objects.transit(pipeline_id, to_state=states.RUNNING, is_pipeline=True)
+    action_result = Status.objects.transit(pipeline_id, to_state=states.RUNNING, is_pipeline=True, unchanged_pass=True)
     if not action_result.result:
         logger.warning("can not start pipeline({}), message: {}".format(pipeline_id, action_result.message))
         return
