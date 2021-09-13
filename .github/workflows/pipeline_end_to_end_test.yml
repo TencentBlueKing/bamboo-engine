@@ -52,7 +52,7 @@ jobs:
         while ! celery inspect ping; do
             sleep 1
         done
-        pytest pipeline_test_use/tests/advanced/test_rerun.py
+        pytest pipeline_test_use/tests
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
