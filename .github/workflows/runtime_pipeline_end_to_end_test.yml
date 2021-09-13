@@ -31,6 +31,8 @@ jobs:
         mysql root password: pipeline_test
         mysql user: pipeline_test
         mysql password: pipeline_test
+    - name: Start Mysql
+      run: service mysql restart
     - name: Set up Rabbitmq
       uses: nijel/rabbitmq-action@v1.0.0
       with:
