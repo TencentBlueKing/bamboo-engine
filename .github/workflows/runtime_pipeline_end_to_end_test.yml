@@ -45,6 +45,8 @@ jobs:
         while ! mysqladmin ping --host=127.0.0.1 --password=pipeline_test --silent; do
           sleep 1
         done
+    - name: Test MySQL
+      run:  mysql -upipeline_test -hlocalhost -ppipeline_test --default-character-set=utf8 -B -e "show databases;"
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
