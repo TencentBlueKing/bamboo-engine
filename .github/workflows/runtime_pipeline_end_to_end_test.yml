@@ -7,9 +7,27 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  container-job:
 
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_DATABASE: pipeline_test
+          MYSQL_USER: pipeline_test
+          MYSQL_PASSWORD: pipeline_test
+          MYSQL_ROOT_PASSWORD: pipeline_test
+        ports:
+          - 33306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:5.0
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         python-version: [3.6, 3.7]
@@ -21,38 +39,10 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Shutdown Ubuntu MySQL (SUDO)
-      run: sudo service mysql stop
-    - name: Set up Mysql
-      uses: mirromutth/mysql-action@v1.1
-      with:
-        mysql version: 5.7
-        host port: 3306
-        container port: 3306
-        mysql database: pipeline_test
-        mysql root password: pipeline_test
-        mysql user: pipeline_test
-        mysql password: pipeline_test
-    - name: Start MySQL
-      run: sudo service mysql restart
     - name: Set up Rabbitmq
       uses: nijel/rabbitmq-action@v1.0.0
       with:
         rabbitmq version: 3
-    - name: Set up Redis
-      uses: zhulik/redis-action@1.1.0
-      with:
-        redis version: '5'
-        number of databases: 0
-    - name: check dockers
-      run: docker ps
-    - name: Wait for MySQL
-      run: |
-        while ! mysqladmin ping --host=127.0.0.1 --password=pipeline_test --silent; do
-          sleep 1
-        done
-    - name: Test MySQL
-      run:  mysql -upipeline_test -hlocalhost -ppipeline_test --default-character-set=utf8 -B -e "show databases;"
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
