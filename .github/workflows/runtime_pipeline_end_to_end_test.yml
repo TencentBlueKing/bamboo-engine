@@ -43,6 +43,8 @@ jobs:
       uses: nijel/rabbitmq-action@v1.0.0
       with:
         rabbitmq version: 3
+    - name: Test Redis
+      run: redis-cli ping
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
