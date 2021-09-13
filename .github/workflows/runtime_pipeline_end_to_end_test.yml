@@ -48,7 +48,7 @@ jobs:
         cp -r ../../../bamboo_engine/ .
         cp -r ../pipeline .
         python manage.py migrate
-        python manage.py celery worker &
+        python manage.py celery worker -l error &
         pytest pipeline_test_use/tests
       env:
         PIPELINE_TEST_DB_TYPE: mysql
