@@ -1,0 +1,40 @@
+name: Runtime Pipeline End To End Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7]
+
+    steps:
+
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Set up Rabbitmq ${{ matrix.python-version }}
+    - uses: nijel/rabbitmq-action@v1.0.0
+      with:
+        rabbitmq version: '3'
+    - name: Install dependency
+      run: |
+        cd runtime/bamboo-pipeline/test
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Run test
+      run: |
+        cd runtime/bamboo-pipeline/test
+        cp -r ../../../bamboo_engine/ .
+        cp -r ../pipeline .
+        python manage.py migrate
+        python manage.py celery worker -c 8 &
+        pytest pipeline_test_use/tests
