@@ -49,7 +49,10 @@ jobs:
         cp -r ../pipeline .
         python manage.py migrate
         python manage.py celery worker &
-        pytest pipeline_test_use/tests/advanced/test_rerun.py::TestRerun::test_subprocess_rerun
+        while ! celery inspect ping; do
+            sleep 1
+        done
+        pytest pipeline_test_use/tests/advanced/test_rerun.py
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
