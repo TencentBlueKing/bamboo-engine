@@ -20,3 +20,4 @@ mock==2.0.0
 factory_boy==2.11.1
 pytest==6.2.1
 pytest-django==4.1.0
+mysqlclient==2.0.3
