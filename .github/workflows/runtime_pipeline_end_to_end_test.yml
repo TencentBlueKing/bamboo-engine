@@ -54,10 +54,6 @@ jobs:
         cp -r ../../../bamboo_engine/ .
         cp -r ../pipeline .
         python manage.py migrate
-        python manage.py celery worker
+        python manage.py celery worker -c 1 &
         pytest pipeline_test_use/tests
-      env:
-        PIPELINE_TEST_DB_TYPE: mysql
-        PIPELINE_TEST_DB_NAME: pipeline_test
-        PIPELINE_TEST_DB_USER: pipeline_test
-        PIPELINE_TEST_DB_PWD: pipeline_test
+
