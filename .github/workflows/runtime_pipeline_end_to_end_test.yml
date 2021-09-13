@@ -21,15 +21,6 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Set up Rabbitmq
-      uses: nijel/rabbitmq-action@v1.0.0
-      with:
-        rabbitmq version: 3
-    - name: Set up Redis
-      uses: zhulik/redis-action@1.1.0
-      with:
-        redis version: '5'
-        number of databases: 0
     - name: Set up Mysql
       uses: mirromutth/mysql-action@v1.1
       with:
@@ -40,6 +31,20 @@ jobs:
         mysql root password: pipeline_test
         mysql user: pipeline_test
         mysql password: pipeline_test
+    - name: Set up Rabbitmq
+      uses: nijel/rabbitmq-action@v1.0.0
+      with:
+        rabbitmq version: 3
+    - name: Set up Redis
+      uses: zhulik/redis-action@1.1.0
+      with:
+        redis version: '5'
+        number of databases: 0
+    - name: Wait for MySQL
+      run: |
+        while ! mysqladmin ping --host=127.0.0.1 --password=pipeline_test --silent; do
+          sleep 1
+        done
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
