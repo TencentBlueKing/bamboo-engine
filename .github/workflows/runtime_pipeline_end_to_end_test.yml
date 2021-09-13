@@ -34,6 +34,8 @@ jobs:
       uses: mirromutth/mysql-action@v1.1
       with:
         mysql version: 5.7
+        host port: 3306
+        ontainer port: 3306
         mysql database: pipeline_test
         mysql root password: pipeline_test
         mysql user: pipeline_test
