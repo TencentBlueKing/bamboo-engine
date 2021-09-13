@@ -21,10 +21,23 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Set up Rabbitmq ${{ matrix.python-version }}
+    - name: Set up Rabbitmq
       uses: nijel/rabbitmq-action@v1.0.0
       with:
-        rabbitmq version: '3'
+        rabbitmq version: 3
+    - name: Set up Redis
+      uses: zhulik/redis-action@1.1.0
+      with:
+        redis version: '5'
+        number of databases: 0
+    - name: Set up Mysql
+      uses: mirromutth/mysql-action@v1.1
+      with:
+        mysql version: 5.7
+        mysql database: pipeline_test
+        mysql root password: pipeline_test
+        mysql user: pipeline_test
+        mysql password: pipeline_test
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
@@ -37,4 +50,4 @@ jobs:
         cp -r ../pipeline .
         python manage.py migrate
         python manage.py celery worker -c 8 &
-        pytest pipeline_test_use/tests
+        PIPELINE_TEST_DB_TYPE="mysql" PIPELINE_TEST_DB_NAME="pipeline_test" PIPELINE_TEST_DB_USER="pipeline_test" PIPELINE_TEST_DB_PWD="pipeline_test" pytest pipeline_test_use/tests
