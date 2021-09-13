@@ -1,0 +1,60 @@
+name: Runtime Pipeline End To End Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    env:
+      DB_DATABASE: pipeline_test
+      DB_USER: root
+      DB_PASSWORD: root
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7]
+
+    steps:
+
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Set up MySQL
+      run: |
+        sudo /etc/init.d/mysql start
+        mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ env.DB_USER }} -p${{ env.DB_PASSWORD }}
+    - name: Set up Redis
+      uses: supercharge/redis-github-action@1.2.0
+      with:
+        redis-version: 5
+    - name: Set up Rabbitmq
+      uses: nijel/rabbitmq-action@v1.0.0
+      with:
+        rabbitmq version: 3
+    - name: Install dependency
+      run: |
+        cd runtime/bamboo-pipeline/test
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Run test
+      run: |
+        cd runtime/bamboo-pipeline/test
+        cp -r ../../../bamboo_engine/ .
+        cp -r ../pipeline .
+        python manage.py migrate
+        python manage.py celery worker &
+        while ! celery inspect ping; do
+            sleep 1
+        done
+        pytest eri_imp_test_use/tests
+      env:
+        PIPELINE_TEST_DB_TYPE: mysql
+        PIPELINE_TEST_DB_NAME: pipeline_test
+        PIPELINE_TEST_DB_USER: root
+        PIPELINE_TEST_DB_PWD: root
