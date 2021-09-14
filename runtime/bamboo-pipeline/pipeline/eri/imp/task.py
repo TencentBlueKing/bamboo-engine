@@ -10,6 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 from typing import Optional
 
 from celery import current_app
@@ -17,6 +18,16 @@ from celery import current_app
 from pipeline.eri.celery.queues import QueueResolver
 
 from pipeline.eri.models import Process
+
+
+def _retry_once(action: callable):
+    try:
+        action()
+    except Exception:
+        try:
+            action()
+        except Exception as e:
+            raise e
 
 
 class TaskMixin:
@@ -42,10 +53,19 @@ class TaskMixin:
         task_name = "pipeline.eri.celery.tasks.execute"
         route_params = self._get_task_route_params(task_name, process_id)
 
-        current_app.tasks[task_name].apply_async(kwargs={"process_id": process_id, "node_id": node_id}, **route_params)
+        def action():
+            current_app.tasks[task_name].apply_async(
+                kwargs={"process_id": process_id, "node_id": node_id}, **route_params
+            )
+
+        _retry_once(action=action)
 
     def schedule(
-        self, process_id: int, node_id: str, schedule_id: str, callback_data_id: Optional[int] = None,
+        self,
+        process_id: int,
+        node_id: str,
+        schedule_id: str,
+        callback_data_id: Optional[int] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -60,15 +80,18 @@ class TaskMixin:
         task_name = "pipeline.eri.celery.tasks.schedule"
         route_params = self._get_task_route_params(task_name, process_id)
 
-        current_app.tasks[task_name].apply_async(
-            kwargs={
-                "process_id": process_id,
-                "node_id": node_id,
-                "schedule_id": schedule_id,
-                "callback_data_id": callback_data_id,
-            },
-            **route_params,
-        )
+        def action():
+            current_app.tasks[task_name].apply_async(
+                kwargs={
+                    "process_id": process_id,
+                    "node_id": node_id,
+                    "schedule_id": schedule_id,
+                    "callback_data_id": callback_data_id,
+                },
+                **route_params,
+            )
+
+        _retry_once(action=action)
 
     def set_next_schedule(
         self,
@@ -93,16 +116,19 @@ class TaskMixin:
         task_name = "pipeline.eri.celery.tasks.schedule"
         route_params = self._get_task_route_params(task_name, process_id)
 
-        current_app.tasks[task_name].apply_async(
-            kwargs={
-                "process_id": process_id,
-                "node_id": node_id,
-                "schedule_id": schedule_id,
-                "callback_data_id": callback_data_id,
-            },
-            countdown=schedule_after,
-            **route_params,
-        )
+        def action():
+            current_app.tasks[task_name].apply_async(
+                kwargs={
+                    "process_id": process_id,
+                    "node_id": node_id,
+                    "schedule_id": schedule_id,
+                    "callback_data_id": callback_data_id,
+                },
+                countdown=schedule_after,
+                **route_params,
+            )
+
+        _retry_once(action=action)
 
     def start_timeout_monitor(self, process_id: int, node_id: str, version: str, timeout: int):
         """
@@ -125,7 +151,10 @@ class TaskMixin:
         )
 
     def stop_timeout_monitor(
-        self, process_id: int, node_id: str, version: str,
+        self,
+        process_id: int,
+        node_id: str,
+        version: str,
     ):
         """
         停止对某个节点的超时监控
