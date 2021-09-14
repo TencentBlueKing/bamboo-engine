@@ -17,7 +17,7 @@ from celery import current_app
 
 from pipeline.eri.celery.queues import QueueResolver
 
-from pipeline.eri.models import Process, SendFailTask
+from pipeline.eri.models import Process
 
 
 def _retry_once(action: callable):
