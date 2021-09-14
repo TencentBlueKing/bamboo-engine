@@ -91,20 +91,6 @@ class TaskMixin:
                 **route_params,
             )
 
-        def compensate(exc_trace: str):
-            SendFailTask.objects.create(
-                method="schedule",
-                kwargs=json.dumps(
-                    {
-                        "process_id": process_id,
-                        "node_id": node_id,
-                        "schedule_id": schedule_id,
-                        "callback_data_id": callback_data_id,
-                    }
-                ),
-                exc_trace=exc_trace,
-            )
-
         _retry_once(action=action)
 
     def set_next_schedule(
@@ -140,21 +126,6 @@ class TaskMixin:
                 },
                 countdown=schedule_after,
                 **route_params,
-            )
-
-        def compensate(exc_trace: str):
-            SendFailTask.objects.create(
-                method="set_next_schedule",
-                kwargs=json.dumps(
-                    {
-                        "process_id": process_id,
-                        "node_id": node_id,
-                        "schedule_id": schedule_id,
-                        "schedule_after": schedule_after,
-                        "callback_data_id": callback_data_id,
-                    }
-                ),
-                exc_trace=exc_trace,
             )
 
         _retry_once(action=action)
