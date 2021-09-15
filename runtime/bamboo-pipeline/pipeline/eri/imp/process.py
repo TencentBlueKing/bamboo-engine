@@ -133,11 +133,21 @@ class ProcessMixin:
         : return: 暂停的进程信息
         : rtype: SuspendedProcessInfo
         """
-        qs = Process.objects.filter(suspended_by=suspended_by).only("id", "current_node_id")
+        qs = Process.objects.filter(suspended_by=suspended_by).only(
+            "id", "current_node_id", "root_pipeline_id", "pipeline_stack"
+        )
 
-        return [SuspendedProcessInfo(process_id=p.id, current_node=p.current_node_id) for p in qs]
+        return [
+            SuspendedProcessInfo(
+                process_id=p.id,
+                current_node=p.current_node_id,
+                root_pipeline_id=p.root_pipeline_id,
+                pipeline_stack=json.loads(p.pipeline_stack),
+            )
+            for p in qs
+        ]
 
-    def get_sleep_process_with_current_node_id(self, node_id: str) -> Optional[str]:
+    def get_sleep_process_info_with_current_node_id(self, node_id: str) -> Optional[ProcessInfo]:
         """
         获取由于处于睡眠状态且当前节点 ID 为 node_id 的进程 ID
 
@@ -146,7 +156,9 @@ class ProcessMixin:
         : return: 进程 ID
         : rtype: str
         """
-        qs = Process.objects.filter(asleep=True, current_node_id=node_id).only("id")
+        qs = Process.objects.filter(asleep=True, current_node_id=node_id).only(
+            "id", "destination_id", "root_pipeline_id", "pipeline_stack", "parent_id"
+        )
 
         if len(qs) == 0:
             return None
@@ -154,7 +166,13 @@ class ProcessMixin:
         if len(qs) != 1:
             raise ValueError("found multiple sleep process({}) with current_node_id({})".format(qs, node_id))
 
-        return qs[0].id
+        return ProcessInfo(
+            process_id=qs[0].id,
+            destination_id=qs[0].destination_id,
+            root_pipeline_id=qs[0].root_pipeline_id,
+            pipeline_stack=json.loads(qs[0].pipeline_stack),
+            parent_id=qs[0].parent_id,
+        )
 
     def get_process_id_with_current_node_id(self, node_id: str) -> Optional[str]:
         """
@@ -227,7 +245,11 @@ class ProcessMixin:
         Process.objects.filter(id=process_id).update(frozen=True)
 
     def fork(
-        self, parent_id: str, root_pipeline_id: str, pipeline_stack: List[str], from_to: Dict[str, str],
+        self,
+        parent_id: str,
+        root_pipeline_id: str,
+        pipeline_stack: List[str],
+        from_to: Dict[str, str],
     ) -> List[DispatchProcess]:
         """
         根据当前进程 fork 出多个子进程

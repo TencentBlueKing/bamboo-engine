@@ -102,32 +102,54 @@ class ProcessMixinTestCase(TransactionTestCase):
         self.assertEqual(process_info.parent_id, process.parent_id)
 
     def test_get_suspended_process_info(self):
-        p1 = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
-        p2 = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
-        p3 = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
+        p1 = Process.objects.create(
+            priority=1, queue="queue", current_node_id=uuid.uuid1().hex, root_pipeline_id="root"
+        )
+        p2 = Process.objects.create(
+            priority=1, queue="queue", current_node_id=uuid.uuid1().hex, root_pipeline_id="root"
+        )
+        p3 = Process.objects.create(
+            priority=1, queue="queue", current_node_id=uuid.uuid1().hex, root_pipeline_id="root"
+        )
         self.mixin.suspend(p1.id, "123")
         self.mixin.suspend(p2.id, "123")
         self.mixin.suspend(p3.id, "123")
         spi_list = self.mixin.get_suspended_process_info("123")
-        actual = [(spi.process_id, spi.current_node) for spi in spi_list]
+        actual = [(spi.process_id, spi.current_node, spi.root_pipeline_id, spi.pipeline_stack) for spi in spi_list]
         self.assertEqual(
-            actual, [(p1.id, p1.current_node_id), (p2.id, p2.current_node_id), (p3.id, p3.current_node_id)]
+            actual,
+            [
+                (p1.id, p1.current_node_id, p1.root_pipeline_id, []),
+                (p2.id, p2.current_node_id, p2.root_pipeline_id, []),
+                (p3.id, p3.current_node_id, p3.root_pipeline_id, []),
+            ],
         )
 
-    def test_get_sleep_process_with_current_node_id(self):
-        process = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
+    def test_get_sleep_process_info_with_current_node_id(self):
+        process = Process.objects.create(
+            priority=1,
+            queue="queue",
+            current_node_id=uuid.uuid1().hex,
+            destination_id=uuid.uuid1().hex,
+            root_pipeline_id="root",
+        )
         self.mixin.sleep(process.id)
-        self.assertEqual(self.mixin.get_sleep_process_with_current_node_id(process.current_node_id), process.id)
+        process_info = self.mixin.get_sleep_process_info_with_current_node_id(process.current_node_id)
+        self.assertEqual(process_info.process_id, process.id)
+        self.assertEqual(process_info.destination_id, process.destination_id)
+        self.assertEqual(process_info.parent_id, process.parent_id)
+        self.assertEqual(process_info.root_pipeline_id, process.root_pipeline_id)
+        self.assertEqual(process_info.pipeline_stack, [])
 
-    def test_get_sleep_process_with_current_node_id__not_exist(self):
-        self.assertIsNone(self.mixin.get_sleep_process_with_current_node_id("not_exist"))
+    def test_get_sleep_process_info_with_current_node_id__not_exist(self):
+        self.assertIsNone(self.mixin.get_sleep_process_info_with_current_node_id("not_exist"))
 
-    def test_get_sleep_process_with_current_node_id__more_than_one(self):
+    def test_get_sleep_process_info_with_current_node_id__more_than_one(self):
         p1 = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
         p2 = Process.objects.create(priority=1, queue="queue", current_node_id=p1.current_node_id)
         self.mixin.sleep(p1.id)
         self.mixin.sleep(p2.id)
-        self.assertRaises(ValueError, self.mixin.get_sleep_process_with_current_node_id, p1.current_node_id)
+        self.assertRaises(ValueError, self.mixin.get_sleep_process_info_with_current_node_id, p1.current_node_id)
 
     def test_get_process_id_with_current_node_id(self):
         p1 = Process.objects.create(priority=1, queue="queue", current_node_id=uuid.uuid1().hex)
