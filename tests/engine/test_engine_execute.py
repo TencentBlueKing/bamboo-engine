@@ -46,7 +46,7 @@ def test_execute__reach_destination_and_wake_up_failed():
     runtime.child_process_finish = MagicMock(return_value=False)
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.wake_up.assert_called_once_with(pi.process_id)
@@ -70,7 +70,7 @@ def test_execute__reach_destination_and_wake_up_success():
     runtime.child_process_finish = MagicMock(return_value=True)
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.wake_up.assert_called_once_with(pi.process_id)
@@ -96,7 +96,7 @@ def test_execute__engine_frozen():
     runtime.is_frozen = MagicMock(return_value=True)
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.set_current_node.assert_called_once_with(pi.process_id, node_id)
@@ -119,7 +119,7 @@ def test_execute__root_pipeline_revoked():
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.REVOKED})
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.die.assert_called_once_with(pi.process_id)
@@ -141,7 +141,7 @@ def test_execute__root_pipeline_suspended():
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.SUSPENDED})
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.suspend.assert_called_once_with(pi.process_id, pi.root_pipeline_id)
@@ -169,7 +169,7 @@ def test_execute__suspended_in_pipeline_stack():
     )
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.suspend.assert_called_once_with(pi.process_id, pi.pipeline_stack[1])
@@ -223,7 +223,7 @@ def test_execute__exceed_rerun_limit():
     runtime.get_execution_data_outputs = MagicMock(return_value={})
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -283,7 +283,7 @@ def test_execute__node_has_suspended_appoint():
     runtime.node_rerun_limit = MagicMock(return_value=10)
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -342,7 +342,7 @@ def test_execute__node_can_not_transit_to_running():
     runtime.node_rerun_limit = MagicMock(return_value=10)
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -421,7 +421,7 @@ def test_execute__rerun_and_have_to_sleep():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -530,7 +530,7 @@ def test_execute__have_to_sleep():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -637,7 +637,7 @@ def test_execute__poll_schedule_ready():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
@@ -748,7 +748,7 @@ def test_execute__callback_schedule_ready():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -860,7 +860,7 @@ def test_execute__multi_callback_schedule_ready():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -966,7 +966,7 @@ def test_execute__has_dispatch_processes():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -1079,7 +1079,7 @@ def test_execute__have_to_die():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.execute(pi.process_id, node_id)
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
@@ -1124,7 +1124,7 @@ def test_execute__unexpect_raise():
     runtime.get_execution_data_outputs = MagicMock(return_value={})
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -1157,7 +1157,7 @@ def test_execute__raise_state_version_not_match():
     runtime.get_execution_data_outputs = MagicMock(return_value={})
 
     engine = Engine(runtime=runtime)
-    engine.execute(pi.process_id, node_id)
+    engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -1165,3 +1165,30 @@ def test_execute__raise_state_version_not_match():
     runtime.set_state.assert_not_called()
     runtime.set_execution_data_outputs.assert_not_called()
     runtime.sleep.assert_not_called()
+
+
+def test_execute__prepare_stage_raise_exception():
+    node_id = "nid"
+    process_id = "pid"
+    root_pipeline_id = "root"
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(side_effect=Exception)
+    runtime.get_execution_data_outputs = MagicMock(return_value={})
+
+    engine = Engine(runtime=runtime)
+    engine.execute(process_id, node_id, root_pipeline_id, root_pipeline_id)
+
+    runtime.beat.wake_up.assert_not_called()
+    runtime.sleep.assert_called_once_with(process_id)
+    runtime.get_process_info.assert_called_once_with(process_id)
+    runtime.get_execution_data_outputs.assert_called_once_with(node_id)
+    runtime.set_state.assert_called_once_with(
+        node_id=node_id,
+        to_state=states.FAILED,
+        root_id=root_pipeline_id,
+        parent_id=root_pipeline_id,
+        set_started_time=True,
+        set_archive_time=True,
+    )
+    runtime.set_execution_data_outputs.assert_called_once()

@@ -488,7 +488,7 @@ class Engine:
     # engine event
     @setup_gauge(ENGINE_RUNNING_PROCESSES)
     @setup_histogram(ENGINE_PROCESS_RUNNING_TIME)
-    def execute(self, process_id: int, node_id: str):
+    def execute(self, process_id: int, node_id: str, root_pipeline_id: str, parent_pipeline_id: str):
         """
         在某个进程上从某个节点开始进入推进循环
 
@@ -496,11 +496,41 @@ class Engine:
         :type process_id: int
         :param node_id: 节点 ID
         :type node_id: str
+        :param root_pipeline_id: 根流程 ID
+        :type root_pipeline_id: str
+        :param parent_pipeline_id: 父流程 ID
+        :type parent_pipeline_id: str
         """
         current_node_id = node_id
 
-        process_info = self.runtime.get_process_info(process_id)
-        self.runtime.wake_up(process_id)
+        # 推进前准备
+        try:
+            process_info = self.runtime.get_process_info(process_id)
+            self.runtime.wake_up(process_id)
+        except Exception:
+            ex_data = traceback.format_exc()
+            logger.exception(
+                "[%s]execute node(%s) prepare fail",
+                root_pipeline_id,
+                current_node_id,
+            )
+
+            self.runtime.sleep(process_id)
+
+            outputs = self.runtime.get_execution_data_outputs(current_node_id)
+            outputs["ex_data"] = ex_data
+            self.runtime.set_execution_data_outputs(current_node_id, outputs)
+
+            self.runtime.set_state(
+                node_id=current_node_id,
+                to_state=states.FAILED,
+                root_id=root_pipeline_id,
+                parent_id=parent_pipeline_id,
+                set_started_time=True,
+                set_archive_time=True,
+            )
+
+            return
 
         # 推进循环
         while True:
