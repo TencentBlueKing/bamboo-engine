@@ -541,17 +541,32 @@ class SuspendedProcessInfo(Representable):
     挂起进程信息
     """
 
-    def __init__(self, process_id: int, current_node: str):
+    def __init__(
+        self,
+        process_id: int,
+        current_node: str,
+        root_pipeline_id: str,
+        pipeline_stack: List[str],
+    ):
         """
 
         :param process_id: 进程 ID
         :type process_id: int
         :param current_node: 当前节点 ID
         :type current_node: str
+        :param root_pipeline_id: 根流程 ID
+        :type root_pipeline_id: str
+        :param pipeline_stack: 流程栈
+        :type pipeline_stack: List[str]
         """
         self.process_id = process_id
         self.current_node = current_node
+        self.root_pipeline_id = root_pipeline_id
+        self.pipeline_stack = pipeline_stack
 
+    @property
+    def top_pipeline_id(self):
+        return self.pipeline_stack[-1]
 
 class ProcessInfo(Representable):
     """

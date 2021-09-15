@@ -11,6 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from bamboo_engine.eri.models import ProcessInfo
+from os import pipe
 import pytest
 from mock import MagicMock, call, patch
 
@@ -23,6 +25,7 @@ from bamboo_engine.engine import Engine
 def test_run_pipeline():
     process_id = 1
     start_event_id = "token"
+    pipeline_id = "pipeline_id"
     options = {"priority": 100, "queue": "q"}
 
     runtime = MagicMock()
@@ -30,7 +33,7 @@ def test_run_pipeline():
     runtime.execute = MagicMock()
     validator = MagicMock()
 
-    pipeline = {"start_event": {"id": start_event_id}}
+    pipeline = {"start_event": {"id": start_event_id}, "id": pipeline_id}
     root_pipeline_data = {"k": "v"}
     root_pipeline_context = {"k1": "v1"}
     subprocess_context = {"k2": "v2"}
@@ -56,7 +59,9 @@ def test_run_pipeline():
     runtime.post_prepare_run_pipeline.assert_called_once_with(
         pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
     )
-    runtime.execute.assert_called_once_with(process_id, start_event_id)
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=start_event_id, root_pipeline_id=pipeline_id, parent_pipeline_id=pipeline_id
+    )
 
 
 def test_pause_pipeline():
@@ -118,8 +123,8 @@ def test_revoke_pipeline__pipeline_not_exist():
 def test_resume_pipeline():
     pipeline_id = "pid"
     suspended_process_info = [
-        SuspendedProcessInfo(process_id=1, current_node=2),
-        SuspendedProcessInfo(process_id=3, current_node=4),
+        SuspendedProcessInfo(process_id=1, current_node=2, root_pipeline_id=pipeline_id, pipeline_stack=[pipeline_id]),
+        SuspendedProcessInfo(process_id=3, current_node=4, root_pipeline_id=pipeline_id, pipeline_stack=[pipeline_id]),
     ]
     state = MagicMock()
     state.name = "SUSPENDED"
@@ -144,12 +149,16 @@ def test_resume_pipeline():
     runtime.execute.assert_has_calls(
         [
             call(
-                suspended_process_info[0].process_id,
-                suspended_process_info[0].current_node,
+                process_id=suspended_process_info[0].process_id,
+                node_id=suspended_process_info[0].current_node,
+                root_pipeline_id=pipeline_id,
+                parent_pipeline_id=pipeline_id,
             ),
             call(
-                suspended_process_info[1].process_id,
-                suspended_process_info[1].current_node,
+                process_id=suspended_process_info[1].process_id,
+                node_id=suspended_process_info[1].current_node,
+                root_pipeline_id=pipeline_id,
+                parent_pipeline_id=pipeline_id,
             ),
         ]
     )
@@ -233,11 +242,12 @@ def test_pause_node_appoint__node_type_is_subprocess():
 def test_resume_node_appoint():
     node_id = "nid"
     node_type = NodeType.ServiceActivity
+    pipeline_id = "pid"
 
     node = MagicMock()
     node.type = node_type
     suspended_process_info_list = [
-        SuspendedProcessInfo("1", "2"),
+        SuspendedProcessInfo("1", "2", pipeline_id, [pipeline_id]),
     ]
 
     runtime = MagicMock()
@@ -253,8 +263,10 @@ def test_resume_node_appoint():
     runtime.get_suspended_process_info.assert_called_once_with(node_id)
     runtime.resume.assert_called_once_with(process_id=suspended_process_info_list[0].process_id)
     runtime.execute.assert_called_once_with(
-        suspended_process_info_list[0].process_id,
-        suspended_process_info_list[0].current_node,
+        process_id=suspended_process_info_list[0].process_id,
+        node_id=suspended_process_info_list[0].current_node,
+        root_pipeline_id=pipeline_id,
+        parent_pipeline_id=pipeline_id,
     )
     runtime.post_resume_node.assert_called_once_with(node_id)
 
@@ -304,6 +316,7 @@ def test_resume_node_appoint__without_suspended_process():
 def test_retry_node():
     node_id = "nid"
     process_id = "pid"
+    pipeline_id = "pipeline_id"
     data = {}
 
     state = MagicMock()
@@ -320,9 +333,17 @@ def test_retry_node():
     execution_data.inputs = "inputs"
     execution_data.outputs = "outputs"
 
+    process_info = ProcessInfo(
+        process_id=process_id,
+        destination_id="did",
+        parent_id=2,
+        root_pipeline_id=pipeline_id,
+        pipeline_stack=[pipeline_id],
+    )
+
     runtime = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
 
     engine = Engine(runtime=runtime)
@@ -330,7 +351,7 @@ def test_retry_node():
 
     runtime.pre_retry_node.assert_called_once_with(node_id, data)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.set_data_inputs.assert_called_once_with(node_id, data)
     runtime.add_history.assert_called_once_with(
         node_id=node_id,
@@ -351,7 +372,12 @@ def test_retry_node():
         clear_started_time=True,
         clear_archived_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node_id)
+    runtime.execute.assert_called_once_with(
+        process_id=process_id,
+        node_id=node_id,
+        root_pipeline_id=process_info.root_pipeline_id,
+        parent_pipeline_id=process_info.top_pipeline_id,
+    )
     runtime.post_retry_node.assert_called_once_with(node_id, data)
 
 
@@ -402,7 +428,7 @@ def test_retry_node__can_not_find_sleep_process():
 
     runtime = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=None)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=None)
     runtime.pre_retry_node = MagicMock(side_effect=Exception)
 
     engine = Engine(runtime=runtime)
@@ -424,13 +450,17 @@ def test_retry_node__with_none_data():
     state.retry = 0
     state.version = "version"
 
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p"]
+    )
+
     execution_data = MagicMock()
     execution_data.inputs = "inputs"
     execution_data.outputs = "outputs"
 
     runtime = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
 
     engine = Engine(runtime=runtime)
@@ -438,7 +468,7 @@ def test_retry_node__with_none_data():
 
     runtime.pre_retry_node.assert_called_once_with(node_id, None)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.set_data_inputs.assert_not_called()
     runtime.add_history.assert_called_once_with(
         node_id=node_id,
@@ -459,7 +489,9 @@ def test_retry_node__with_none_data():
         clear_started_time=True,
         clear_archived_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node_id)
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=node_id, root_pipeline_id="p", parent_pipeline_id="p"
+    )
     runtime.post_retry_node.assert_called_once_with(node_id, None)
 
 
@@ -482,6 +514,10 @@ def test_skip_node():
     state.retry = 0
     state.version = "version"
 
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p", "nid"]
+    )
+
     execution_data = MagicMock()
     execution_data.inputs = "inputs"
     execution_data.outputs = "outputs"
@@ -489,7 +525,7 @@ def test_skip_node():
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
 
     engine = Engine(runtime=runtime)
@@ -498,7 +534,7 @@ def test_skip_node():
     runtime.get_node.assert_called_once_with(node_id)
     runtime.pre_skip_node.assert_called_once_with(node_id)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id(node_id)
+    runtime.get_sleep_process_info_with_current_node_id(node_id)
     runtime.add_history.assert_called_once_with(
         node_id=node_id,
         started_time=state.started_time,
@@ -517,7 +553,9 @@ def test_skip_node():
         refresh_version=True,
         set_archive_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node.target_nodes[0])
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=node.target_nodes[0], root_pipeline_id="p", parent_pipeline_id="nid"
+    )
     runtime.post_skip_node.assert_called_once_with(node_id)
 
 
@@ -598,7 +636,7 @@ def test_skip_node__can_not_find_sleep_process():
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=None)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=None)
     runtime.pre_retry_node = MagicMock(side_effect=Exception)
 
     engine = Engine(runtime=runtime)
@@ -628,6 +666,10 @@ def test_skip_exclusive_gateway():
     state.retry = 0
     state.version = "version"
 
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p"]
+    )
+
     execution_data = MagicMock()
     execution_data.inputs = "inputs"
     execution_data.outputs = "outputs"
@@ -636,7 +678,7 @@ def test_skip_exclusive_gateway():
     runtime.get_node = MagicMock(return_value=node)
     runtime.pre_skip_exclusive_gateway = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
 
     engine = Engine(runtime=runtime)
@@ -645,7 +687,7 @@ def test_skip_exclusive_gateway():
     runtime.get_node.assert_called_once_with(node_id)
     runtime.pre_skip_exclusive_gateway.assert_called_once_with(node_id, flow_id)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id(node_id)
+    runtime.get_sleep_process_info_with_current_node_id(node_id)
     runtime.add_history.assert_called_once_with(
         node_id=node_id,
         started_time=state.started_time,
@@ -664,7 +706,9 @@ def test_skip_exclusive_gateway():
         refresh_version=True,
         set_archive_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node.targets[flow_id])
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=node.targets[flow_id], root_pipeline_id="p", parent_pipeline_id="p"
+    )
     runtime.post_skip_exclusive_gateway.assert_called_once_with(node_id, flow_id)
 
 
@@ -727,7 +771,7 @@ def test_skip_exclusive_gateway__can_not_find_sleep_proces():
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=None)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=None)
     runtime.pre_skip_exclusive_gateway = MagicMock(side_effect=Exception)
 
     engine = Engine(runtime=runtime)
@@ -847,12 +891,15 @@ def test_callback():
     state.version = version
 
     schedule = MagicMock()
-    schedule_id = 2
     schedule.finished = False
     schedule.expired = False
 
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p"]
+    )
+
     runtime = MagicMock()
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_schedule_with_node_and_version = MagicMock(return_value=schedule)
     runtime.set_callback_data = MagicMock(return_value=data_id)
@@ -860,7 +907,7 @@ def test_callback():
     engine = Engine(runtime=runtime)
     engine.callback(node_id, version, data)
 
-    runtime.get_sleep_process_with_current_node_id.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_schedule_with_node_and_version(node_id, version)
     runtime.pre_callback.assert_called_once_with(node_id, version, data)
@@ -875,7 +922,7 @@ def test_callback__can_not_find_process_id():
     data = {"data": 1}
 
     runtime = MagicMock()
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=None)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=None)
     runtime.get_state = MagicMock(side_effect=Exception)
 
     engine = Engine(runtime=runtime)
@@ -896,7 +943,7 @@ def test_callback__version_not_match():
     schedule_id = 2
 
     runtime = MagicMock()
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_id)
     runtime.get_schedule_with_node_and_version = MagicMock(return_value=schedule)
     runtime.get_state = MagicMock(return_value=state)
     runtime.pre_callback = MagicMock(side_effect=Exception)
@@ -923,7 +970,7 @@ def test_callback__schedule_finished():
     schedule.expired = False
 
     runtime = MagicMock()
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_id)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_schedule_with_node_and_version = MagicMock(return_value=schedule)
     runtime.pre_callback = MagicMock(side_effect=Exception)
@@ -951,7 +998,7 @@ def test_callback__schedule_expired():
     schedule.expired = True
 
     runtime = MagicMock()
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_id)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_schedule_with_node_and_version = MagicMock(return_value=schedule)
     runtime.pre_callback = MagicMock(side_effect=Exception)
@@ -1106,13 +1153,14 @@ def test_retry_subprocess__success_and_need_reset_pipeline_stack():
     state.name = states.FAILED
     state.node_id = node_id
 
-    process_info = MagicMock()
-    process_info.pipeline_stack = ["p", "nid"]
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p", "nid"]
+    )
 
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_process_info = MagicMock(return_value=process_info)
 
     engine = Engine(runtime)
@@ -1122,7 +1170,7 @@ def test_retry_subprocess__success_and_need_reset_pipeline_stack():
 
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.pre_retry_subprocess.assert_called_once_with(node_id)
     runtime.set_pipeline_stack.assert_called_once_with(process_id, process_info.pipeline_stack[:-1])
     engine._add_history.assert_called_once_with(node_id, state)
@@ -1134,7 +1182,9 @@ def test_retry_subprocess__success_and_need_reset_pipeline_stack():
         clear_started_time=True,
         clear_archived_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node_id)
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=node_id, root_pipeline_id="p", parent_pipeline_id="nid"
+    )
     runtime.post_retry_subprocess.assert_called_once_with(node_id)
 
 
@@ -1149,14 +1199,14 @@ def test_retry_subprocess__success():
     state.name = states.FAILED
     state.node_id = node_id
 
-    process_info = MagicMock()
-    process_info.pipeline_stack = ["p"]
+    process_info = ProcessInfo(
+        process_id=process_id, destination_id="did", parent_id=2, root_pipeline_id="p", pipeline_stack=["p"]
+    )
 
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
-    runtime.get_sleep_process_with_current_node_id = MagicMock(return_value=process_id)
-    runtime.get_process_info = MagicMock(return_value=process_info)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
 
     engine = Engine(runtime)
     engine._add_history = MagicMock()
@@ -1165,7 +1215,7 @@ def test_retry_subprocess__success():
 
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_with_current_node_id.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.pre_retry_subprocess.assert_called_once_with(node_id)
     runtime.set_pipeline_stack.assert_not_called()
     engine._add_history.assert_called_once_with(node_id, state)
@@ -1177,5 +1227,7 @@ def test_retry_subprocess__success():
         clear_started_time=True,
         clear_archived_time=True,
     )
-    runtime.execute.assert_called_once_with(process_id, node_id)
+    runtime.execute.assert_called_once_with(
+        process_id=process_id, node_id=node_id, root_pipeline_id="p", parent_pipeline_id="p"
+    )
     runtime.post_retry_subprocess.assert_called_once_with(node_id)
