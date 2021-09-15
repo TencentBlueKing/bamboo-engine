@@ -41,7 +41,7 @@ class TaskMixin:
             "routing_key": routing_key,
         }
 
-    def execute(self, process_id: int, node_id: str):
+    def execute(self, process_id: int, node_id: str, root_pipeline_id: str, parent_pipeline_id: str):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
 
@@ -55,7 +55,13 @@ class TaskMixin:
 
         def action():
             current_app.tasks[task_name].apply_async(
-                kwargs={"process_id": process_id, "node_id": node_id}, **route_params
+                kwargs={
+                    "process_id": process_id,
+                    "node_id": node_id,
+                    "root_pipeline_id": root_pipeline_id,
+                    "parent_pipeline_id": parent_pipeline_id,
+                },
+                **route_params,
             )
 
         _retry_once(action=action)

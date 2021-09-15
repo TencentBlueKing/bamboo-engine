@@ -59,7 +59,7 @@ class BambooDjangoRuntime(
         "lazy": ContextValueType.COMPUTE.value,
     }
 
-    ERI_SUPPORT_VERSION = 3
+    ERI_SUPPORT_VERSION = 4
 
     def __init__(self):
         try:
