@@ -568,6 +568,7 @@ class SuspendedProcessInfo(Representable):
     def top_pipeline_id(self):
         return self.pipeline_stack[-1]
 
+
 class ProcessInfo(Representable):
     """
     进程信息

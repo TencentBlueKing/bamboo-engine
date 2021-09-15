@@ -23,7 +23,9 @@ from pipeline.eri.runtime import BambooDjangoRuntime
 @task(ignore_result=True)
 def execute(process_id: int, node_id: str, root_pipeline_id: str = None, parent_pipeline_id: str = None):
     runtime = BambooDjangoRuntime()
-    Engine(runtime).execute(process_id=process_id, node_id=node_id, root_pipeline_id=root_pipeline_id, parent_pipeline_id=parent_pipeline_id)
+    Engine(runtime).execute(
+        process_id=process_id, node_id=node_id, root_pipeline_id=root_pipeline_id, parent_pipeline_id=parent_pipeline_id
+    )
 
 
 @task(ignore_result=True)
