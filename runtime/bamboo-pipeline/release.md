@@ -1,3 +1,8 @@
+# 3.7.0
+
+- feature:
+  - eri 4.0 support
+
 # 3.6.3
 
 - bugfix:

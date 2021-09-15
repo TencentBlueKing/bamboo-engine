@@ -1,3 +1,13 @@
+## 1.4.0
+
+- feature:
+  - [(eri 4.0)](https://github.com/TencentBlueKing/bamboo-engine/pull/12/commits/8c882b7e84c7c743b0f49e0bb3ed01866346ea73)
+    - task 模块 execute 方法增加 root_pipeline_id，parent_pipeline_id 参数
+    - process 模块增加 get_sleep_process_info_with_current_node_id 接口
+    - process 模块移除 get_sleep_process_with_current_node_id 接口
+- optimization:
+  - 优化 execute 事件中异常处理的逻辑
+
 ## 1.3.2
 
 - optimization:
@@ -10,7 +20,7 @@
 ## 1.3.0
 
 - feature:
-  - （er 3.0）增加 retry_subprocess API，支持对进入失败的子流程进行重试
+  - （eri 3.0）增加 retry_subprocess API，支持对进入失败的子流程进行重试
 
 ## 1.2.1
 
