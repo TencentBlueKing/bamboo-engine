@@ -76,7 +76,9 @@ def test_execute__reach_destination_and_wake_up_success():
     runtime.wake_up.assert_called_once_with(pi.process_id)
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.child_process_finish.assert_called_once_with(pi.parent_id, pi.process_id)
-    runtime.execute.assert_called_once_with(pi.parent_id, pi.destination_id)
+    runtime.execute.assert_called_once_with(
+        process_id=pi.parent_id, node_id=pi.destination_id, root_pipeline_id="root", parent_pipeline_id="root"
+    )
 
 
 def test_execute__engine_frozen():
@@ -230,9 +232,7 @@ def test_execute__exceed_rerun_limit():
     runtime.set_execution_data_outputs.assert_called_once_with(
         node_id, {"ex_data": "node execution exceed rerun limit 10"}
     )
-    runtime.set_state.assert_called_once_with(
-        node_id=node_id, to_state=states.FAILED, set_archive_time=True
-    )
+    runtime.set_state.assert_called_once_with(node_id=node_id, to_state=states.FAILED, set_archive_time=True)
     runtime.sleep.assert_called_once_with(pi.process_id)
 
 
@@ -443,7 +443,7 @@ def test_execute__rerun_and_have_to_sleep():
         node_id=node.id,
         to_state=states.RUNNING,
         loop=state.loop + 1,
-        inner_loop=state.inner_loop+1,
+        inner_loop=state.inner_loop + 1,
         root_id=pi.root_pipeline_id,
         parent_id=pi.top_pipeline_id,
         set_started_time=True,
@@ -988,13 +988,21 @@ def test_execute__has_dispatch_processes():
     runtime.sleep.assert_called_once_with(pi.process_id)
     runtime.set_schedule.assert_not_called()
     runtime.schedule.assert_not_called()
-    runtime.join.assert_called_once_with(
-        pi.process_id, [d.process_id for d in dispatch_processes]
-    )
+    runtime.join.assert_called_once_with(pi.process_id, [d.process_id for d in dispatch_processes])
     runtime.execute.assert_has_calls(
         [
-            call(dispatch_processes[0].process_id, dispatch_processes[0].node_id),
-            call(dispatch_processes[1].process_id, dispatch_processes[1].node_id),
+            call(
+                process_id=dispatch_processes[0].process_id,
+                node_id=dispatch_processes[0].node_id,
+                root_pipeline_id="root",
+                parent_pipeline_id="root",
+            ),
+            call(
+                process_id=dispatch_processes[1].process_id,
+                node_id=dispatch_processes[1].node_id,
+                root_pipeline_id="root",
+                parent_pipeline_id="root",
+            ),
         ]
     )
     runtime.die.assert_not_called()

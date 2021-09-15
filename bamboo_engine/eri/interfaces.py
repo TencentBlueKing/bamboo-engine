@@ -34,7 +34,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 
 
 def version():
@@ -506,7 +506,7 @@ class TaskMixin:
     """
 
     @abstractmethod
-    def execute(self, process_id: int, node_id: str):
+    def execute(self, process_id: int, node_id: str, root_pipeline_id: str, parent_pipeline_id: str):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
 
@@ -514,6 +514,10 @@ class TaskMixin:
         :type process_id: int
         :param node_id: 节点 ID
         :type node_id: str
+        :param root_pipeline_id: 根流程 ID
+        :type root_pipeline_id: str
+        :param parent_pipeline_id: 父流程 ID
+        :type parent_pipeline_id: str
         """
 
     @abstractmethod
@@ -708,7 +712,7 @@ class ProcessMixin:
         """
 
     @abstractmethod
-    def get_sleep_process_with_current_node_id(self, node_id: str) -> Optional[int]:
+    def get_sleep_process_info_with_current_node_id(self, node_id: str) -> Optional[ProcessInfo]:
         """
         获取由于处于睡眠状态且当前节点 ID 为 node_id 的进程 ID
 

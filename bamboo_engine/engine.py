@@ -96,7 +96,12 @@ class Engine:
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
         )
         # execute from start event
-        self.runtime.execute(process_id, pipeline["start_event"]["id"])
+        self.runtime.execute(
+            process_id=process_id,
+            node_id=pipeline["start_event"]["id"],
+            root_pipeline_id=pipeline["id"],
+            parent_pipeline_id=pipeline["id"],
+        )
 
         self.runtime.post_prepare_run_pipeline(
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
@@ -155,7 +160,12 @@ class Engine:
         if info_list:
             self.runtime.batch_resume(process_id_list=[i.process_id for i in info_list])
             for info in info_list:
-                self.runtime.execute(info.process_id, info.current_node)
+                self.runtime.execute(
+                    process_id=info.process_id,
+                    node_id=info.current_node,
+                    root_pipeline_id=info.root_pipeline_id,
+                    parent_pipeline_id=info.top_pipeline_id,
+                )
 
         self.runtime.post_resume_pipeline(pipeline_id)
 
@@ -198,7 +208,12 @@ class Engine:
         # found process suspended by node suspend
         for info in info_list:
             self.runtime.resume(process_id=info.process_id)
-            self.runtime.execute(info.process_id, info.current_node)
+            self.runtime.execute(
+                process_id=info.process_id,
+                node_id=info.current_node,
+                root_pipeline_id=info.root_pipeline_id,
+                parent_pipeline_id=info.top_pipeline_id,
+            )
 
         self.runtime.post_resume_node(node_id)
 
@@ -218,7 +233,7 @@ class Engine:
 
         state = self.runtime.get_state(node_id)
 
-        process_id = self._ensure_state_is_fail_and_return_process_id(state)
+        process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_retry_node(node_id, data)
 
@@ -239,7 +254,12 @@ class Engine:
             clear_archived_time=True,
         )
 
-        self.runtime.execute(process_id, node_id)
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
         self.runtime.post_retry_node(node_id, data)
 
@@ -258,15 +278,13 @@ class Engine:
 
         state = self.runtime.get_state(node_id)
 
-        process_id = self._ensure_state_is_fail_and_return_process_id(state)
+        process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_retry_subprocess(node_id)
 
-        proc_info = self.runtime.get_process_info(process_id)
-
         # reset pipeline stack
-        if proc_info.pipeline_stack[-1] == node_id:
-            self.runtime.set_pipeline_stack(process_id, proc_info.pipeline_stack[:-1])
+        if process_info.pipeline_stack[-1] == node_id:
+            self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack[:-1])
 
         self._add_history(node_id, state)
 
@@ -279,7 +297,12 @@ class Engine:
             clear_archived_time=True,
         )
 
-        self.runtime.execute(process_id, node_id)
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
         self.runtime.post_retry_subprocess(node_id)
 
@@ -302,7 +325,7 @@ class Engine:
 
         state = self.runtime.get_state(node_id)
 
-        process_id = self._ensure_state_is_fail_and_return_process_id(state)
+        process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_skip_node(node_id)
 
@@ -321,7 +344,12 @@ class Engine:
 
         # 跳过节点时不再做节点输出提取到上下文的操作
         # 因为节点失败的位置未知，可能提取出来的变量是无法预知的，会导致不可预知的行为
-        self.runtime.execute(process_id, next_node_id)
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=next_node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
         self.runtime.post_skip_node(node_id)
 
@@ -344,7 +372,7 @@ class Engine:
 
         state = self.runtime.get_state(node_id)
 
-        process_id = self._ensure_state_is_fail_and_return_process_id(state)
+        process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_skip_exclusive_gateway(node_id, flow_id)
 
@@ -358,7 +386,12 @@ class Engine:
             set_archive_time=True,
         )
 
-        self.runtime.execute(process_id, next_node_id)
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=next_node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
         self.runtime.post_skip_exclusive_gateway(node_id, flow_id)
 
@@ -425,9 +458,9 @@ class Engine:
         :raises InvalidOperationError: [description]
         """
 
-        process_id = self.runtime.get_sleep_process_with_current_node_id(node_id)
+        process_info = self.runtime.get_sleep_process_info_with_current_node_id(node_id)
 
-        if not process_id:
+        if not process_info:
             raise InvalidOperationError("can not find process with current node id: {}".format(node_id))
 
         state = self.runtime.get_state(node_id)
@@ -448,7 +481,7 @@ class Engine:
 
         data_id = self.runtime.set_callback_data(node_id, state.version, data)
 
-        self.runtime.schedule(process_id, node_id, schedule.id, data_id)
+        self.runtime.schedule(process_info.process_id, node_id, schedule.id, data_id)
 
         self.runtime.post_callback(node_id, version, data)
 
@@ -464,28 +497,36 @@ class Engine:
         :param node_id: 节点 ID
         :type node_id: str
         """
+        current_node_id = node_id
 
         process_info = self.runtime.get_process_info(process_id)
         self.runtime.wake_up(process_id)
 
-        current_node_id = node_id
-
         # 推进循环
         while True:
             # 进程心跳
-            self.runtime.beat(process_id)
-
-            # 遇到推进终点后需要尝试唤醒父进程
-            if current_node_id == process_info.destination_id:
-                self.runtime.die(process_id)
-                wake_up_seccess = self.runtime.child_process_finish(process_info.parent_id, process_id)
-
-                if wake_up_seccess:
-                    self.runtime.execute(process_info.parent_id, process_info.destination_id)
-
-                return
+            try:
+                self.runtime.beat(process_id)
+            except Exception:
+                # do not fail the flow when beat failed
+                logger.exception("process(%s) beat error" % process_id)
 
             try:
+                # 遇到推进终点后需要尝试唤醒父进程
+                if current_node_id == process_info.destination_id:
+                    self.runtime.die(process_id)
+                    wake_up_seccess = self.runtime.child_process_finish(process_info.parent_id, process_id)
+
+                    if wake_up_seccess:
+
+                        self.runtime.execute(
+                            process_id=process_info.parent_id,
+                            node_id=process_info.destination_id,
+                            root_pipeline_id=process_info.root_pipeline_id,
+                            parent_pipeline_id=process_info.top_pipeline_id,
+                        )
+
+                    return
 
                 self.runtime.set_current_node(process_id, current_node_id)
 
@@ -633,7 +674,12 @@ class Engine:
                     )
                     self.runtime.join(process_id, children)
                     for d in execute_result.dispatch_processes:
-                        self.runtime.execute(d.process_id, d.node_id)
+                        self.runtime.execute(
+                            process_id=d.process_id,
+                            node_id=d.node_id,
+                            root_pipeline_id=process_info.root_pipeline_id,
+                            parent_pipeline_id=process_info.top_pipeline_id,
+                        )
 
                 if execute_result.should_die:
                     self.runtime.die(process_id)
@@ -815,7 +861,12 @@ class Engine:
 
                 if schedule_result.schedule_done:
                     self.runtime.finish_schedule(schedule_id)
-                    self.runtime.execute(process_id, schedule_result.next_node_id)
+                    self.runtime.execute(
+                        process_id=process_id,
+                        node_id=schedule_result.next_node_id,
+                        root_pipeline_id=process_info.root_pipeline_id,
+                        parent_pipeline_id=process_info.top_pipeline_id,
+                    )
         except Exception as e:
             ex_data = traceback.format_exc()
             logger.warning(
@@ -875,16 +926,16 @@ class Engine:
             outputs=exec_data.outputs,
         )
 
-    def _ensure_state_is_fail_and_return_process_id(self, state: State) -> str:
+    def _ensure_state_is_fail_and_return_process_info(self, state: State) -> str:
         if state.name != states.FAILED:
             raise InvalidOperationError("{} state is not FAILED, actual {}".format(state.node_id, state.name))
 
-        process_id = self.runtime.get_sleep_process_with_current_node_id(state.node_id)
+        process_info = self.runtime.get_sleep_process_info_with_current_node_id(state.node_id)
 
-        if not process_id:
+        if not process_info:
             raise InvalidOperationError("can not find sleep process with current node id: {}".format(state.node_id))
 
-        return process_id
+        return process_info
 
     def _get_metrics_node_type(self, node: Node) -> str:
         if node.type != NodeType.ServiceActivity:
