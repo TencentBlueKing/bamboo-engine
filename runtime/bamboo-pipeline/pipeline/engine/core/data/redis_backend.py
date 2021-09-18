@@ -12,10 +12,12 @@ specific language governing permissions and limitations under the License.
 """
 
 import pickle
+import logging
 
 from pipeline.conf import settings
 from pipeline.engine.core.data.base_backend import BaseDataBackend
 
+logger = logging.getLogger("celery")
 
 class RedisDataBackend(BaseDataBackend):
     def set_object(self, key, obj):
@@ -24,6 +26,7 @@ class RedisDataBackend(BaseDataBackend):
     def get_object(self, key):
         pickle_str = settings.redis_inst.get(key)
         if not pickle_str:
+            logger.warning("[RedisDataBackend.get_object]redis(%s) get %s return %s" % (str(settings.redis_inst), key, pickle_str))
             return None
         return pickle.loads(pickle_str)
 
