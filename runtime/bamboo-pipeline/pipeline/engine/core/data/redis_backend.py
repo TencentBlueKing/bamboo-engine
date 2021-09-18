@@ -19,6 +19,7 @@ from pipeline.engine.core.data.base_backend import BaseDataBackend
 
 logger = logging.getLogger("celery")
 
+
 class RedisDataBackend(BaseDataBackend):
     def set_object(self, key, obj):
         return settings.redis_inst.set(key, pickle.dumps(obj))
@@ -26,7 +27,9 @@ class RedisDataBackend(BaseDataBackend):
     def get_object(self, key):
         pickle_str = settings.redis_inst.get(key)
         if not pickle_str:
-            logger.warning("[RedisDataBackend.get_object]redis(%s) get %s return %s" % (str(settings.redis_inst), key, pickle_str))
+            logger.warning(
+                "[RedisDataBackend.get_object]redis(%s) get %s return %s" % (str(settings.redis_inst), key, pickle_str)
+            )
             return None
         return pickle.loads(pickle_str)
 
