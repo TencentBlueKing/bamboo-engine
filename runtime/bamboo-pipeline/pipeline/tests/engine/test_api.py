@@ -583,6 +583,7 @@ class TestEngineAPI(TestCase):
     @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
     @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
     @patch(PIPELINE_PROCESS_GET, MagicMock(side_effect=PipelineProcess.DoesNotExist))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
     def test_skip_conditional_parallel_gateway__fail_with_can_not_get_process(self):
         act_result = api.skip_conditional_parallel_gateway(self.node_id, uniqid(), "converge_gateway_id")
 
@@ -591,6 +592,7 @@ class TestEngineAPI(TestCase):
     @patch(PIPELINE_STATUS_GET, MagicMock())
     @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
     @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
     def test_skip_conditional_parallel_gateway__fail_with_invalid_node_type(self):
         top_pipeline = PipelineObject(nodes={self.node_id: ServiceActObject()})
         process = MockPipelineProcess(top_pipeline=top_pipeline)
@@ -604,6 +606,7 @@ class TestEngineAPI(TestCase):
     @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
     @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
     @patch(PIPELINE_STATUS_SKIP, MagicMock(return_value=MockActionResult(result=False, message="skip fail")))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
     def test_skip_conditional_parallel_gateway__fail_with_skip_fail(self):
         converge_gateway_id = "converge_gateway_id"
         cpg = ConditionalParallelGateway(id=uniqid(), converge_gateway_id=converge_gateway_id)
@@ -627,6 +630,7 @@ class TestEngineAPI(TestCase):
     @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
     @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
     @patch(PIPELINE_STATUS_SKIP, MagicMock(return_value=MockActionResult(result=True)))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
     def test_skip_conditional_parallel_gateway__success(self):
         converge_gateway_id = "converge_gateway_id"
         cpg = ConditionalParallelGateway(id=uniqid(), converge_gateway_id=converge_gateway_id)
