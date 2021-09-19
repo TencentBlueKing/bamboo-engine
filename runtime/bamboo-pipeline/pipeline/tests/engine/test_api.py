@@ -653,10 +653,6 @@ class TestEngineAPI(TestCase):
     def test_status_tree__with_not_exist_node(self):
         self.assertRaises(exceptions.InvalidOperationException, api.get_status_tree, self.node_id)
 
-    @patch(PIPELINE_NODE_RELATIONSHIP_FILTER, MagicMock(return_value=MockQuerySet(exists_return=False)))
-    def test_status_tree__with_not_exist_node(self):
-        self.assertRaises(exceptions.InvalidOperationException, api.get_status_tree, self.node_id)
-
     def test_status_tree(self):
         s1 = Status.objects.create(
             id=uniqid(),
