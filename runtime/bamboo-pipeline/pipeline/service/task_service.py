@@ -55,6 +55,10 @@ def skip_exclusive_gateway(gateway_id, flow_id):
     return adapter_api.skip_exclusive_gateway(gateway_id, flow_id)
 
 
+def skip_conditional_parallel_gateway(gateway_id, flow_ids, converge_gateway_id):
+    return adapter_api.skip_conditional_parallel_gateway(gateway_id, flow_ids, converge_gateway_id)
+
+
 def forced_fail(act_id, ex_data=""):
     return adapter_api.forced_fail(act_id, ex_data)
 

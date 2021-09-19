@@ -234,6 +234,30 @@ def skip_exclusive_gateway(runtime: EngineRuntimeInterface, node_id: str, flow_i
 
 
 @_ensure_return_api_result
+def skip_conditional_parallel_gateway(
+    runtime: EngineRuntimeInterface,
+    node_id: str,
+    flow_ids: list,
+    converge_gateway_id: str,
+) -> EngineAPIResult:
+    """
+    跳过某个执行失败的条件并行网关
+
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param node_id: 失败的分支网关 id
+    :type node_id: str
+    :param flow_ids: 需要往下执行的 flow id 列表
+    :type flow_ids: list
+    :param converge_gateway_id: 目标汇聚网关 id
+    :type converge_gateway_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+    Engine(runtime).skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
+
+
+@_ensure_return_api_result
 def forced_fail_activity(runtime: EngineRuntimeInterface, node_id: str, ex_data: str) -> EngineAPIResult:
     """
     强制失败某个 activity 节点

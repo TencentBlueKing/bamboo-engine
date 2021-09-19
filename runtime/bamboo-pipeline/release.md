@@ -1,3 +1,7 @@
+# 3.8.0
+- feature: 
+  - eri 5.0 support
+
 # 3.7.0
 
 - feature:

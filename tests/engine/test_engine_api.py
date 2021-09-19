@@ -687,7 +687,7 @@ def test_skip_exclusive_gateway():
     runtime.get_node.assert_called_once_with(node_id)
     runtime.pre_skip_exclusive_gateway.assert_called_once_with(node_id, flow_id)
     runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_sleep_process_info_with_current_node_id(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
     runtime.add_history.assert_called_once_with(
         node_id=node_id,
         started_time=state.started_time,
@@ -777,6 +777,154 @@ def test_skip_exclusive_gateway__can_not_find_sleep_proces():
     engine = Engine(runtime=runtime)
     with pytest.raises(exceptions.InvalidOperationError):
         engine.skip_exclusive_gateway(node_id, flow_id)
+
+    runtime.get_state.assert_called_once_with(node_id)
+
+
+def test_skip_conditional_parallel_gateway():
+    node_id = "nid"
+    process_id = "pid"
+    root_pipeline_id = "r_pid"
+    top_pipeline_id = "t_pid"
+    pipeline_stack = "p_stack"
+    flow_ids = ["flow_1", "flow_2"]
+    converge_gateway_id = "converge_gateway_id"
+    child_1_id = "target_1"
+    child_2_id = "target_2"
+    child_1_process_id = "child_1_pid"
+    child_2_process_id = "child_2_pid"
+
+    node = MagicMock()
+    node.id = node_id
+    node.type = NodeType.ConditionalParallelGateway
+    node.targets = {"flow_1": child_1_id, "flow_2": child_2_id}
+
+    state = MagicMock()
+    state.node_id = node_id
+    state.name = states.FAILED
+    state.started_time = "started_time"
+    state.archived_time = "archived_time"
+    state.loop = 1
+    state.skip = True
+    state.retry = 0
+    state.version = "version"
+
+    execution_data = MagicMock()
+    execution_data.inputs = "inputs"
+    execution_data.outputs = "outputs"
+
+    process_info = MagicMock()
+    process_info.process_id = process_id
+    process_info.root_pipeline_id = root_pipeline_id
+    process_info.pipeline_stack = pipeline_stack
+    process_info.top_pipeline_id = top_pipeline_id
+
+    dispatch_process_1 = MagicMock()
+    dispatch_process_1.process_id = child_1_process_id
+    dispatch_process_1.node_id = child_1_id
+    dispatch_process_2 = MagicMock()
+    dispatch_process_2.process_id = child_2_process_id
+    dispatch_process_2.node_id = child_2_id
+
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
+    runtime.get_process_info = MagicMock(return_value=process_info)
+    runtime.pre_skip_conditional_parallel_gateway = MagicMock()
+    runtime.sleep = MagicMock()
+    runtime.fork = MagicMock(return_value=[dispatch_process_1, dispatch_process_2])
+    runtime.join = MagicMock()
+
+    runtime.get_execution_data = MagicMock(return_value=execution_data)
+
+    engine = Engine(runtime=runtime)
+    engine.skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
+
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.pre_skip_conditional_parallel_gateway.assert_called_once_with(node_id, flow_ids, converge_gateway_id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_sleep_process_info_with_current_node_id.assert_called_once_with(node_id)
+    runtime.add_history.assert_called_once_with(
+        node_id=node_id,
+        started_time=state.started_time,
+        archived_time=state.archived_time,
+        loop=state.loop,
+        skip=state.skip,
+        retry=state.retry,
+        version=state.version,
+        inputs=execution_data.inputs,
+        outputs=execution_data.outputs,
+    )
+    runtime.set_state.assert_called_once_with(
+        node_id=node_id,
+        to_state=states.FINISHED,
+        is_skip=True,
+        refresh_version=True,
+        set_archive_time=True,
+    )
+    runtime.sleep.assert_called_once_with(process_id)
+    runtime.join.assert_called_once_with(process_id, [dispatch_process_1.process_id, dispatch_process_2.process_id])
+    runtime.execute.assert_has_calls(
+        [
+            call(
+                process_id=dispatch_process_1.process_id,
+                node_id=dispatch_process_1.node_id,
+                root_pipeline_id=root_pipeline_id,
+                parent_pipeline_id=top_pipeline_id,
+            ),
+            call(
+                process_id=dispatch_process_2.process_id,
+                node_id=dispatch_process_2.node_id,
+                root_pipeline_id=root_pipeline_id,
+                parent_pipeline_id=top_pipeline_id,
+            ),
+        ]
+    )
+    runtime.post_skip_conditional_parallel_gateway.assert_called_once_with(node_id, flow_ids, converge_gateway_id)
+
+
+def test_skip_conditional_parallel_gateway__node_type_not_fit():
+    node_id = "nid"
+    flow_ids = ["flow_1", "flow_2"]
+    converge_gateway_id = "converge_gateway_id"
+
+    node = MagicMock()
+    node.type = NodeType.ParallelGateway
+
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(side_effect=Exception)
+
+    engine = Engine(runtime=runtime)
+
+    with pytest.raises(exceptions.InvalidOperationError):
+        engine.skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
+
+
+def test_skip_conditional_parallel_gateway__node_is_not_failed():
+    node_id = "nid"
+    flow_ids = ["flow_1", "flow_2"]
+    converge_gateway_id = "converge_gateway_id"
+
+    node = MagicMock()
+    node.type = NodeType.ConditionalParallelGateway
+    node.can_skip = True
+    node.targets = {"flow_1": "target_1", "flow_2": "target_2"}
+
+    state = MagicMock()
+    state.node_id = node_id
+    state.name = states.RUNNING
+
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(side_effect=Exception)
+
+    engine = Engine(runtime=runtime)
+
+    with pytest.raises(exceptions.InvalidOperationError):
+        engine.skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
 
     runtime.get_state.assert_called_once_with(node_id)
 

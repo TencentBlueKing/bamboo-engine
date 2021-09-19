@@ -85,10 +85,23 @@ class ConditionalParallelGatewayTestCase(TestCase):
 
         self.assertRaises(ConditionExhaustedException, cpg.targets_meet_condition, {})
 
+    def test_target_for_sequence_flows__normal(self):
+        node_1 = ParallelGateway(id="1", converge_gateway_id="cvg")
+        node_2 = ParallelGateway(id="2", converge_gateway_id="cvg")
+        node_3 = ParallelGateway(id="3", converge_gateway_id="cvg")
+        node_4 = ParallelGateway(id="4", converge_gateway_id="cvg")
+        condition_1 = Condition(evaluate="1 == 0", sequence_flow=SequenceFlow(id="f1", source=None, target=node_1))
+        condition_2 = Condition(evaluate="1 == 0", sequence_flow=SequenceFlow(id="f2", source=None, target=node_2))
+        condition_3 = Condition(evaluate="1 == 0", sequence_flow=SequenceFlow(id="f3", source=None, target=node_3))
+        condition_4 = Condition(evaluate="1 == 0", sequence_flow=SequenceFlow(id="f4", source=None, target=node_4))
+        cpg = ConditionalParallelGateway(
+            id=self.id,
+            converge_gateway_id=self.converge_gateway_id,
+            conditions=[condition_1, condition_2, condition_3, condition_4],
+        )
+        result = cpg.target_for_sequence_flows(["f1", "f3"])
+        self.assertEqual(result, [node_1, node_3])
+
     def test_next(self):
         cpg = ConditionalParallelGateway(id=self.id, converge_gateway_id=self.converge_gateway_id)
         self.assertRaises(InvalidOperationException, cpg.next)
-
-    def test_skip(self):
-        cpg = ConditionalParallelGateway(id=self.id, converge_gateway_id=self.converge_gateway_id)
-        self.assertRaises(InvalidOperationException, cpg.skip)

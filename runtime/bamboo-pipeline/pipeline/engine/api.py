@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 import functools
 import logging
 import time
+import traceback
 
 from celery import current_app
 from django.db import transaction
@@ -22,7 +23,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 from pipeline.celery.queues import ScalableQueues
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY, PIPELINE_MAX_PRIORITY, PIPELINE_MIN_PRIORITY
 from pipeline.core.flow.activity import ServiceActivity
-from pipeline.core.flow.gateway import ExclusiveGateway, ParallelGateway
+from pipeline.core.flow.gateway import ExclusiveGateway, ParallelGateway, ConditionalParallelGateway
 from pipeline.engine import exceptions, states
 from pipeline.engine.core.api import workers
 from pipeline.engine.models import (
@@ -40,6 +41,7 @@ from pipeline.engine.models import (
 )
 from pipeline.engine.signals import pipeline_revoke
 from pipeline.engine.utils import ActionResult, calculate_elapsed_time
+from pipeline.exceptions import PipelineException
 from pipeline.utils import uniqid
 
 logger = logging.getLogger("celery")
@@ -356,6 +358,59 @@ def skip_exclusive_gateway(node_id, flow_id):
 
     # wake up process
     PipelineProcess.objects.process_ready(process_id=process.id, current_node_id=next_node_id)
+
+    return action_result
+
+
+@_worker_check
+@_frozen_check
+@_node_existence_check
+def skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id):
+    """
+    skip a failed conditional parallel gateway and appoint the flow to be pushed
+    :param node_id:
+    :param flow_ids:
+    :param converge_gateway_id:
+    :return:
+    """
+
+    try:
+        process = PipelineProcess.objects.get(current_node_id=node_id)
+    except PipelineProcess.DoesNotExist:
+        return ActionResult(
+            result=False, message="invalid operation, this gateway is finished or pipeline have been revoked"
+        )
+
+    if process.children:
+        process.clean_children()
+
+    conditional_parallel_gateway = process.top_pipeline.node(node_id)
+
+    if not isinstance(conditional_parallel_gateway, ConditionalParallelGateway):
+        return ActionResult(result=False, message="invalid operation, this node is not a conditional parallel gateway")
+
+    children = []
+    targets = conditional_parallel_gateway.target_for_sequence_flows(flow_ids)
+
+    for target in targets:
+        try:
+            child = PipelineProcess.objects.fork_child(
+                parent=process, current_node_id=target.id, destination_id=converge_gateway_id
+            )
+        except PipelineException as e:
+            logger.error(traceback.format_exc())
+            Status.objects.fail(conditional_parallel_gateway, ex_data=str(e))
+            return ActionResult(result=False, message=e)
+
+        children.append(child)
+
+    action_result = Status.objects.skip(process, conditional_parallel_gateway)
+    if not action_result.result:
+        return action_result
+
+    Status.objects.transit(id=process.top_pipeline.id, to_state=states.RUNNING, is_pipeline=True)
+    process.join(children)
+    process.sleep(adjust_status=True)
 
     return action_result
 

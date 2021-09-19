@@ -185,6 +185,30 @@ class HooksMixin:
         :type flow_id: str
         """
 
+    def pre_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
+        """
+        跳过条件并行网关前执行的钩子
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param flow_ids: 跳过后选择的目标流 ID 列表
+        :type flow_ids: list
+        :param converge_gateway_id: 目标汇聚网关 ID
+        :type converge_gateway_id: str
+        """
+
+    def post_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
+        """
+        跳过条件并行网关后执行的钩子
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param flow_ids: 跳过后选择的目标流 ID 列表
+        :type flow_ids: list
+        :param converge_gateway_id: 目标汇聚网关 ID
+        :type converge_gateway_id: str
+        """
+
     def pre_forced_fail_activity(self, node_id: str, ex_data: str):
         """
         强制失败节点前执行的钩子
