@@ -1,3 +1,8 @@
+# 3.7.1
+
+- minor:
+  - add redis bakckend log
+
 # 3.7.0
 
 - feature:
