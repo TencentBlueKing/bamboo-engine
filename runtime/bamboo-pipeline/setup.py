@@ -40,7 +40,7 @@ setup(
         "Django>=2.2.6,<4.0",
         "requests>=2.22.0,<=2.23.0",
         "celery>=4.4.0,<5.0",
-        "django-celery-beat>=2.0.0,<2.3",
+        "django-celery-beat>=2.1.0,<2.3",
         "django-celery-results>=1.2.1,<2.2",
         "Mako>=1.0.6,<2.0",
         "pytz==2019.3",

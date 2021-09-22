@@ -1,3 +1,7 @@
+# 3.7.1
+  - minor:
+    - django-celery-beat upgrade to 2.1.0
+
 # 3.7.0
 
 - feature:
