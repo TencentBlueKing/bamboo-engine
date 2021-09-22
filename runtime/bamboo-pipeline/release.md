@@ -1,7 +1,7 @@
 # 3.7.1
-
-- minor:
-  - add redis bakckend log
+  - minor:
+    - django-celery-beat upgrade to 2.1.0
+    - add redis bakckend log
 
 # 3.7.0
 
