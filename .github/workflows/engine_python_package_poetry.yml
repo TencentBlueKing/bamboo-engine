@@ -1,4 +1,4 @@
-name: Python package
+name: Engine python package
 on:
   push:
     tags:
