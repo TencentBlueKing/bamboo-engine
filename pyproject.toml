@@ -1,3 +1,27 @@
+[tool.poetry]
+name = "bamboo-engine"
+version = "1.4.0"
+description = "Bamboo-engine is a general-purpose workflow engine"
+authors = ["homholueng <homholueng@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">= 3.6, < 3.8"
+Werkzeug = "^1.0.0"
+pyparsing = "^2.2.0"
+Mako = "^1.1.4"
+prometheus-client = "^0.9.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+black = "^20.8b1"
+mock = "^4.0.3"
+coverage = {extras = ["toml"], version = "^5.5"}
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.black]
 line-length = 120
 include = '\.pyi?$'
