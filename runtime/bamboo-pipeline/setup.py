@@ -47,7 +47,7 @@ setup(
         "bamboo-engine==1.3.2",
         # pipeline
         "jsonschema==2.5.1",
-        "ujson>=1.35",
+        "ujson>=1.35,<4.2.0",
         "pyparsing>=2.2.0,<3.0",
         "redis==3.2.0",
         "redis-py-cluster==2.1.0",
