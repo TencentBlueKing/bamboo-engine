@@ -1,3 +1,5 @@
+# bamboo-engine: A event-driven workflow engine for Python
+
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](https://github.com/TencentBlueKing/bamboo-engine/blob/master/LICENSE.txt)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/TencentBlueKing/bamboo-engine/pulls)
 [![Python 3.6](https://img.shields.io/badge/python-v3.6-blue)](https://github.com/TencentBlueKing/bamboo-engine/)
