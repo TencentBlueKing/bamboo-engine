@@ -4,6 +4,9 @@ version = "3.7.3"
 description = "runtime for bamboo-engine base on Django and Celery"
 authors = ["homholueng <homholueng@gmail.com>"]
 license = "MIT"
+packages = [
+  { include = "pipeline" },
+]
 
 [tool.poetry.dependencies]
 python = ">= 3.6, < 3.8"
