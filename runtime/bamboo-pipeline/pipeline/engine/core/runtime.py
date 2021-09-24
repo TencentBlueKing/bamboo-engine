@@ -23,6 +23,7 @@ from pipeline.engine.core.handlers import HandlersFactory
 from pipeline.engine.models import NAME_MAX_LENGTH, FunctionSwitch, NodeRelationship, Status
 
 logger = logging.getLogger("pipeline_engine")
+celery_logger = logging.getLogger("celery")
 
 RERUN_MAX_LIMIT = pipeline_settings.PIPELINE_RERUN_MAX_TIMES
 
@@ -44,7 +45,11 @@ def run_loop(process):
     """
     with runtime_exception_handler(process):
         while True:
+
             current_node = process.top_pipeline.node(process.current_node_id)
+            celery_logger.info(
+                "[pipeline-trace](root_pipeline: %s) execute node %s" % (process.root_pipeline_id, current_node.id)
+            )
 
             # check child process destination
             if process.destination_id == current_node.id:

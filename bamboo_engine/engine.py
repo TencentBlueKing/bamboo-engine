@@ -558,10 +558,16 @@ class Engine:
 
                     return
 
+                logger.info("[pipeline-trace](root_pipeline: %s) execute node %s" % (root_pipeline_id, current_node_id))
                 self.runtime.set_current_node(process_id, current_node_id)
 
                 # 冻结检测
                 if self.runtime.is_frozen(process_id):
+                    logger.info(
+                        "[%s] root pipeline freeze at node %s",
+                        process_info.root_pipeline_id,
+                        current_node_id,
+                    )
                     self.runtime.freeze(process_id)
                     return
 
@@ -857,6 +863,10 @@ class Engine:
                 )
                 return
 
+            logger.info(
+                "[pipeline-trace](root_pipeline: %s) schedule node %s with version %s"
+                % (root_pipeline_id, node_id, schedule.version)
+            )
             with self._schedule_lock_keeper(schedule_id):
                 # 进程心跳
                 self.runtime.beat(process_id)
