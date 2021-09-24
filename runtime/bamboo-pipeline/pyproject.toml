@@ -26,6 +26,7 @@ redis-py-cluster = "2.1.0"
 django-timezone-field = "^4.0"
 Werkzeug = "^1.0.0"
 prometheus-client = "^0.9.0"
+boto3 = "^1.9.130"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
@@ -34,6 +35,7 @@ mock = "^4.0.3"
 factory_boy = "2.11.1"
 pytest-django = "4.1.0"
 mysqlclient = "2.0.3"
+coverage = {extras = ["toml"], version = "^5.5"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
