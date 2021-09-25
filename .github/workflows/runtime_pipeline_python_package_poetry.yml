@@ -1,4 +1,4 @@
-name: Runtime pipeline python package
+name: Runtime Pipeline python package
 on:
   push:
     tags:
@@ -25,6 +25,5 @@ jobs:
           rm -rf pipeline/tests
           rm -rf pipeline/contrib/external_plugins/tests
           poetry build -vvv
-          poetry config pypi-token.bamboo-pipeline ${{ secrets.TEST_PYPI_TOKEN }}
-          poetry config repositories.bamboo-pipeline https://test.pypi.org/legacy/
-          poetry publish --repository bamboo-pipeline
+          poetry config pypi-token.pypi ${{ secrets.PIPELINE_PYPI_TOKEN }}
+          poetry publish
