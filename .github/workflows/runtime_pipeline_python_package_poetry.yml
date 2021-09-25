@@ -25,5 +25,5 @@ jobs:
           rm -rf pipeline/tests
           rm -rf pipeline/contrib/external_plugins/tests
           poetry build -vvv
-          poetry config pypi-token.pypi ${{ secrets.PIPELINE_PYPI_TOKEN }}
-          poetry publish
+          poetry config pypi-token.bamboo-pipeline ${{ secrets.PIPELINE_PYPI_TOKEN }}
+          poetry publish --repository bamboo-pipeline
