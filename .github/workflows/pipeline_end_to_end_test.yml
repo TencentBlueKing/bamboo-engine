@@ -25,34 +25,43 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+    
     - name: Set up MySQL
       run: |
         sudo /etc/init.d/mysql start
         mysql -e 'CREATE DATABASE ${{ env.DB_DATABASE }};' -u${{ env.DB_USER }} -p${{ env.DB_PASSWORD }}
+
     - name: Set up Redis
       uses: supercharge/redis-github-action@1.2.0
       with:
         redis-version: 5
+
     - name: Set up Rabbitmq
       uses: nijel/rabbitmq-action@v1.0.0
       with:
         rabbitmq version: 3
+
+    - name: Set up Poetry
+      uses: abatilo/actions-poetry@v2.0.0
+      with:
+        poetry-version: 1.1.9
+
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        poetry install
+
     - name: Run test
       run: |
         cd runtime/bamboo-pipeline/test
         cp -r ../../../bamboo_engine/ .
         cp -r ../pipeline .
-        python manage.py migrate
-        python manage.py celery worker &
+        poetry run python manage.py migrate
+        poetry run python manage.py celery worker &
         while ! celery inspect ping; do
             sleep 1
         done
-        pytest pipeline_test_use/tests
+        poetry run pytest pipeline_test_use/tests
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
