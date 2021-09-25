@@ -1,4 +1,4 @@
-name: Engine python package
+name: Runtime pipeline python package
 on:
   push:
     tags:
