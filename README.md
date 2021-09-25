@@ -231,6 +231,10 @@ print(result.data)
 
 如果你有好的意见或建议，欢迎给我们提 Issues 或 Pull Requests，为蓝鲸开源社区贡献力量。
 
+1. 本项目使用 [Poetry](https://python-poetry.org/) 进行开发、构建及发布，本地开发环境搭建请参考 Poetry 官方文档
+2. PR 需要通过 CI 中的所有代码风格检查，单元测试及集成测试才可被接受合并
+3. 新增加的模块请确保完备的单元测试覆盖
+
 ## License
 
 基于 MIT 协议， 详细请参考[LICENSE](LICENSE.txt)
