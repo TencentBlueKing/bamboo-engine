@@ -25,7 +25,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    
+s
     - name: Set up MySQL
       run: |
         sudo /etc/init.d/mysql start
@@ -58,7 +58,7 @@ jobs:
         cp -r ../pipeline .
         poetry run python manage.py migrate
         poetry run python manage.py celery worker &
-        while ! celery inspect ping; do
+        while ! poetry run celery inspect ping; do
             sleep 1
         done
         poetry run pytest pipeline_test_use/tests
