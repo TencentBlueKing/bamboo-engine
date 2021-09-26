@@ -44,10 +44,10 @@ setup(
         "django-celery-results>=1.2.1,<2.2",
         "Mako>=1.0.6,<2.0",
         "pytz==2019.3",
-        "bamboo-engine==1.3.2",
+        "bamboo-engine==1.4.0",
         # pipeline
         "jsonschema==2.5.1",
-        "ujson>=1.35",
+        "ujson>=1.35,<4.2.0",
         "pyparsing>=2.2.0,<3.0",
         "redis==3.2.0",
         "redis-py-cluster==2.1.0",

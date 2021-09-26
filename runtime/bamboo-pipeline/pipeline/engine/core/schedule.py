@@ -24,6 +24,7 @@ from pipeline.engine.core.data import delete_parent_data, get_schedule_parent_da
 from pipeline.engine.models import Data, MultiCallbackData, PipelineProcess, ScheduleService, Status
 
 logger = logging.getLogger("pipeline_engine")
+celery_logger = logging.getLogger("celery")
 
 
 @contextlib.contextmanager
@@ -116,6 +117,7 @@ def schedule(process_id, schedule_id, data_id=None):
             )
             return
 
+        celery_logger.info("[pipeline-trace] schedule node %s with version %s" % (act_id, version))
         with auto_release_schedule_lock(schedule_id):
             # get data
             parent_data = get_schedule_parent_data(sched_service.id)

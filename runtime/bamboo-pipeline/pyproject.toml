@@ -1,3 +1,46 @@
+[tool.poetry]
+name = "bamboo-pipeline"
+version = "3.7.3"
+description = "runtime for bamboo-engine base on Django and Celery"
+authors = ["homholueng <homholueng@gmail.com>"]
+license = "MIT"
+packages = [
+  { include = "pipeline" },
+]
+
+[tool.poetry.dependencies]
+python = ">= 3.6, < 3.8"
+celery = "^4.4.0"
+Django = "^2.2.6"
+requests = "^2.22.0"
+django-celery-beat = "^2.1.0"
+django-celery-results = "^1.2.1"
+Mako = "^1.1.4"
+pytz = "2019.3"
+bamboo-engine = "1.4.0"
+jsonschema = "^2.5.1"
+ujson = "4.1.*"
+pyparsing = "^2.2.0"
+redis = "^3.2.0"
+redis-py-cluster = "2.1.0"
+django-timezone-field = "^4.0"
+Werkzeug = "^1.0.0"
+prometheus-client = "^0.9.0"
+boto3 = "^1.9.130"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+black = "^20.8b1"
+mock = "^4.0.3"
+factory_boy = "2.11.1"
+pytest-django = "4.1.0"
+mysqlclient = "2.0.3"
+coverage = {extras = ["toml"], version = "^5.5"}
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.black]
 line-length = 120
 include = '\.pyi?$'

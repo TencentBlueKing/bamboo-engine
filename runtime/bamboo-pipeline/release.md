@@ -2,10 +2,21 @@
 - feature: 
   - eri 5.0 support
 
+# 3.7.3
+
+- minor:
+  - bamboo-engine dependecy bump to 1.4.0
+
+# 3.7.2
+
+- minor:
+  - ujson limit <4.2.0
+
 # 3.7.1
-  - minor:
-    - django-celery-beat upgrade to 2.1.0
-    - add redis bakckend log
+
+- minor:
+  - django-celery-beat upgrade to 2.1.0
+  - add redis bakckend log
 
 # 3.7.0
 
