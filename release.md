@@ -1,3 +1,8 @@
+## 1.5.0
+
+- feature:
+  - (eri 5.0) 增加 skip_conditional_parallel_gateway API，支持对条件并行网关失败的网关节点进行跳过
+
 ## 1.4.0
 
 - feature:

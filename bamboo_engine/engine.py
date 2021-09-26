@@ -395,6 +395,62 @@ class Engine:
 
         self.runtime.post_skip_exclusive_gateway(node_id, flow_id)
 
+    def skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
+        """
+        跳过执行失败的条件并行网关继续执行
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param flow_ids: 需要继续执行的流 ID 列表
+        :type flow_ids: list
+        :param converge_gateway_id: 目标汇聚网关 ID
+        :type converge_gateway_id: str
+        :raises InvalidOperationError: [description]
+        """
+        node = self.runtime.get_node(node_id)
+
+        if node.type != NodeType.ConditionalParallelGateway:
+            raise InvalidOperationError(
+                "{} is not conditional parallel gateway, actual: {}".format(node_id, node.type.value)
+            )
+
+        state = self.runtime.get_state(node_id)
+        process_info = self._ensure_state_is_fail_and_return_process_info(state)
+        process_id = process_info.process_id
+
+        self.runtime.pre_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
+
+        self.runtime.sleep(process_id)
+        fork_targets = [node.targets[flow_id] for flow_id in flow_ids]
+        from_to = {target: converge_gateway_id for target in fork_targets}
+        dispatch_processes = self.runtime.fork(
+            parent_id=process_info.process_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            pipeline_stack=process_info.pipeline_stack,
+            from_to=from_to,
+        )
+        children = [d.process_id for d in dispatch_processes]
+        self.runtime.join(process_id, children)
+        for d in dispatch_processes:
+            self.runtime.execute(
+                process_id=d.process_id,
+                node_id=d.node_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                parent_pipeline_id=process_info.top_pipeline_id,
+            )
+
+        self._add_history(node_id, state)
+
+        self.runtime.set_state(
+            node_id=node_id,
+            to_state=states.FINISHED,
+            is_skip=True,
+            refresh_version=True,
+            set_archive_time=True,
+        )
+
+        self.runtime.post_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
+
     def forced_fail_activity(self, node_id: str, ex_data: str):
         """
         强制失败某个 Activity

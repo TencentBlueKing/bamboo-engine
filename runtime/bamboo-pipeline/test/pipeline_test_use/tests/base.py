@@ -207,6 +207,12 @@ class EngineTestCase(object):
         assert act_result.result, act_result.message
 
     @classmethod
+    def skip_conditional_parallel_gateway(cls, cpg, flow_ids, converge_gateway_id):
+        logger.info(log_message(f"skip conditional parallel gateway: {cpg.id}"))
+        act_result = task_service.skip_conditional_parallel_gateway(cpg.id, flow_ids, converge_gateway_id)
+        assert act_result.result, act_result.message
+
+    @classmethod
     def callback_activity(cls, act, data=None):
         logger.info(log_message("callback activity: {} with data: {}".format(act.id, data)))
         act_result = task_service.callback(act.id, data)

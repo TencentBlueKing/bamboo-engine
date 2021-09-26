@@ -145,11 +145,18 @@ class ConditionalParallelGateway(Gateway):
 
         return targets
 
+    def target_for_sequence_flows(self, flow_ids):
+        flow_to_target = {c.sequence_flow.id: c.sequence_flow.target for c in self.conditions}
+        if not set(flow_ids).issubset(set(flow_to_target.keys())):
+            not_exist_flow_ids = set(flow_ids) - set(flow_to_target.keys())
+            raise InvalidOperationException(f"sequence flows {not_exist_flow_ids} does not exist.")
+        return [flow_to_target[flow_id] for flow_id in flow_ids]
+
     def next(self):
         raise InvalidOperationException("can not determine next node for conditional parallel gateway.")
 
     def skip(self):
-        raise InvalidOperationException("can not skip conditional parallel gateway.")
+        return True
 
 
 class ConvergeGateway(Gateway):

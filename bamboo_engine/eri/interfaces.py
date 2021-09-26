@@ -34,7 +34,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "4.0.0"
+__version__ = "5.0.0"
 
 
 def version():
@@ -46,7 +46,6 @@ class Service(metaclass=ABCMeta):
     服务对象接口
     """
 
-    @abstractmethod
     def pre_execute(self, data: ExecutionData, root_pipeline_data: ExecutionData):
         """
         execute 执行前执行的逻辑
@@ -243,7 +242,6 @@ class EngineAPIHooksMixin:
     引擎 API 执行时调用的钩子相关接口声明
     """
 
-    @abstractmethod
     def pre_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
@@ -260,7 +258,6 @@ class EngineAPIHooksMixin:
         :type subprocess_context: dict
         """
 
-    @abstractmethod
     def post_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
@@ -277,7 +274,6 @@ class EngineAPIHooksMixin:
         :type subprocess_context: dict
         """
 
-    @abstractmethod
     def pre_pause_pipeline(self, pipeline_id: str):
         """
         暂停 pipeline 前执行的钩子
@@ -286,7 +282,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def post_pause_pipeline(self, pipeline_id: str):
         """
         暂停 pipeline 后执行的钩子
@@ -295,7 +290,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def pre_revoke_pipeline(self, pipeline_id: str):
         """
         撤销 pipeline 前执行的钩子
@@ -304,7 +298,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def post_revoke_pipeline(self, pipeline_id: str):
         """
         撤销 pipeline 后执行的钩子
@@ -313,7 +306,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def pre_resume_pipeline(self, pipeline_id: str):
         """
         继续 pipeline 前执行的钩子
@@ -322,7 +314,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def post_resume_pipeline(self, pipeline_id: str):
         """
         继续 pipeline 后执行的钩子
@@ -331,7 +322,6 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
-    @abstractmethod
     def pre_resume_node(self, node_id: str):
         """
         继续节点后执行的钩子
@@ -340,7 +330,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def post_resume_node(self, node_id: str):
         """
         继续节点后执行的钩子
@@ -349,7 +338,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def pre_pause_node(self, node_id: str):
         """
         暂停节点前执行的钩子
@@ -358,7 +346,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def post_pause_node(self, node_id: str):
         """
         暂停节点后执行的钩子
@@ -367,7 +354,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def pre_retry_node(self, node_id: str, data: Optional[dict]):
         """
         重试节点前执行的钩子
@@ -378,7 +364,6 @@ class EngineAPIHooksMixin:
         :type data: Optional[dict]
         """
 
-    @abstractmethod
     def post_retry_node(self, node_id: str, data: Optional[dict]):
         """
         重试节点后执行的钩子
@@ -389,7 +374,6 @@ class EngineAPIHooksMixin:
         :type data: Optional[dict]
         """
 
-    @abstractmethod
     def pre_skip_node(self, node_id: str):
         """
         跳过节点前执行的钩子
@@ -398,7 +382,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def post_skip_node(self, node_id: str):
         """
         跳过节点后执行的钩子
@@ -407,7 +390,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def pre_skip_exclusive_gateway(self, node_id: str, flow_id: str):
         """
         跳过分支网关前执行的钩子
@@ -418,7 +400,6 @@ class EngineAPIHooksMixin:
         :type flow_id: str
         """
 
-    @abstractmethod
     def post_skip_exclusive_gateway(self, node_id: str, flow_id: str):
         """
         跳过分支网关后执行的钩子
@@ -429,7 +410,30 @@ class EngineAPIHooksMixin:
         :type flow_id: str
         """
 
-    @abstractmethod
+    def pre_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
+        """
+        跳过条件并行网关前执行的钩子
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param flow_ids: 跳过后选择的目标流 ID 列表
+        :type flow_ids: list
+        :param converge_gateway_id: 目标汇聚网关 ID
+        :type converge_gateway_id: str
+        """
+
+    def post_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
+        """
+        跳过条件并行网关后执行的钩子
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param flow_ids: 跳过后选择的目标流 ID 列表
+        :type flow_ids: list
+        :param converge_gateway_id: 目标汇聚网关 ID
+        :type converge_gateway_id: str
+        """
+
     def pre_forced_fail_activity(self, node_id: str, ex_data: str):
         """
         强制失败节点前执行的钩子
@@ -440,7 +444,6 @@ class EngineAPIHooksMixin:
         :type ex_data: str
         """
 
-    @abstractmethod
     def post_forced_fail_activity(self, node_id: str, ex_data: str, old_version: str, new_version: str):
         """
         强制失败节点后执行的钩子
@@ -455,7 +458,6 @@ class EngineAPIHooksMixin:
         :type new_version: str
         """
 
-    @abstractmethod
     def pre_callback(self, node_id: str, version: str, data: str):
         """
         回调节点前执行的钩子
@@ -468,7 +470,6 @@ class EngineAPIHooksMixin:
         :type data: str
         """
 
-    @abstractmethod
     def post_callback(self, node_id: str, version: str, data: str):
         """
         回调节点后执行的钩子
@@ -481,7 +482,6 @@ class EngineAPIHooksMixin:
         :type data: str
         """
 
-    @abstractmethod
     def pre_retry_subprocess(self, node_id: str):
         """
         子流程重试前执行的钩子
@@ -490,7 +490,6 @@ class EngineAPIHooksMixin:
         :type node_id: str
         """
 
-    @abstractmethod
     def post_retry_subprocess(self, node_id: str):
         """
         子流程重试后执行的钩子

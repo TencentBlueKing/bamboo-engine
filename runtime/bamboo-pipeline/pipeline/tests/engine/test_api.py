@@ -19,7 +19,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError
 
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY, PIPELINE_MAX_PRIORITY, PIPELINE_MIN_PRIORITY
 from pipeline.core.flow.activity import ServiceActivity
-from pipeline.core.flow.gateway import ExclusiveGateway, ParallelGateway
+from pipeline.core.flow.gateway import ExclusiveGateway, ParallelGateway, ConditionalParallelGateway
 from pipeline.engine import api, exceptions, states
 from pipeline.engine.models import (
     Data,
@@ -578,6 +578,80 @@ class TestEngineAPI(TestCase):
             PipelineProcess.objects.process_ready.assert_called_once_with(
                 process_id=process.id, current_node_id=next_node.id
             )
+
+    @patch(PIPELINE_STATUS_GET, MagicMock())
+    @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
+    @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
+    @patch(PIPELINE_PROCESS_GET, MagicMock(side_effect=PipelineProcess.DoesNotExist))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
+    def test_skip_conditional_parallel_gateway__fail_with_can_not_get_process(self):
+        act_result = api.skip_conditional_parallel_gateway(self.node_id, uniqid(), "converge_gateway_id")
+
+        self.assertFalse(act_result.result)
+
+    @patch(PIPELINE_STATUS_GET, MagicMock())
+    @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
+    @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
+    def test_skip_conditional_parallel_gateway__fail_with_invalid_node_type(self):
+        top_pipeline = PipelineObject(nodes={self.node_id: ServiceActObject()})
+        process = MockPipelineProcess(top_pipeline=top_pipeline)
+
+        with patch(PIPELINE_PROCESS_GET, MagicMock(return_value=process)):
+            act_result = api.skip_conditional_parallel_gateway(self.node_id, uniqid(), "converge_gateway_id")
+
+            self.assertFalse(act_result.result)
+
+    @patch(PIPELINE_STATUS_GET, MagicMock())
+    @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
+    @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
+    @patch(PIPELINE_STATUS_SKIP, MagicMock(return_value=MockActionResult(result=False, message="skip fail")))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
+    def test_skip_conditional_parallel_gateway__fail_with_skip_fail(self):
+        converge_gateway_id = "converge_gateway_id"
+        cpg = ConditionalParallelGateway(id=uniqid(), converge_gateway_id=converge_gateway_id)
+        next_nodes = [IdentifyObject(), IdentifyObject()]
+        cpg.target_for_sequence_flows = MagicMock(return_value=next_nodes)
+        top_pipeline = PipelineObject(nodes={self.node_id: cpg})
+        process = MockPipelineProcess(top_pipeline=top_pipeline)
+        process.join = MagicMock()
+        process.sleep = MagicMock()
+
+        with patch(PIPELINE_PROCESS_GET, MagicMock(return_value=process)):
+            with patch(PIPELINE_PROCESS_FORK_CHILD, MagicMock(return_value="child")):
+                act_result = api.skip_conditional_parallel_gateway(
+                    self.node_id, [uniqid(), uniqid()], converge_gateway_id
+                )
+                Status.objects.skip.assert_called_once_with(process, cpg)
+
+                self.assertFalse(act_result.result)
+
+    @patch(PIPELINE_STATUS_GET, MagicMock())
+    @patch(PIPELINE_FUNCTION_SWITCH_IS_FROZEN, MagicMock(return_value=False))
+    @patch(PIPELINE_ENGINE_API_WORKERS, MagicMock(return_value=True))
+    @patch(PIPELINE_STATUS_SKIP, MagicMock(return_value=MockActionResult(result=True)))
+    @mock.patch(DJCELERY_APP_CURRENT_APP_CONNECTION, mock.MagicMock())
+    def test_skip_conditional_parallel_gateway__success(self):
+        converge_gateway_id = "converge_gateway_id"
+        cpg = ConditionalParallelGateway(id=uniqid(), converge_gateway_id=converge_gateway_id)
+        next_nodes = [IdentifyObject(), IdentifyObject()]
+        cpg.target_for_sequence_flows = MagicMock(return_value=next_nodes)
+        top_pipeline = PipelineObject(nodes={self.node_id: cpg})
+        process = MockPipelineProcess(top_pipeline=top_pipeline)
+        process.join = MagicMock()
+        process.sleep = MagicMock()
+
+        with patch(PIPELINE_PROCESS_GET, MagicMock(return_value=process)):
+            with patch(PIPELINE_PROCESS_FORK_CHILD, MagicMock(return_value="child")):
+                act_result = api.skip_conditional_parallel_gateway(
+                    self.node_id, [uniqid(), uniqid()], converge_gateway_id
+                )
+
+                self.assertTrue(act_result.result)
+
+                Status.objects.skip.assert_called_once_with(process, cpg)
+                process.join.assert_called_once_with(["child", "child"])
+                process.sleep.assert_called_once_with(adjust_status=True)
 
     @patch(PIPELINE_NODE_RELATIONSHIP_FILTER, MagicMock(return_value=MockQuerySet(exists_return=False)))
     def test_status_tree__with_not_exist_node(self):

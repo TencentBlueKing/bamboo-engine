@@ -21,26 +21,28 @@
         - [example](#191-example)
     - [skip_exclusive_gateway](#110-skip_exclusive_gateway)
         - [example](#1101-example)
-    - [forced_fail_activity](#111-forced_fail_activity)
-        - [example](#1111-example)
-    - [callback](#112-callback)
+  - [skip_conditional_parallel_gateway](#111-skip_conditional_parallel_gateway)
+      - [example](#1111-example)
+    - [forced_fail_activity](#112-forced_fail_activity)
         - [example](#1121-example)
-    - [get_pipeline_states](#113-get_pipeline_states)
+    - [callback](#113-callback)
         - [example](#1131-example)
-    - [get_children_states](#114-get_children_states)
+    - [get_pipeline_states](#114-get_pipeline_states)
         - [example](#1141-example)
-    - [get_execution_data_inputs](#115-get_execution_data_inputs)
+    - [get_children_states](#115-get_children_states)
         - [example](#1151-example)
-    - [get_execution_data_outputs](#116-get_execution_data_outputs)
+    - [get_execution_data_inputs](#116-get_execution_data_inputs)
         - [example](#1161-example)
-    - [get_execution_data](#117-get_execution_data)
+    - [get_execution_data_outputs](#117-get_execution_data_outputs)
         - [example](#1171-example)
-    - [get_data](#118-get_data)
+    - [get_execution_data](#118-get_execution_data)
         - [example](#1181-example)
-    - [get_node_histories](#119-get_node_histories)
+    - [get_data](#119-get_data)
         - [example](#1191-example)
-    - [get_node_short_histories](#120-get_node_short_histories)
+    - [get_node_histories](#120-get_node_histories)
         - [example](#1201-example)
+    - [get_node_short_histories](#121-get_node_short_histories)
+        - [example](#1211-example)
 
 <!-- /TOC -->
 
@@ -395,9 +397,41 @@ api.skip_exclusive_gateway(runtime=runtime, node_id="node_id", flow_id="flow_id"
 # True
 ```
 
-<a id="toc_anchor" name="#111-forced_fail_activity"></a>
+## 1.11. skip_conditional_parallel_gateway
 
-## 1.11. forced_fail_activity
+```python
+def skip_conditional_parallel_gateway(
+    runtime: EngineRuntimeInterface, node_id: str, flow_ids: list, converge_gateway_id: str
+) -> EngineAPIResult:
+    """
+    跳过执行失败的条件并行网关继续执行
+
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param node_id: 失败的分支网关 id
+    :type node_id: str
+    :param flow_ids: 需要继续执行的流 ID 列表
+    :type flow_ids: list
+    :param converge_gateway_id: 目标汇聚网关 ID
+    :type converge_gateway_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+```
+
+<a id="toc_anchor" name="#1121-example"></a>
+
+### 1.12.1. example
+
+```python
+runtime = BambooDjangoRuntime()
+api.skip_conditional_parallel_gateway(runtime=runtime, node_id="node_id", flow_id="flow_id").result
+# True
+```
+
+<a id="toc_anchor" name="#112-forced_fail_activity"></a>
+
+## 1.12. forced_fail_activity
 
 ```python
 def forced_fail_activity(
@@ -417,9 +451,9 @@ def forced_fail_activity(
     """
 ```
 
-<a id="toc_anchor" name="#1111-example"></a>
+<a id="toc_anchor" name="#1131-example"></a>
 
-### 1.11.1. example
+### 1.13.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -427,9 +461,9 @@ api.forced_fail_activity(runtime=runtime, node_id="node_id", ex_data="forced fai
 # True
 ```
 
-<a id="toc_anchor" name="#112-callback"></a>
+<a id="toc_anchor" name="#113-callback"></a>
 
-## 1.12. callback
+## 1.13. callback
 
 ```python
 def callback(
@@ -449,9 +483,9 @@ def callback(
     """
 ```
 
-<a id="toc_anchor" name="#1121-example"></a>
+<a id="toc_anchor" name="#1141-example"></a>
 
-### 1.12.1. example
+### 1.14.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -459,9 +493,9 @@ api.callback(runtime=runtime, node_id="node_id", version="version", data={"key":
 # True
 ```
 
-<a id="toc_anchor" name="#113-get_pipeline_states"></a>
+<a id="toc_anchor" name="#114-get_pipeline_states"></a>
 
-## 1.13. get_pipeline_states
+## 1.14. get_pipeline_states
 
 ```python
 def get_pipeline_states(
@@ -481,9 +515,9 @@ def get_pipeline_states(
     """
 ```
 
-<a id="toc_anchor" name="#1131-example"></a>
+<a id="toc_anchor" name="#1151-example"></a>
 
-### 1.13.1. example
+### 1.15.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -546,9 +580,9 @@ api.get_pipeline_states(runtime=runtime, root_id="pipeline_id").data
     'archived_time': datetime.datetime(2021, 3, 10, 3, 45, 54, 773341, tzinfo=<UTC>)}}}}
 ```
 
-<a id="toc_anchor" name="#114-get_children_states"></a>
+<a id="toc_anchor" name="#115-get_children_states"></a>
 
-## 1.14. get_children_states
+## 1.15. get_children_states
 
 ```python
 def get_children_states(
@@ -566,9 +600,9 @@ def get_children_states(
     """
 ```
 
-<a id="toc_anchor" name="#1141-example"></a>
+<a id="toc_anchor" name="#1161-example"></a>
 
-### 1.14.1. example
+### 1.16.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -629,9 +663,9 @@ api.get_children_states(runtime=runtime, node_id="pipeline_id").data
     'archived_time': datetime.datetime(2021, 3, 10, 11, 5, 22, 840337, tzinfo=<UTC>)}}}}
 ```
 
-<a id="toc_anchor" name="#115-get_execution_data_inputs"></a>
+<a id="toc_anchor" name="#116-get_execution_data_inputs"></a>
 
-## 1.15. get_execution_data_inputs
+## 1.16. get_execution_data_inputs
 
 ```python
 def get_execution_data_inputs(
@@ -649,9 +683,9 @@ def get_execution_data_inputs(
     """
 ```
 
-<a id="toc_anchor" name="#1151-example"></a>
+<a id="toc_anchor" name="#1171-example"></a>
 
-### 1.15.1. example
+### 1.17.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -660,9 +694,9 @@ api.get_execution_data_inputs(runtime=runtime, node_id="node_id").data
 {'_loop': 1}
 ```
 
-<a id="toc_anchor" name="#116-get_execution_data_outputs"></a>
+<a id="toc_anchor" name="#117-get_execution_data_outputs"></a>
 
-## 1.16. get_execution_data_outputs
+## 1.17. get_execution_data_outputs
 
 ```python
 def get_execution_data_outputs(
@@ -680,9 +714,9 @@ def get_execution_data_outputs(
     """
 ```
 
-<a id="toc_anchor" name="#1161-example"></a>
+<a id="toc_anchor" name="#1181-example"></a>
 
-### 1.16.1. example
+### 1.18.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -691,9 +725,9 @@ api.get_execution_data_outputs(runtime=runtime, node_id="node_id").data
 {}
 ```
 
-<a id="toc_anchor" name="#117-get_execution_data"></a>
+<a id="toc_anchor" name="#118-get_execution_data"></a>
 
-## 1.17. get_execution_data
+## 1.18. get_execution_data
 
 ```python
 def get_execution_data(
@@ -711,9 +745,9 @@ def get_execution_data(
     """
 ```
 
-<a id="toc_anchor" name="#1171-example"></a>
+<a id="toc_anchor" name="#1181-example"></a>
 
-### 1.17.1. example
+### 1.19.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -722,9 +756,9 @@ api.get_execution_data(runtime=runtime, node_id="node_id").data
 {'inputs': {'_loop': 1}, 'outputs': {}}
 ```
 
-<a id="toc_anchor" name="#118-get_data"></a>
+<a id="toc_anchor" name="#119-get_data"></a>
 
-## 1.18. get_data
+## 1.19. get_data
 
 ```python
 def get_data(runtime: EngineRuntimeInterface, node_id: str) -> EngineAPIResult:
@@ -739,9 +773,9 @@ def get_data(runtime: EngineRuntimeInterface, node_id: str) -> EngineAPIResult:
     :rtype: EngineAPIResult
     """
 ```
-<a id="toc_anchor" name="#1181-example"></a>
+<a id="toc_anchor" name="#1191-example"></a>
 
-### 1.18.1. example
+### 1.20.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -750,9 +784,9 @@ api.get_data(runtime=runtime, node_id="node_id").data
 {'inputs': {'_loop': 1}, 'outputs': {}}
 ```
 
-<a id="toc_anchor" name="#119-get_node_histories"></a>
+<a id="toc_anchor" name="#120-get_node_histories"></a>
 
-## 1.19. get_node_histories
+## 1.20. get_node_histories
 
 > 注意，只有进行过重试、跳过、重入的节点才会记录执行历史
 
@@ -774,9 +808,9 @@ def get_node_histories(
     """
 ```
 
-<a id="toc_anchor" name="#1191-example"></a>
+<a id="toc_anchor" name="#1211-example"></a>
 
-### 1.19.1. example
+### 1.21.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
@@ -798,9 +832,9 @@ api.get_node_histories(runtime=runtime, node_id="node_id").data
 ]
 ```
 
-<a id="toc_anchor" name="#120-get_node_short_histories"></a>
+<a id="toc_anchor" name="#121-get_node_short_histories"></a>
 
-## 1.20. get_node_short_histories
+## 1.21. get_node_short_histories
 
 > 注意，只有进行过重试、跳过、重入的节点才会记录执行历史
 
@@ -822,9 +856,9 @@ def get_node_short_histories(
     """
 ```
 
-<a id="toc_anchor" name="#1201-example"></a>
+<a id="toc_anchor" name="#1211-example"></a>
 
-### 1.20.1. example
+### 1.21.1. example
 
 ```python
 runtime = BambooDjangoRuntime()
