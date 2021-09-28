@@ -7,6 +7,8 @@
 [![codecov](https://codecov.io/gh/TencentBlueKing/bamboo-engine/branch/master/graph/badge.svg?token=ROH54UE7B8)](https://codecov.io/gh/TencentBlueKing/bamboo-engine)
 [![BK Pipelines Status](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/blueapps/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)](https://api.bkdevops.qq.com/process/api/external/pipelines/projects/blueapps/p-d620b6131c994e76ba292ae359c162f1/badge?X-DEVOPS-PROJECT-ID=blueapps)
 
+[(English Documents Available)](README_en.md)
+
 bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度由用户创建的流程任务，并提供了如暂停，撤销，跳过，强制失败，重试和重入等等灵活的控制能力和并行、子流程等进阶特性，并可通过水平扩展来进一步提升任务的并发处理能力。
 
 <!-- TOC -->
