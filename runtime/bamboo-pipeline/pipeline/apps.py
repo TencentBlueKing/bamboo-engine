@@ -85,6 +85,7 @@ class PipelineConfig(AppConfig):
         if hasattr(settings, "REDIS"):
             mode = settings.REDIS.get("mode") or "single"
             try:
+                settings.REDIS_INST = CLIENT_GETTER[mode]()
                 settings.redis_inst = CLIENT_GETTER[mode]()
             except Exception:
                 # fall back to single node mode
