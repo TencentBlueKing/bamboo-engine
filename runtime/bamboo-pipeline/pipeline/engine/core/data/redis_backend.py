@@ -22,25 +22,25 @@ logger = logging.getLogger("celery")
 
 class RedisDataBackend(BaseDataBackend):
     def set_object(self, key, obj):
-        return settings.redis_inst.set(key, pickle.dumps(obj))
+        return settings.REDIS_INST.set(key, pickle.dumps(obj))
 
     def get_object(self, key):
-        pickle_str = settings.redis_inst.get(key)
+        pickle_str = settings.REDIS_INST.get(key)
         if not pickle_str:
             logger.warning(
-                "[RedisDataBackend.get_object]redis(%s) get %s return %s" % (str(settings.redis_inst), key, pickle_str)
+                "[RedisDataBackend.get_object]redis(%s) get %s return %s" % (str(settings.REDIS_INST), key, pickle_str)
             )
             return None
         return pickle.loads(pickle_str)
 
     def del_object(self, key):
-        return settings.redis_inst.delete(key)
+        return settings.REDIS_INST.delete(key)
 
     def expire_cache(self, key, value, expires):
-        settings.redis_inst.set(key, pickle.dumps(value))
-        settings.redis_inst.expire(key, expires)
+        settings.REDIS_INST.set(key, pickle.dumps(value))
+        settings.REDIS_INST.expire(key, expires)
         return True
 
     def cache_for(self, key):
-        cache = settings.redis_inst.get(key)
+        cache = settings.REDIS_INST.get(key)
         return pickle.loads(cache) if cache else cache
