@@ -31,8 +31,10 @@ from pyparsing import (
     oneOf,
 )
 
+PATH_DELIMITER = "."
 
-class SubstituteVal:
+
+class SubstituteVal(object):
     """
     Represents a token that will later be replaced by a context value.
     """
@@ -50,7 +52,7 @@ class SubstituteVal:
         val = context
 
         try:
-            for part in self._path.split(pathDelimiter):
+            for part in self._path.split(PATH_DELIMITER):
                 val = getattr(val, part) if hasattr(val, part) else val[part]
 
         except KeyError:
@@ -62,51 +64,53 @@ class SubstituteVal:
         return "SubstituteVal(%s)" % self._path
 
 
-# Grammar definition
-pathDelimiter = "."
-# match gcloud's variable
-identifier = Combine(Optional("${") + Optional("_") + Word(alphas, alphanums + "_") + Optional("}"))
-# identifier = Word(alphas, alphanums + "_")
-propertyPath = delimitedList(identifier, pathDelimiter, combine=True)
+def get_bool_expression():
 
-and_ = Keyword("and", caseless=True)
-or_ = Keyword("or", caseless=True)
-in_ = Keyword("in", caseless=True)
+    # Grammar definition
+    # match gcloud's variable
+    identifier = Combine(Optional("${") + Optional("_") + Word(alphas, alphanums + "_") + Optional("}"))
+    # identifier = Word(alphas, alphanums + "_")
+    propertyPath = delimitedList(identifier, PATH_DELIMITER, combine=True)
 
-lparen = Suppress("(")
-rparen = Suppress(")")
+    and_ = Keyword("and", caseless=True)
+    or_ = Keyword("or", caseless=True)
 
-binaryOp = oneOf("== != < > >= <= in notin issuperset notissuperset", caseless=True)("operator")
+    lparen = Suppress("(")
+    rparen = Suppress(")")
 
-E = CaselessLiteral("E")
-numberSign = Word("+-", exact=1)
-realNumber = Combine(
-    Optional(numberSign)
-    + (Word(nums) + "." + Optional(Word(nums)) | ("." + Word(nums)))
-    + Optional(E + Optional(numberSign) + Word(nums))
-)
+    binaryOp = oneOf("== != < > >= <= in notin issuperset notissuperset", caseless=True)("operator")
 
-integer = Combine(Optional(numberSign) + Word(nums) + Optional(E + Optional("+") + Word(nums)))
+    E = CaselessLiteral("E")
+    numberSign = Word("+-", exact=1)
+    realNumber = Combine(
+        Optional(numberSign)
+        + (Word(nums) + "." + Optional(Word(nums)) | ("." + Word(nums)))
+        + Optional(E + Optional(numberSign) + Word(nums))
+    )
 
-# str_ = quotedString.addParseAction(removeQuotes)
-str_ = QuotedString('"') | QuotedString("'")
-bool_ = oneOf("true false", caseless=True)
+    integer = Combine(Optional(numberSign) + Word(nums) + Optional(E + Optional("+") + Word(nums)))
 
-simpleVals = (
-    realNumber.setParseAction(lambda toks: float(toks[0]))
-    | integer.setParseAction(lambda toks: int(toks[0]))
-    | str_
-    | bool_.setParseAction(lambda toks: toks[0] == "true")
-    | propertyPath.setParseAction(lambda toks: SubstituteVal(toks))
-)  # need to add support for alg expressions
+    # str_ = quotedString.addParseAction(removeQuotes)
+    str_ = QuotedString('"') | QuotedString("'")
+    bool_ = oneOf("true false", caseless=True)
 
-propertyVal = simpleVals | (lparen + Group(delimitedList(simpleVals)) + rparen)
+    simpleVals = (
+        realNumber.setParseAction(lambda toks: float(toks[0]))
+        | integer.setParseAction(lambda toks: int(toks[0]))
+        | str_
+        | bool_.setParseAction(lambda toks: toks[0] == "true")
+        | propertyPath.setParseAction(lambda toks: SubstituteVal(toks))
+    )  # need to add support for alg expressions
 
-boolExpression = Forward()
-boolCondition = Group(
-    (Group(propertyVal)("lval") + binaryOp + Group(propertyVal)("rval")) | (lparen + boolExpression + rparen)
-)
-boolExpression << boolCondition + ZeroOrMore((and_ | or_) + boolExpression)
+    propertyVal = simpleVals | (lparen + Group(delimitedList(simpleVals)) + rparen)
+
+    boolExpression = Forward()
+    boolCondition = Group(
+        (Group(propertyVal)("lval") + binaryOp + Group(propertyVal)("rval")) | (lparen + boolExpression + rparen)
+    )
+    boolExpression << boolCondition + ZeroOrMore((and_ | or_) + boolExpression)
+
+    return boolExpression
 
 
 def double_equals_trans(lval, rval, operator):
@@ -151,16 +155,16 @@ def double_equals_trans(lval, rval, operator):
     return lval, rval
 
 
-class BoolRule:
+class BoolRule(object):
     """
     Represents a boolean expression and provides a `test` method to evaluate
     the expression and determine its truthiness.
 
     :param query: A string containing the query to be evaluated
     :param lazy: If ``True``, parse the query the first time it's tested rather
-                than immediately. This can help with performance if you
-                instantiate a lot of rules and only end up evaluating a
-                small handful.
+                 than immediately. This can help with performance if you
+                 instantiate a lot of rules and only end up evaluating a
+                 small handful.
     """
 
     _compiled = False
@@ -179,7 +183,7 @@ class BoolRule:
 
         :param context: A dict context to evaluate the expression against.
         :return: True if the expression succesfully evaluated against the
-                context, or False otherwise.
+                 context, or False otherwise.
         """
         if self._is_match_all():
             return True
@@ -198,7 +202,7 @@ class BoolRule:
                 return
 
             try:
-                self._tokens = boolExpression.parseString(self._query, parseAll=self.strict)
+                self._tokens = get_bool_expression().parseString(self._query, parseAll=self.strict)
             except ParseException:
                 raise
 
