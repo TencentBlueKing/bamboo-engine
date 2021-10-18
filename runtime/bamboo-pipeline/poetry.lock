@@ -41,17 +41,17 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "bamboo-engine"
-version = "1.4.0"
-description = "bamboo-engine"
+version = "1.5.1"
+description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6,<3.8"
 
 [package.dependencies]
-mako = ">=1.1.4,<2.0"
-prometheus-client = ">=0.9.0,<1.0.0"
-pyparsing = ">=2.2.0,<3.0"
-Werkzeug = ">=1.0.1,<2.0"
+Mako = ">=1.1.4,<2.0.0"
+prometheus-client = ">=0.9.0,<0.10.0"
+pyparsing = ">=2.2.0,<3.0.0"
+Werkzeug = ">=1.0.0,<2.0.0"
 
 [[package]]
 name = "billiard"
@@ -737,7 +737,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 3.8"
-content-hash = "13f822a4e1c9ee84c6fd8340726782f4714a8abc338c6ca725337095aa71a418"
+content-hash = "5a6ecdd5b4513225e566c7976d8e8adf5b782ddf69db5b8eeabf62c0d218998e"
 
 [metadata.files]
 amqp = [
@@ -757,7 +757,8 @@ attrs = [
     {file = "attrs-21.2.0.tar.gz", hash = "sha256:ef6aaac3ca6cd92904cdd0d83f629a15f18053ec84e6432106f7a4d04ae4f5fb"},
 ]
 bamboo-engine = [
-    {file = "bamboo-engine-1.4.0.tar.gz", hash = "sha256:0c974edaa349f7c364333e8796686f93da25430128700a949d02d671b77f443f"},
+    {file = "bamboo-engine-1.5.1.tar.gz", hash = "sha256:c54372c4cd8cbc96b3c633e7633e43f2f3be4faf175596a80768e62e3695a9db"},
+    {file = "bamboo_engine-1.5.1-py3-none-any.whl", hash = "sha256:88a959ab27a204ad1a9baca8188fc10319a19363e20ef247ec597cee9fb75af6"},
 ]
 billiard = [
     {file = "billiard-3.6.4.0-py3-none-any.whl", hash = "sha256:87103ea78fa6ab4d5c751c4909bcff74617d985de7fa8b672cf8618afd5a875b"},

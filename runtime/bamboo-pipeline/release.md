@@ -1,3 +1,8 @@
+# 3.8.2
+
+- feature:
+  - bamboo-engine dep upgrade to 1.5.1
+
 # 3.8.1
 
 - feature:
