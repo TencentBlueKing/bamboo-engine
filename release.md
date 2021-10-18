@@ -1,3 +1,8 @@
+## 1.5.1
+
+- bugfix:
+  - boorule multi threads context error fix
+
 ## 1.5.0
 
 - feature:

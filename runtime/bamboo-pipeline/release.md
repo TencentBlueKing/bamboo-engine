@@ -1,3 +1,10 @@
+# 3.8.1
+
+- feature:
+  - Django 3.X support
+- bugfix:
+  - boorule multi threads context error fix
+
 # 3.8.0
 - feature: 
   - eri 5.0 support
