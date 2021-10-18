@@ -74,7 +74,6 @@ def get_bool_expression():
 
     and_ = Keyword("and", caseless=True)
     or_ = Keyword("or", caseless=True)
-    in_ = Keyword("in", caseless=True)
 
     lparen = Suppress("(")
     rparen = Suppress(")")
