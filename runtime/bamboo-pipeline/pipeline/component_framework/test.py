@@ -157,12 +157,18 @@ class ComponentTestMixin(object):
 
     def _case_pass(self, case):
         sys.stdout.write(
-            "\n[√] <{component}> - [{case_name}]\n".format(component=self._component_cls_name, case_name=case.name,)
+            "\n[√] <{component}> - [{case_name}]\n".format(
+                component=self._component_cls_name,
+                case_name=case.name,
+            )
         )
 
     def _case_fail(self, case):
         sys.stdout.write(
-            "\n[×] <{component}> - [{case_name}]\n".format(component=self._component_cls_name, case_name=case.name,)
+            "\n[×] <{component}> - [{case_name}]\n".format(
+                component=self._component_cls_name,
+                case_name=case.name,
+            )
         )
 
         if not hasattr(self, "__failed_cases"):
@@ -187,6 +193,7 @@ class ComponentTestMixin(object):
 
                     bound_service = component.service()
 
+                    setattr(bound_service, "root_pipeline_id", case.root_pipeline_id)
                     setattr(bound_service, "id", case.service_id)
                     setattr(bound_service, "logger", MagicMock())
 
@@ -280,6 +287,7 @@ class ComponentTestCase(object):
         execute_call_assertion=None,
         schedule_call_assertion=None,
         service_id=None,
+        root_pipeline_id=None,
     ):
         self.inputs = inputs
         self.parent_data = parent_data
@@ -290,6 +298,7 @@ class ComponentTestCase(object):
         self.name = name
         self.patchers = patchers or []
         self.service_id = service_id or uniqid()
+        self.root_pipeline_id = root_pipeline_id or uniqid()
 
 
 class CallAssertion(object):
@@ -311,9 +320,10 @@ class CallAssertion(object):
         if not self.calls:
             func.assert_not_called()
         else:
-            assert func.call_count == len(self.calls), (
-                "Expected 'mock' have been called {expect} times. "
-                "Called {actual} times".format(expect=len(self.calls), actual=func.call_count)
+            assert func.call_count == len(
+                self.calls
+            ), "Expected 'mock' have been called {expect} times. " "Called {actual} times".format(
+                expect=len(self.calls), actual=func.call_count
             )
             func.assert_has_calls(calls=self.calls, any_order=self.any_order)
 
