@@ -1,3 +1,8 @@
+# 3.8.3
+
+- feature:
+  - ComponentTestMixin support runtime attribute root_pipeline_id get
+
 # 3.8.2
 
 - feature:
