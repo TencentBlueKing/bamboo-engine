@@ -322,7 +322,7 @@ pipeline_data = Data()
 pipeline_data.inputs['${input_a}'] = Var(type=Var.PLAIN, value=0)
 pipeline_data.inputs['${act_1_output}'] = NodeOutput(type=Var.SPLICE, source_act=act_1.id, source_key='input_a')
 
-pipeline = build_tree(start)
+pipeline = build_tree(start, data=pipeline_data)
 api.run_pipeline(runtime=BambooDjangoRuntime(), pipeline=pipeline)
 ```
 
