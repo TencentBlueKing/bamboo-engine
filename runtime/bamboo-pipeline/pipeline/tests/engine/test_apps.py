@@ -28,7 +28,7 @@ class EngineConfigTestCase(TestCase):
 
         EngineConfig.path = "test"
 
-        config = EngineConfig("", "")
+        config = EngineConfig("engine", "engine")
 
         config.ready()
 

@@ -17,6 +17,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.6, 3.7]
+        django-version: [2.2, 3.0]
 
     steps:
 
@@ -50,6 +51,7 @@ jobs:
       run: |
         cd runtime/bamboo-pipeline/test
         poetry install
+        poetry run pip install "Django>${{ matrix.django-version }}"
 
     - name: Run test
       run: |

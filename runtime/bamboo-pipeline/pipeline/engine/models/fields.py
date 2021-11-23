@@ -44,5 +44,5 @@ class IOField(models.BinaryField):
         except Exception:
             return "IOField to_python raise error: {}".format(traceback.format_exc())
 
-    def from_db_value(self, value, expression, connection, context):
+    def from_db_value(self, value, expression, connection, context=None):
         return self.to_python(value)

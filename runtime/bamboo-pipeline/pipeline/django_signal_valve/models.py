@@ -31,7 +31,7 @@ class IOField(models.BinaryField):
         value = super(IOField, self).to_python(value)
         return pickle.loads(zlib.decompress(value))
 
-    def from_db_value(self, value, expression, connection, context):
+    def from_db_value(self, value, expression, connection, context=None):
         return self.to_python(value)
 
 
