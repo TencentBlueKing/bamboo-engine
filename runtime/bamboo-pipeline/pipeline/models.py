@@ -52,7 +52,7 @@ class CompressJSONField(models.BinaryField):
         value = super(CompressJSONField, self).to_python(value)
         return json.loads(zlib.decompress(value).decode("utf-8"))
 
-    def from_db_value(self, value, expression, connection, context):
+    def from_db_value(self, value, expression, connection, context=None):
         return self.to_python(value)
 
 
