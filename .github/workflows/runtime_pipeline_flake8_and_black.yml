@@ -1,8 +1,6 @@
 name: Runtime Pipeline Flake8 and Black
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
