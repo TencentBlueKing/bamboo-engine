@@ -1,4 +1,4 @@
- release.yml
+# release.yml
 
 changelog:
   exclude:
