@@ -18,13 +18,24 @@ from pipeline.eri import models
 
 @admin.register(models.Process)
 class ProcessAdmin(admin.ModelAdmin):
-    list_display = ["id", "parent_id", "ack_num", "need_ack", "asleep", "suspended", "frozen", "dead"]
-    search_fields = ["id___exact", "parent_id____exact", "current_node_id____exact", "suspended_by____exact"]
+    list_display = [
+        "id",
+        "parent_id",
+        "ack_num",
+        "need_ack",
+        "asleep",
+        "suspended",
+        "frozen",
+        "dead",
+        "root_pipeline_id",
+        "current_node_id",
+    ]
+    search_fields = ["root_pipeline_id__exact", "current_node_id__exact", "suspended_by__exact"]
 
 
 @admin.register(models.Node)
 class NodeAdmin(admin.ModelAdmin):
-    list_display = ["id", "node_id"]
+    list_display = ["id", "node_id", "detail"]
     search_fields = ["node_id__exact"]
 
 
@@ -48,18 +59,18 @@ class StateAdmin(admin.ModelAdmin):
 @admin.register(models.Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
     list_display = ["id", "type", "process_id", "node_id", "finished", "expired", "version", "schedule_times"]
-    search_fields = ["id__exact", "node_id__exact"]
+    search_fields = ["node_id__exact"]
 
 
 @admin.register(models.Data)
 class DataAdmin(admin.ModelAdmin):
-    list_display = ["id", "node_id"]
+    list_display = ["id", "node_id", "inputs", "outputs"]
     search_fields = ["node_id__exact"]
 
 
 @admin.register(models.ExecutionData)
 class ExecutionDataAdmin(admin.ModelAdmin):
-    list_display = ["id", "node_id"]
+    list_display = ["id", "node_id", "inputs", "outputs"]
     search_fields = ["node_id__exact"]
 
 
