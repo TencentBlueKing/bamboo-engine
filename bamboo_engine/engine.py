@@ -46,6 +46,7 @@ from .eri import (
     Node,
 )
 from .utils.string import get_lower_case_name
+from .utils.host import get_hostname
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -59,6 +60,7 @@ class Engine:
 
     def __init__(self, runtime: EngineRuntimeInterface):
         self.runtime = runtime
+        self._hostname = get_hostname()
 
     # api
     def run_pipeline(
@@ -738,7 +740,9 @@ class Engine:
                 type_label = self._get_metrics_node_type(node)
                 execute_start = time.time()
                 execute_result = handler.execute(process_info, loop, inner_loop, version)
-                ENGINE_NODE_EXECUTE_TIME.labels(type_label).observe(time.time() - execute_start)
+                ENGINE_NODE_EXECUTE_TIME.labels(type=type_label, hostname=self._hostname).observe(
+                    time.time() - execute_start
+                )
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -945,7 +949,9 @@ class Engine:
                 )
                 schedule_start = time.time()
                 schedule_result = handler.schedule(process_info, state.loop, state.inner_loop, schedule, callback_data)
-                ENGINE_NODE_SCHEDULE_TIME.labels(type_label).observe(time.time() - schedule_start)
+                ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
+                    time.time() - schedule_start
+                )
 
                 if schedule_result.has_next_schedule:
                     self.runtime.set_next_schedule(

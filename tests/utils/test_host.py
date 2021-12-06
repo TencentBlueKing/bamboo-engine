@@ -11,4 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-__version__ = "1.6.0"
+from bamboo_engine.utils import host
+
+
+def test_get_hostname():
+    host.get_hostname()
