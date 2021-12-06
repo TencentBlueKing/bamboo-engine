@@ -50,7 +50,7 @@ def test_pause_subprocess():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(subproc.id)
 
@@ -74,7 +74,7 @@ def test_pause_subprocess():
 
     engine.resume_pipeline(subproc.id)
 
-    sleep(1)
+    sleep(2)
 
     finished.extend(not_execute)
     finished.append(pipeline["id"])
@@ -111,7 +111,7 @@ def test_pause_subprocess_in_parallel():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(subproc_1.id)
 

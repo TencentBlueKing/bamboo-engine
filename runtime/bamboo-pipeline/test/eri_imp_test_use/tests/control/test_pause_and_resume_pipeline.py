@@ -44,7 +44,7 @@ def test_pause_and_resume_pipeline_with_nest_parallel():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(pipeline["id"])
 
@@ -111,7 +111,7 @@ def test_pause_and_resume_pipeline_with_nest_parallel_early_resume():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(pipeline["id"])
 
@@ -152,7 +152,7 @@ def test_pause_and_resume_pipeline_with_subprocess():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(pipeline["id"])
 
@@ -168,7 +168,7 @@ def test_pause_and_resume_pipeline_with_subprocess():
 
     engine.resume_pipeline(pipeline["id"])
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"], start.id, subproc.id, end.id, subproc_start.id, subproc_act.id, subproc_end.id])
 
@@ -216,7 +216,7 @@ def test_pause_and_resume_pipeline_with_subprocess_has_parallel():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.pause_pipeline(pipeline["id"])
 
@@ -239,7 +239,7 @@ def test_pause_and_resume_pipeline_with_subprocess_has_parallel():
 
     engine.resume_pipeline(pipeline["id"])
 
-    sleep(1)
+    sleep(2)
 
     finished.extend(not_execute)
     finished.append(pipeline["id"])

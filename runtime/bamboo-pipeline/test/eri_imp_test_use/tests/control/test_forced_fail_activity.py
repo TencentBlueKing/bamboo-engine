@@ -20,7 +20,7 @@ def test_forced_fail_schedule_node():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.forced_fail_activity(act_1.id, "forced fail by test")
     data = runtime.get_execution_data(act_1.id)
@@ -42,7 +42,7 @@ def test_forced_fail_schedule_node():
 
     engine.skip_node(act_1.id)
 
-    sleep(1)
+    sleep(2)
     assert_all_finish([pipeline["id"], start.id, act_1.id, end.id])
 
     data = runtime.get_execution_data(act_1.id)
@@ -97,7 +97,7 @@ def test_forced_fail_not_schedule_node():
 
     engine.skip_node(act_1.id)
 
-    sleep(1)
+    sleep(2)
     assert_all_finish([pipeline["id"], start.id, act_1.id, end.id])
 
     data = runtime.get_execution_data(act_1.id)
@@ -122,7 +122,7 @@ def test_forced_fail_callback_node():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.forced_fail_activity(act_1.id, "forced fail by test")
     data = runtime.get_execution_data(act_1.id)
@@ -135,14 +135,14 @@ def test_forced_fail_callback_node():
         "_loop": 1,
     }
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([act_1.id])
     assert_schedule_not_finish(act_1.id, times=0)
 
     engine.skip_node(act_1.id)
 
-    sleep(1)
+    sleep(2)
     assert_all_finish([pipeline["id"], start.id, act_1.id, end.id])
 
     data = runtime.get_execution_data(act_1.id)

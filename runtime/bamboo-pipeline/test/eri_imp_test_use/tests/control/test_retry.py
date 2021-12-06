@@ -19,7 +19,7 @@ def test_retry_with_simple_pipeline():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     old_state = runtime.get_state(act_1.id)
     assert_all_failed([act_1.id])
@@ -34,7 +34,7 @@ def test_retry_with_simple_pipeline():
 
     engine.retry_node(act_1.id, {"bit": 1})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([start.id, act_1.id, end.id])
     assert_exec_data_equal(
@@ -87,7 +87,7 @@ def test_retry_with_subprocess_has_parallel():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     fail_nodes = []
     fail_nodes.extend(acts_group_1)
@@ -100,7 +100,7 @@ def test_retry_with_subprocess_has_parallel():
     for node in fail_nodes:
         engine.retry_node(node.id, {"bit": 1})
 
-    sleep(1)
+    sleep(2)
     node_id_list = [
         pipeline["id"],
         start.id,

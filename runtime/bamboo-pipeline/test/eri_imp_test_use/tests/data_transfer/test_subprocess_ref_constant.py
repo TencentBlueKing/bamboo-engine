@@ -33,7 +33,7 @@ def test_ref_constant():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -84,7 +84,7 @@ def test_ref_constant_using_splice_input():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -135,7 +135,7 @@ def test_ref_constant_using_default_value():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -198,7 +198,7 @@ def test_nesting_ref_constant():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -267,7 +267,7 @@ def test_nesting_ref_constant_with_same_key():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 

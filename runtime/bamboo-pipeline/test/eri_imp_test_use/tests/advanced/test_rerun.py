@@ -376,7 +376,7 @@ def test_rerun_in_branch():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -426,19 +426,19 @@ def test_retry_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([act_1.id])
 
     engine.retry_node(act_1.id, {})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([act_1.id])
 
     engine.retry_node(act_1.id, {"can_go": True})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -506,13 +506,13 @@ def test_skip_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([act_1.id])
 
     engine.skip_node(act_1.id)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 

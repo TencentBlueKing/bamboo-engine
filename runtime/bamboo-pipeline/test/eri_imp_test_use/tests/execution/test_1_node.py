@@ -19,7 +19,7 @@ def test_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
     assert_all_finish([start.id, act_1.id, end.id, pipeline["id"]])
     assert_exec_data_equal(
         {

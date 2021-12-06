@@ -24,7 +24,7 @@ def test_subprocess_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     node_id_list = [pipeline["id"], subproc_start.id, subproc_act.id, subproc_end.id, start.id, subproc.id, end.id]
     node_data_dict = {
@@ -83,7 +83,7 @@ def test_parallel_subprocess_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     node_id_list.extend(
         [
@@ -146,7 +146,7 @@ def test_nest_subprocess_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     node_id_list = [
         pipeline["id"],
@@ -205,7 +205,7 @@ def test_subprocess_preset_context():
         pipeline=pipeline, root_pipeline_data={}, subprocess_context={"${user}": "user00", "${password}": "password"}
     )
 
-    sleep(1)
+    sleep(2)
 
     node_id_list = [
         pipeline["id"],

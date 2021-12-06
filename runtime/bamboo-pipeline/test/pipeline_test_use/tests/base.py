@@ -72,7 +72,7 @@ class EngineTestCase(object):
                 except Status.DoesNotExist:
                     pass
 
-            time.sleep(1)
+            time.sleep(2)
 
     def state_for(self, node):
         return Status.objects.get(id=node.id).state

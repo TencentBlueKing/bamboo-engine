@@ -27,7 +27,7 @@ def test_ref_output():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -84,7 +84,7 @@ def test_ref_subprocess_output():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -182,7 +182,7 @@ def test_ref_nesting_subprocess_output():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 

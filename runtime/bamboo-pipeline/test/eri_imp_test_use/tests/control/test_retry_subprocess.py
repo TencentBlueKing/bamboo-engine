@@ -26,14 +26,14 @@ def test_retry_subprocess():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     old_state = runtime.get_state(subproc.id)
     assert old_state.name == states.FAILED
 
     engine.retry_subprocess(subproc.id)
 
-    sleep(1)
+    sleep(2)
 
     state = runtime.get_state(subproc.id)
     assert state.name == states.FAILED

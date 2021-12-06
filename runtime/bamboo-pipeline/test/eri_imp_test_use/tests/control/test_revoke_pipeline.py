@@ -44,7 +44,7 @@ def test_revoke_pipeline_with_nest_parallel():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     engine.revoke_pipeline(pipeline["id"])
 
