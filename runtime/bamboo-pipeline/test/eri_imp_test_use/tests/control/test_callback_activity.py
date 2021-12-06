@@ -19,13 +19,13 @@ def test_callback_node_success():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
     engine.callback(act_1.id, state.version, {})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([start.id, act_1.id, end.id])
     assert_schedule_finish(act_1.id, times=1)
@@ -43,7 +43,7 @@ def test_multi_callback_node_success():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
@@ -75,7 +75,7 @@ def test_multi_callback_node_fail_and_callback_again():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
@@ -88,7 +88,7 @@ def test_multi_callback_node_fail_and_callback_again():
     assert_schedule_not_finish(act_1.id, times=1, scheduling=False, expired=True)
 
     engine.retry_node(act_1.id)
-    sleep(1)
+    sleep(2)
 
     state = runtime.get_state(act_1.id)
     for schedule_time in range(5):
@@ -112,23 +112,23 @@ def test_callback_node_fail_and_callback_again():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
     engine.callback(act_1.id, state.version, {"bit": 0})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([act_1.id])
     assert_schedule_not_finish(act_1.id, times=1, scheduling=False)
 
     engine.retry_node(act_1.id)
-    sleep(1)
+    sleep(2)
 
     state = runtime.get_state(act_1.id)
     engine.callback(act_1.id, state.version, data={})
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([start.id, act_1.id, end.id])
     assert_schedule_finish(act_1.id, times=1, version=state.version)
@@ -146,17 +146,17 @@ def test_callback_node_fail_and_skip():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
     engine.callback(act_1.id, state.version, {"bit": 0})
 
-    sleep(1)
+    sleep(2)
 
     engine.skip_node(act_1.id)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([start.id, act_1.id, end.id])
     assert_schedule_not_finish(act_1.id, times=1)

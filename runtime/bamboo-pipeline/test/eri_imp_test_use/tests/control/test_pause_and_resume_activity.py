@@ -33,7 +33,7 @@ def test_pause_activity_in_plain():
 
     engine.resume_node_appoint(act_1.id)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"], start.id, act_0.id, act_1.id, end.id])
 
@@ -54,7 +54,7 @@ def test_pause_activity_in_plain_early_resume():
 
     engine.pause_node_appoint(act_1.id)
 
-    sleep(1)
+    sleep(2)
 
     assert_all_running([pipeline["id"], act_0.id])
     assert_all_finish([start.id])

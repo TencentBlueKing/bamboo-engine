@@ -26,7 +26,7 @@ def test_skip_exclusive_gateway():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_failed([eg.id])
 

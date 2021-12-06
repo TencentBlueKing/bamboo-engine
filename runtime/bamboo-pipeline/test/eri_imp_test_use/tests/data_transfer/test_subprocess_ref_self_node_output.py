@@ -44,7 +44,7 @@ def test_ref_self_node_constant():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(1)
+    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
