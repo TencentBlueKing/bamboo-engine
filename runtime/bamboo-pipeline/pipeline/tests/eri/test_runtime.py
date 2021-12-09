@@ -845,6 +845,11 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "type": "plain",
                 "value": "${_system.task_url}",
                 "need_render": True
+            },
+            "n0004": {
+                "type": "splice",
+                "value": "${_system.task_url}",
+                "need_render": True
             }
         }
         test_inputs = {
@@ -856,6 +861,9 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
             },
             "n0003": {
                 "need_render": False, "value": "${_system.task_url}"
+            },
+            "n0004": {
+                "need_render": True, "value": "${_system.task_url}"
             }
         }
         inputs, _ = self.runtime._data_inputs_assemble(pipeline_id, node_id, node_inputs)
