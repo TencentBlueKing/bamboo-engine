@@ -100,7 +100,9 @@ class BambooDjangoRuntime(
                 inputs[k] = {"need_render": True, "value": cv_key}
             else:
                 inputs[k] = {"need_render": v["type"] == "splice", "value": v["value"]}
-
+            # inject need_render from node_inputs[item].need_render
+            if not v.get("need_render", True):
+                inputs[k]["need_render"] = False
         return inputs, context_values
 
     def _gen_executable_end_event_node(self, event: dict, pipeline: dict, root_id: str, parent_id: str) -> Node:
