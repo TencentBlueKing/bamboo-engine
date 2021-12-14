@@ -7,7 +7,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-14.04
+    runs-on: ubuntu-latest
     env:
       DB_DATABASE: pipeline_test
       DB_USER: root
