@@ -826,3 +826,45 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "references": set(),
             },
         )
+
+    def test_data_inputs_assemble(self):
+        pipeline_id = "1"
+        node_id = "2"
+        node_inputs = {
+            "n0001": {
+                "type": "lazy",
+                "value": "${_system.task_url}",
+                "need_render": False
+            },
+            "n0002": {
+                "type": "splice",
+                "value": "${_system.task_url}",
+                "need_render": False
+            },
+            "n0003": {
+                "type": "plain",
+                "value": "${_system.task_url}",
+                "need_render": True
+            },
+            "n0004": {
+                "type": "splice",
+                "value": "${_system.task_url}",
+                "need_render": True
+            }
+        }
+        test_inputs = {
+            "n0001": {
+                "need_render": False, "value": "${n0001_2}"
+            },
+            "n0002": {
+                "need_render": False, "value": "${_system.task_url}"
+            },
+            "n0003": {
+                "need_render": False, "value": "${_system.task_url}"
+            },
+            "n0004": {
+                "need_render": True, "value": "${_system.task_url}"
+            }
+        }
+        inputs, _ = self.runtime._data_inputs_assemble(pipeline_id, node_id, node_inputs)
+        self.assertEqual(test_inputs, inputs)
