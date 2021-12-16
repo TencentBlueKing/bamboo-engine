@@ -23,7 +23,7 @@ from contextlib import contextmanager
 
 from . import states
 from . import validator
-from .local import set_node_info, CurrentNodeInfo
+from .local import set_node_info, clear_node_info, CurrentNodeInfo
 from .exceptions import InvalidOperationError, NotFoundError, StateVersionNotMatchError
 from .handler import HandlerFactory
 from .metrics import (
@@ -622,7 +622,7 @@ class Engine:
                 # 冻结检测
                 if self.runtime.is_frozen(process_id):
                     logger.info(
-                        "[%s] root pipeline freeze at node %s",
+                        "root pipeline[%s] freeze at node %s",
                         process_info.root_pipeline_id,
                         current_node_id,
                     )
@@ -635,7 +635,7 @@ class Engine:
                 if node_state_map[process_info.root_pipeline_id] == states.REVOKED:
                     self.runtime.die(process_id)
                     logger.info(
-                        "[%s] root pipeline revoked checked at node %s",
+                        "root pipeline[%s] revoked checked at node %s",
                         process_info.root_pipeline_id,
                         current_node_id,
                     )
@@ -645,7 +645,7 @@ class Engine:
                 for pid in process_info.pipeline_stack:
                     if node_state_map[pid] == states.SUSPENDED:
                         logger.info(
-                            "[%s] process %s suspended by subprocess %s",
+                            "root pipeline[%s] process %s suspended by subprocess %s",
                             process_info.root_pipeline_id,
                             process_id,
                             pid,
@@ -690,7 +690,7 @@ class Engine:
                         )
                         self.runtime.suspend(process_id, current_node_id)
                         logger.info(
-                            "[%s] process %s suspended by node %s",
+                            "root_pipeline[%s] process %s suspended by node %s",
                             process_info.root_pipeline_id,
                             process_id,
                             current_node_id,
@@ -727,19 +727,26 @@ class Engine:
                     reset_error_ignored=reset_mark_bit,
                     refresh_version=reset_mark_bit,
                 )
+                set_node_info(CurrentNodeInfo(node_id=current_node_id, version=version, loop=loop))
 
                 logger.info(
-                    "[%s] before execute %s(%s) state: %s",
+                    "root pipeline[%s] before execute %s(%s) state: %s",
                     process_info.root_pipeline_id,
                     node.__class__.__name__,
                     current_node_id,
                     node_state,
                 )
                 handler = HandlerFactory.get_handler(node, self.runtime)
-                set_node_info(CurrentNodeInfo(node_id=current_node_id, version=version, loop=loop))
                 type_label = self._get_metrics_node_type(node)
                 execute_start = time.time()
                 execute_result = handler.execute(process_info, loop, inner_loop, version)
+                logger.info(
+                    "root pipeline[%s] node(%s) execute result: %s",
+                    process_info.root_pipeline_id,
+                    node.id,
+                    execute_result.__dict__,
+                )
+
                 ENGINE_NODE_EXECUTE_TIME.labels(type=type_label, hostname=self._hostname).observe(
                     time.time() - execute_start
                 )
@@ -762,7 +769,7 @@ class Engine:
                 elif execute_result.dispatch_processes:
                     children = [d.process_id for d in execute_result.dispatch_processes]
                     logger.info(
-                        "[%s] %s dispatch %s children: %s",
+                        "root pipeline[%s] with top pipeline[%s] dispatch %s children: %s",
                         process_info.root_pipeline_id,
                         process_info.top_pipeline_id,
                         len(execute_result.dispatch_processes),
@@ -820,6 +827,8 @@ class Engine:
                 )
 
                 return
+            finally:
+                clear_node_info()
 
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)
@@ -856,7 +865,7 @@ class Engine:
             # schedule alredy finished
             if schedule.finished:
                 logger.warning(
-                    "[%s] schedule(%s) %s with version %s already finished",
+                    "root pipeline[%s] schedule(%s) %s with version %s already finished",
                     root_pipeline_id,
                     schedule_id,
                     node_id,
@@ -867,7 +876,7 @@ class Engine:
             # 检查 schedule 是否过期
             if state.version != schedule.version:
                 logger.info(
-                    "[%s] schedule(%s) %s with version %s expired, current version: %s",
+                    "root pipeline[%s] schedule(%s) %s with version %s expired, current version: %s",
                     root_pipeline_id,
                     schedule_id,
                     node_id,
@@ -880,7 +889,7 @@ class Engine:
             # 检查节点状态是否合法
             if state.name != states.RUNNING:
                 logger.info(
-                    "[%s] schedule(%s) %s with version %s state is not running: %s",
+                    "root pipeline[%s] schedule(%s) %s with version %s state is not running: %s",
                     root_pipeline_id,
                     schedule_id,
                     node_id,
@@ -897,7 +906,7 @@ class Engine:
                 # only retry at multiple calback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
-                        "[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
@@ -907,7 +916,7 @@ class Engine:
 
                 try_after = random.randint(1, 5)
                 logger.info(
-                    "[%s] schedule(%s) lock %s with data %s fetch fail, try after %s",
+                    "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s",
                     root_pipeline_id,
                     node_id,
                     schedule_id,
@@ -942,7 +951,7 @@ class Engine:
                 type_label = self._get_metrics_node_type(node)
 
                 logger.info(
-                    "[%s] before schedule node %s with data %s",
+                    "root pipeline[%s] before schedule node %s with data %s",
                     root_pipeline_id,
                     node,
                     callback_data,
@@ -951,6 +960,12 @@ class Engine:
                 schedule_result = handler.schedule(process_info, state.loop, state.inner_loop, schedule, callback_data)
                 ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
                     time.time() - schedule_start
+                )
+                logger.info(
+                    "root pipeline[%s] node(%s) schedule result: %s",
+                    process_info.root_pipeline_id,
+                    node.id,
+                    schedule_result.__dict__,
                 )
 
                 if schedule_result.has_next_schedule:
@@ -972,7 +987,7 @@ class Engine:
         except Exception as e:
             ex_data = traceback.format_exc()
             logger.warning(
-                "[%s]schedule exception catch at node(%s): %s",
+                "root pipeline[%s] schedule exception catch at node(%s): %s",
                 root_pipeline_id,
                 node_id,
                 ex_data,
@@ -981,7 +996,7 @@ class Engine:
             # state version already changed, so give up this schedule
             if isinstance(e, StateVersionNotMatchError):
                 logger.exception(
-                    "[%s]schedule exception catch StateVersionNotMatchError at node(%s): %s",
+                    "root pipeline[%s] schedule exception catch StateVersionNotMatchError at node(%s): %s",
                     root_pipeline_id,
                     node_id,
                     ex_data,
@@ -997,6 +1012,8 @@ class Engine:
             self.runtime.set_execution_data_outputs(node_id, outputs)
 
             self.runtime.set_state(node_id=node_id, to_state=states.FAILED, set_archive_time=True)
+        finally:
+            clear_node_info()
 
     # help method
     @contextmanager

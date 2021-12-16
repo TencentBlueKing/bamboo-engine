@@ -38,7 +38,7 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         """
 
         logger.info(
-            "[%s] %s executable end event: %s",
+            "root_pipeline[%s] node(%s) executable end event: %s",
             process_info.root_pipeline_id,
             self.node.id,
             self.node,
@@ -53,7 +53,7 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         except Exception:
             ex_data = traceback.format_exc()
             logger.warning(
-                "[%s] %s executable end event execute raise: %s",
+                "root_pipeline[%s] node(%s) executable end event execute raise: %s",
                 process_info.root_pipeline_id,
                 self.node.id,
                 ex_data,

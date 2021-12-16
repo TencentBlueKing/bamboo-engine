@@ -43,7 +43,7 @@ class SubProcessHandler(NodeHandler):
         root_pipeline_id = process_info.root_pipeline_id
 
         logger.info(
-            "[%s] %s subprocess data: %s",
+            "root_pipeline[%s] node(%s) subprocess data: %s",
             root_pipeline_id,
             self.node.id,
             data,
@@ -55,7 +55,7 @@ class SubProcessHandler(NodeHandler):
         # resolve inputs context references
         inputs_refs = Template(need_render_inputs).get_reference()
         logger.info(
-            "[%s] %s subprocess original refs: %s",
+            "root_pipeline[%s] node(%s) subprocess original refs: %s",
             root_pipeline_id,
             self.node.id,
             inputs_refs,
@@ -64,7 +64,7 @@ class SubProcessHandler(NodeHandler):
         additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
         inputs_refs = inputs_refs.union(additional_refs)
         logger.info(
-            "[%s] %s subprocess final refs: %s",
+            "root_pipeline[%s] node(%s) subprocess final refs: %s",
             root_pipeline_id,
             self.node.id,
             inputs_refs,
@@ -85,7 +85,7 @@ class SubProcessHandler(NodeHandler):
                 )
             )
         logger.info(
-            "[%s] %s subprocess parent context values: %s",
+            "root_pipeline[%s] node(%s) subprocess parent context values: %s",
             root_pipeline_id,
             self.node.id,
             context_values,
@@ -94,7 +94,7 @@ class SubProcessHandler(NodeHandler):
         context = Context(self.runtime, context_values, root_pipeline_inputs)
         hydrated_context = context.hydrate(deformat=True)
         logger.info(
-            "[%s] %s subprocess parent hydrated context: %s",
+            "root_pipeline[%s] node(%s) subprocess parent hydrated context: %s",
             root_pipeline_id,
             self.node.id,
             hydrated_context,
@@ -108,7 +108,7 @@ class SubProcessHandler(NodeHandler):
             for key, value in subprocess_inputs.items()
         }
         logger.info(
-            "[%s] %s subprocess inject context: %s",
+            "root_pipeline[%s] node(%s) subprocess inject context: %s",
             root_pipeline_id,
             self.node.id,
             sub_context_values,

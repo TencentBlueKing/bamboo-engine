@@ -51,7 +51,7 @@ class ExclusiveGatewayHandler(NodeHandler):
             evaluation_refs = evaluation_refs.union(refs)
 
         logger.info(
-            "[%s] %s evaluation original refs: %s",
+            "root_pipeline[%s] node(%s) evaluation original refs: %s",
             root_pipeline_id,
             self.node.id,
             evaluation_refs,
@@ -60,14 +60,14 @@ class ExclusiveGatewayHandler(NodeHandler):
         evaluation_refs = evaluation_refs.union(additional_refs)
 
         logger.info(
-            "[%s] %s evaluation final refs: %s",
+            "root_pipeline[%s] node(%s) evaluation final refs: %s",
             root_pipeline_id,
             self.node.id,
             evaluation_refs,
         )
         context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=evaluation_refs)
         logger.info(
-            "[%s] %s evaluation context values: %s",
+            "root_pipeline[%s] node(%s) evaluation context values: %s",
             root_pipeline_id,
             self.node.id,
             context_values,
@@ -78,7 +78,7 @@ class ExclusiveGatewayHandler(NodeHandler):
             hydrated_context = {k: transform_escape_char(v) for k, v in context.hydrate(deformat=True).items()}
         except Exception as e:
             logger.exception(
-                "[%s] %s context hydrate error",
+                "root_pipeline[%s] node(%s) context hydrate error",
                 root_pipeline_id,
                 self.node.id,
             )
@@ -90,7 +90,7 @@ class ExclusiveGatewayHandler(NodeHandler):
         for c in self.node.conditions:
             resolved_evaluate = Template(c.evaluation).render(hydrated_context)
             logger.info(
-                "[%s] %s render evaluation %s: %s with %s",
+                "root_pipeline[%s] node(%s) render evaluation %s: %s with %s",
                 root_pipeline_id,
                 self.node.id,
                 c.evaluation,
@@ -99,7 +99,13 @@ class ExclusiveGatewayHandler(NodeHandler):
             )
             try:
                 result = BoolRule(resolved_evaluate).test()
-                logger.info("[%s] %s %s test result: %s", root_pipeline_id, self.node.id, resolved_evaluate, result)
+                logger.info(
+                    "root_pipeline[%s] node(%s) %s test result: %s",
+                    root_pipeline_id,
+                    self.node.id,
+                    resolved_evaluate,
+                    result,
+                )
             except Exception as e:
                 # test failed
                 return self._execute_fail(

@@ -66,7 +66,7 @@ class ServiceActivityHandler(NodeHandler):
         render_escape_inputs = data.render_escape_inputs()
 
         logger.info(
-            "[%s] %s activity execute data: %s, root inputs: %s",
+            "root_pipeline[%s] node(%s) activity execute data: %s, root inputs: %s",
             root_pipeline_id,
             self.node.id,
             data,
@@ -76,7 +76,7 @@ class ServiceActivityHandler(NodeHandler):
         # resolve inputs context references
         inputs_refs = set(Template(need_render_inputs).get_reference())
         logger.info(
-            "[%s] %s activity original refs: %s",
+            "root_pipeline[%s] node(%s) activity original refs: %s",
             root_pipeline_id,
             self.node.id,
             inputs_refs,
@@ -85,7 +85,7 @@ class ServiceActivityHandler(NodeHandler):
         additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
         inputs_refs = inputs_refs.union(additional_refs)
         logger.info(
-            "[%s] %s activity final refs: %s",
+            "root_pipeline[%s] node(%s) activity final refs: %s",
             root_pipeline_id,
             self.node.id,
             inputs_refs,
@@ -115,7 +115,7 @@ class ServiceActivityHandler(NodeHandler):
             )
 
         logger.info(
-            "[%s] %s activity context values: %s",
+            "root_pipeline[%s] node(%s) activity context values: %s",
             root_pipeline_id,
             self.node.id,
             context_values,
@@ -127,7 +127,7 @@ class ServiceActivityHandler(NodeHandler):
             hydrated_context = context.hydrate(deformat=True)
         except Exception as e:
             logger.exception(
-                "[%s] %s activity context hydrate error",
+                "root_pipeline[%s] node(%s) activity context hydrate error",
                 root_pipeline_id,
                 self.node.id,
             )
@@ -154,7 +154,7 @@ class ServiceActivityHandler(NodeHandler):
             )
 
         logger.info(
-            "[%s] %s actvity hydrated context: %s",
+            "root_pipeline[%s] node(%s) actvity hydrated context: %s",
             root_pipeline_id,
             self.node.id,
             hydrated_context,
@@ -192,13 +192,13 @@ class ServiceActivityHandler(NodeHandler):
 
         # pre_execute and excute
         logger.debug(
-            "[%s] %s service data before execute: %s",
+            "root_pipeline[%s] node(%s) service data before execute: %s",
             self.node.id,
             root_pipeline_id,
             service_data,
         )
         logger.debug(
-            "[%s] %s root pipeline data before execute: %s",
+            "root_pipeline[%s] node(%s) root pipeline data before execute: %s",
             self.node.id,
             root_pipeline_id,
             root_pipeline_data,
@@ -210,8 +210,8 @@ class ServiceActivityHandler(NodeHandler):
         except Exception:
             ex_data = traceback.format_exc()
             service_data.outputs.ex_data = ex_data
-            logger.warning("[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
-        logger.debug("[%s] service data after execute: %s", root_pipeline_id, service_data)
+            logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
+        logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
         service_data.outputs._result = execute_success
         service_data.outputs._loop = loop
         service_data.outputs._inner_loop = inner_loop
@@ -389,7 +389,7 @@ class ServiceActivityHandler(NodeHandler):
         root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
         root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
         logger.info(
-            "[%s] %s activity schedule data: %s, root inputs: %s",
+            "root_pipeline[%s] node(%s) activity schedule data: %s, root inputs: %s",
             root_pipeline_id,
             self.node.id,
             service_data,

@@ -46,7 +46,7 @@ class EmptyEndEventHandler(NodeHandler):
         # write pipeline data
         context_outputs = self.runtime.get_context_outputs(pipeline_id)
         logger.info(
-            "[%s] %s context outputs: %s",
+            "root_pipeline[%s] pipeline(%s) context outputs: %s",
             root_pipeline_id,
             pipeline_id,
             context_outputs,
@@ -54,7 +54,7 @@ class EmptyEndEventHandler(NodeHandler):
 
         context_values = self.runtime.get_context_values(pipeline_id=pipeline_id, keys=context_outputs)
         logger.info(
-            "[%s] %s context values: %s",
+            "root_pipeline[%s] pipeline(%s) context values: %s",
             root_pipeline_id,
             pipeline_id,
             context_values,
@@ -63,7 +63,7 @@ class EmptyEndEventHandler(NodeHandler):
         context = Context(self.runtime, context_values, root_pipeline_inputs)
         hydrated_context = context.hydrate(deformat=False)
         logger.info(
-            "[%s] %s hydrated context: %s",
+            "root_pipeline[%s] pipeline(%s) hydrated context: %s",
             root_pipeline_id,
             pipeline_id,
             hydrated_context,
