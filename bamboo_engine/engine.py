@@ -825,6 +825,8 @@ class Engine:
                     set_started_time=True,
                     set_archive_time=True,
                 )
+
+                return
             finally:
                 clear_node_info()
 
