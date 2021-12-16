@@ -48,7 +48,7 @@ class EmptyStartEventHandler(NodeHandler):
             upsert_context_dict = dict()
             pre_render_keys = data.inputs["pre_render_keys"].value
 
-            logger.info("{} pre_render_keys are: {}".format(top_pipeline_id, ",".join(pre_render_keys)))
+            logger.info("top_pipeline({}) pre_render_keys are: {}".format(top_pipeline_id, ",".join(pre_render_keys)))
 
             refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=set(pre_render_keys))
 
@@ -66,7 +66,7 @@ class EmptyStartEventHandler(NodeHandler):
                         value=hydrated_context[context_key],
                     )
 
-            logger.info(f"{top_pipeline_id} pre_render_keys results are: {upsert_context_dict}")
+            logger.info(f"top_pipeline({top_pipeline_id}) pre_render_keys results are: {upsert_context_dict}")
             self.runtime.upsert_plain_context_values(top_pipeline_id, upsert_context_dict)
 
         self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)

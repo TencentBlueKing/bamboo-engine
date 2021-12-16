@@ -53,3 +53,9 @@ def get_node_info() -> Optional[CurrentNodeInfo]:
     :rtype: [type]
     """
     return getattr(_local, "current_node_info", None)
+
+def clear_node_info():
+    """
+    清理当前进程/线程/协程 Local 中的当前节点信息
+    """
+    _local.current_node_info = None
