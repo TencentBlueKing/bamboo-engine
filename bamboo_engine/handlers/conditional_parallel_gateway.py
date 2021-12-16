@@ -91,7 +91,13 @@ class ConditionalParallelGatewayHandler(NodeHandler):
             )
             try:
                 result = BoolRule(resolved_evaluate).test()
-                logger.info("root_pipeline[%s] node(%s) %s test result: %s", root_pipeline_id, self.node.id, resolved_evaluate, result)
+                logger.info(
+                    "root_pipeline[%s] node(%s) %s test result: %s",
+                    root_pipeline_id,
+                    self.node.id,
+                    resolved_evaluate,
+                    result,
+                )
             except Exception as e:
                 # test failed
                 return self._execute_fail(

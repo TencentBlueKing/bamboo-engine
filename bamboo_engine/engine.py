@@ -638,7 +638,7 @@ class Engine:
                         "root pipeline[%s] revoked checked at node %s",
                         process_info.root_pipeline_id,
                         current_node_id,
-                )
+                    )
                     return
 
                 # 检测流程栈中是否有被暂停的流程
@@ -744,7 +744,7 @@ class Engine:
                     "root pipeline[%s] node(%s) execute result: %s",
                     process_info.root_pipeline_id,
                     node.id,
-                    execute_result.__dict__
+                    execute_result.__dict__,
                 )
 
                 ENGINE_NODE_EXECUTE_TIME.labels(type=type_label, hostname=self._hostname).observe(
@@ -963,7 +963,7 @@ class Engine:
                     "root pipeline[%s] node(%s) schedule result: %s",
                     process_info.root_pipeline_id,
                     node.id,
-                    schedule_result.__dict__
+                    schedule_result.__dict__,
                 )
 
                 if schedule_result.has_next_schedule:
