@@ -37,7 +37,7 @@ You can also use python api to diagnose a stuck pipeline by use `PipelineDoctor`
 
 - pipeline_id: the id of stuck pipeline
 
-this method will return a `pipeline.eri.doctor.Summary` class with these attributes
+this method will return a `pipeline.eri.doctor.DiagnoseSummary` class with these attributes
 
 - healed: is there heal call in this diagnose
 - logs: the log of this diagnose
