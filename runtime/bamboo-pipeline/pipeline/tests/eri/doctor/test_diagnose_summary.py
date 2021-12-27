@@ -13,12 +13,12 @@ specific language governing permissions and limitations under the License.
 
 from django.test import TestCase
 
-from pipeline.eri.doctor import DignoseSummary
+from pipeline.eri.doctor import DiagnoseSummary
 
 
-class DignoseSummaryTestCase(TestCase):
+class DiagnoseSummaryTestCase(TestCase):
     def test(self):
-        summary = DignoseSummary(healed=True)
+        summary = DiagnoseSummary(healed=True)
         self.assertTrue(summary.healed)
         summary.log("1")
         summary.log("2")

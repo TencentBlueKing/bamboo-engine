@@ -57,7 +57,7 @@ class Doctor(object, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
 
-class DignoseSummary:
+class DiagnoseSummary:
     def __init__(self, healed: bool) -> None:
         self.healed = healed
         self.logs = []
@@ -367,8 +367,8 @@ class PipelineDoctor:
     def __init__(self, heal_it: bool) -> None:
         self.heal_it = heal_it
 
-    def dignose(self, pipeline_id: str) -> DignoseSummary:
-        summary = DignoseSummary(healed=self.heal_it)
+    def diagnose(self, pipeline_id: str) -> DiagnoseSummary:
+        summary = DiagnoseSummary(healed=self.heal_it)
 
         try:
             state = State.objects.get(node_id=pipeline_id)
@@ -377,7 +377,7 @@ class PipelineDoctor:
             return summary
 
         if state.name != states.RUNNING:
-            summary.log("pipeline current state is %s(expect: RUNNING), can not dignose" % state.name)
+            summary.log("pipeline current state is %s(expect: RUNNING), can not diagnose" % state.name)
             return summary
 
         related_processes = Process.objects.filter(root_pipeline_id=pipeline_id)

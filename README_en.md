@@ -35,6 +35,7 @@ bamboo-engine is a event-driven workflow engine. It can
     - [Run Custom Component](./docs/user_guide/run_your_component.md)
     - [Component Unittest](./docs/user_guide/component_unit_test.md)
     - [Worker Configuration](./docs/user_guide/workers.md)
+    - [Doctor](./docs/user_guide/bamboo-pipeline/doctor.md)
 
 ## Engine Design
 

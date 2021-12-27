@@ -109,7 +109,7 @@ class PipelineDoctorTestCase(TestCase):
         MockState.DoesNotExist = State.DoesNotExist
 
         with patch("pipeline.eri.doctor.State", MockState):
-            summary = self.doctor_heal.dignose(self.pipeline_id)
+            summary = self.doctor_heal.diagnose(self.pipeline_id)
 
         self.assertEqual(summary.logs, ["can not found state for pipeline: pipeline_id"])
         MockState.objects.get.assert_called_once_with(node_id=self.pipeline_id)
@@ -121,9 +121,9 @@ class PipelineDoctorTestCase(TestCase):
         MockState.objects.get = MagicMock(return_value=state)
 
         with patch("pipeline.eri.doctor.State", MockState):
-            summary = self.doctor_heal.dignose(self.pipeline_id)
+            summary = self.doctor_heal.diagnose(self.pipeline_id)
 
-        self.assertEqual(summary.logs, ["pipeline current state is FINISHED(expect: RUNNING), can not dignose"])
+        self.assertEqual(summary.logs, ["pipeline current state is FINISHED(expect: RUNNING), can not diagnose"])
         MockState.objects.get.assert_called_once_with(node_id=self.pipeline_id)
 
     def test_realte_process_not_found(self):
@@ -136,7 +136,7 @@ class PipelineDoctorTestCase(TestCase):
 
         with patch("pipeline.eri.doctor.State", MockState):
             with patch("pipeline.eri.doctor.Process", MockProcess):
-                summary = self.doctor_heal.dignose(self.pipeline_id)
+                summary = self.doctor_heal.diagnose(self.pipeline_id)
 
         self.assertEqual(summary.logs, ["can not found related process for pipeline: pipeline_id"])
         MockState.objects.get.assert_called_once_with(node_id=self.pipeline_id)
@@ -155,7 +155,7 @@ class PipelineDoctorTestCase(TestCase):
 
         with patch("pipeline.eri.doctor.State", MockState):
             with patch("pipeline.eri.doctor.Process", MockProcess):
-                summary = self.doctor_heal.dignose(self.pipeline_id)
+                summary = self.doctor_heal.diagnose(self.pipeline_id)
 
         self.assertEqual(
             summary.logs,
@@ -185,7 +185,7 @@ class PipelineDoctorTestCase(TestCase):
 
         with patch("pipeline.eri.doctor.State", MockState):
             with patch("pipeline.eri.doctor.Process", MockProcess):
-                summary = self.doctor_heal.dignose(self.pipeline_id)
+                summary = self.doctor_heal.diagnose(self.pipeline_id)
 
         self.assertTrue(summary.healed)
         self.assertEqual(
@@ -230,7 +230,7 @@ class PipelineDoctorTestCase(TestCase):
 
         with patch("pipeline.eri.doctor.State", MockState):
             with patch("pipeline.eri.doctor.Process", MockProcess):
-                summary = self.doctor_not_heal.dignose(self.pipeline_id)
+                summary = self.doctor_not_heal.diagnose(self.pipeline_id)
 
         self.assertFalse(summary.healed)
         self.assertEqual(
