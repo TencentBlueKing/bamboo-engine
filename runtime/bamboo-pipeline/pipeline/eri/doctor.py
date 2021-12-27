@@ -341,7 +341,9 @@ class SuspendedProcessFinishedStateDoctor(Doctor):
                 parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
 
+
 # doctor
+
 
 class PipelineDoctor:
     DECISION_TABLE = {
@@ -399,7 +401,8 @@ class PipelineDoctor:
                 state = State.objects.get(node_id=process.current_node_id)
             except State.DoesNotExist:
                 summary.log_exception(
-                    "can not find state for process(id:%s, asleep: %s, suspended: %s) current node: %s" % (process.id, process.asleep, process.suspended, process.current_node_id)
+                    "can not find state for process(id:%s, asleep: %s, suspended: %s) current node: %s"
+                    % (process.id, process.asleep, process.suspended, process.current_node_id)
                 )
                 continue
 

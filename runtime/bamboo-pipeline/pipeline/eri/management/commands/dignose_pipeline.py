@@ -16,22 +16,16 @@ from django.core.management.base import BaseCommand, CommandParser
 
 from pipeline.eri.doctor import PipelineDoctor
 
+
 class Command(BaseCommand):
     help = "Dignose a stuck pipeline and heal it"
 
     def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument(dest="pipeline_id", help="ID of pipeline which need to dignose")
         parser.add_argument(
-            dest="pipeline_id",
-            help="ID of pipeline which need to dignose"
+            "--heal", action="store_true", dest="heal_it", default=False, help="Whether to try to fix the pipeline"
         )
-        parser.add_argument(
-            "--heal",
-            action="store_true",
-            dest="heal_it",
-            default=False,
-            help="Whether to try to fix the pipeline"
-        )
-    
+
     def handle(self, *args: Any, **options: Any) -> Optional[str]:
         doctor = PipelineDoctor(heal_it=options["heal_it"])
         summary = doctor.dignose(pipeline_id=options["pipeline_id"])

@@ -25,13 +25,10 @@ from pipeline.eri.doctor import (
     RunningProcessFailedStateDoctor,
     RunningProcessFinishedStateDoctor,
     AsleepProcessReadyStateDoctor,
-    HealthyDoctor,
     AsleepProcessSuspendedStateDoctor,
-    HealthyDoctor,
     AsleepProcessFinishedStateDoctor,
     SuspendedProcessReadyStateDoctor,
     SuspendedProcessRunningStateDoctor,
-    HealthyDoctor,
     SuspendedProcessFailedStateDoctor,
     SuspendedProcessFinishedStateDoctor,
 )
