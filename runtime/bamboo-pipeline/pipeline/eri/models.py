@@ -25,12 +25,12 @@ class Process(models.Model):
     frozen = models.BooleanField(_("是否处于冻结状态"), default=False)
     dead = models.BooleanField(_("是否已经死亡"), default=False)
     last_heartbeat = models.DateTimeField(_("上次心跳时间"), auto_now_add=True, db_index=True)
-    destination_id = models.CharField(_("执行终点 ID"), default="", max_length=33)
+    destination_id = models.CharField(_("执行终点 ID"), default="", max_length=33, blank=True)
     current_node_id = models.CharField(_("当前节点 ID"), default="", max_length=33, db_index=True)
     root_pipeline_id = models.CharField(_("根流程 ID"), null=False, max_length=33, db_index=True)
-    suspended_by = models.CharField(_("导致进程暂停的节点 ID"), default="", max_length=33, db_index=True)
+    suspended_by = models.CharField(_("导致进程暂停的节点 ID"), default="", max_length=33, db_index=True, blank=True)
     priority = models.IntegerField(_("优先级"))
-    queue = models.CharField(_("所属队列"), default="", max_length=128)
+    queue = models.CharField(_("所属队列"), default="", max_length=128, blank=True)
     pipeline_stack = models.TextField(_("流程栈"), default="[]", null=False)
 
 
@@ -53,8 +53,8 @@ class State(models.Model):
     skip = models.BooleanField(_("是否跳过"), default=False)
     error_ignored = models.BooleanField(_("是否出错后自动忽略"), default=False)
     created_time = models.DateTimeField(_("创建时间"), auto_now_add=True)
-    started_time = models.DateTimeField(_("开始时间"), null=True)
-    archived_time = models.DateTimeField(_("归档时间"), null=True)
+    started_time = models.DateTimeField(_("开始时间"), null=True, blank=True)
+    archived_time = models.DateTimeField(_("归档时间"), null=True, blank=True)
 
 
 class Schedule(models.Model):
@@ -101,7 +101,7 @@ class ContextValue(models.Model):
     key = models.CharField(_("变量 key"), null=False, max_length=128)
     type = models.IntegerField(_("变量类型"))
     serializer = models.CharField(_("序列化器"), null=False, max_length=32)
-    code = models.CharField(_("计算型变量类型唯一标志"), default="", max_length=128)
+    code = models.CharField(_("计算型变量类型唯一标志"), default="", max_length=128, blank=True)
     value = models.TextField(_("变量值"))
     references = models.TextField(_("所有对其他变量直接或间接的引用"))
 
@@ -136,11 +136,11 @@ class ExecutionHistory(models.Model):
 class LogEntry(models.Model):
     id = models.BigAutoField(_("ID"), primary_key=True)
     node_id = models.CharField(_("节点 ID"), max_length=33)
-    version = models.CharField(_("状态版本"), default="", max_length=33)
+    version = models.CharField(_("状态版本"), default="", max_length=33, blank=True)
     loop = models.IntegerField(_("循环次数"), default=1)
     logger_name = models.CharField(_("logger 名称"), max_length=128)
     level_name = models.CharField(_("日志等级"), max_length=32)
-    message = models.TextField(_("日志内容"), null=True)
+    message = models.TextField(_("日志内容"), null=True, blank=True)
     logged_at = models.DateTimeField(_("输出时间"), auto_now_add=True, db_index=True)
 
     class Meta:

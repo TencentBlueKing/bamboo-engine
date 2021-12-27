@@ -16,8 +16,7 @@ import json
 import traceback
 
 from bamboo_engine import states
-from bamboo_engine.builder.flow.gateway import ExclusiveGateway
-from bamboo_engine.eri.models import ParallelGateway, ConditionalParallelGateway
+from bamboo_engine.eri.models import ParallelGateway, ConditionalParallelGateway, ExclusiveGateway
 
 from pipeline.eri.models import Process, State, Node
 from pipeline.eri.runtime import BambooDjangoRuntime
@@ -120,7 +119,7 @@ class RunningProcessReadyStateDoctor(Doctor):
             process_id=self.process.id,
             node_id=self.process.current_node_id,
             root_pipeline_id=self.process.root_pipeline_id,
-            parent_pipeline_id=json.load(self.process.parent_id)[-1],
+            parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
         )
 
 
@@ -134,7 +133,7 @@ class AsleepProcessReadyStateDoctor(Doctor):
             process_id=self.process.id,
             node_id=self.process.current_node_id,
             root_pipeline_id=self.process.root_pipeline_id,
-            parent_pipeline_id=json.load(self.process.parent_id)[-1],
+            parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
         )
 
 
@@ -149,7 +148,7 @@ class SuspendedProcessReadyStateDoctor(Doctor):
             process_id=self.process.id,
             node_id=self.process.current_node_id,
             root_pipeline_id=self.process.root_pipeline_id,
-            parent_pipeline_id=json.load(self.process.parent_id)[-1],
+            parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
         )
 
 
@@ -166,13 +165,13 @@ class SuspendedProcessRunningStateDoctor(Doctor):
             process_id=self.process.id,
             node_id=self.process.current_node_id,
             root_pipeline_id=self.process.root_pipeline_id,
-            parent_pipeline_id=json.load(self.process.parent_id)[-1],
+            parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
         )
 
 
 class AsleepProcessSuspendedStateDoctor(Doctor):
     def advice(self) -> str:
-        return super().advice("node suspended, make process suspended")
+        return "node suspended, make process suspended"
 
     def heal(self):
         runtime = BambooDjangoRuntime()
@@ -182,7 +181,7 @@ class AsleepProcessSuspendedStateDoctor(Doctor):
 
 class RunningProcessSuspendedStateDoctor(Doctor):
     def advice(self) -> str:
-        return super().advice("node suspended, make process suspended")
+        return "node suspended, make process suspended"
 
     def heal(self):
         runtime = BambooDjangoRuntime()
@@ -217,8 +216,8 @@ class RunningProcessFinishedStateDoctor(Doctor):
             return "current node detail not exist, can't not give any advice"
 
         if isinstance(node, (ParallelGateway, ConditionalParallelGateway)):
-            # 并行网关处于完成状态，说明子进程都已经完成派发
-            return "child process count is ok, make process asleep"
+            # 并行网关处于完成状态，说明子进程都已经完成 fork
+            return "child process is ok, make process asleep"
         elif isinstance(node, ExclusiveGateway):
             return "current node is exclusive gateway, execute it again"
         else:
@@ -238,7 +237,7 @@ class RunningProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=self.process.current_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
         else:
             next_node_id = node.target_nodes[0]
@@ -247,7 +246,7 @@ class RunningProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=next_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
 
 
@@ -279,7 +278,7 @@ class AsleepProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=self.process.current_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
         else:
             next_node_id = node.target_nodes[0]
@@ -287,7 +286,7 @@ class AsleepProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=next_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
 
 
@@ -331,7 +330,7 @@ class SuspendedProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=self.process.current_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
         else:
             next_node_id = node.target_nodes[0]
@@ -339,12 +338,10 @@ class SuspendedProcessFinishedStateDoctor(Doctor):
                 process_id=self.process.id,
                 node_id=next_node_id,
                 root_pipeline_id=self.process.root_pipeline_id,
-                parent_pipeline_id=json.load(self.process.parent_id)[-1],
+                parent_pipeline_id=json.loads(self.process.pipeline_stack)[-1],
             )
 
-
 # doctor
-
 
 class PipelineDoctor:
     DECISION_TABLE = {
@@ -402,8 +399,9 @@ class PipelineDoctor:
                 state = State.objects.get(node_id=process.current_node_id)
             except State.DoesNotExist:
                 summary.log_exception(
-                    "can not find state for process(%s) current node: %s" % (process.id, process.current_node_id)
+                    "can not find state for process(id:%s, asleep: %s, suspended: %s) current node: %s" % (process.id, process.asleep, process.suspended, process.current_node_id)
                 )
+                continue
 
             decision = Decision(asleep=process.asleep, suspended=process.suspended, state_name=state.name)
             doctor = self.DECISION_TABLE.get(

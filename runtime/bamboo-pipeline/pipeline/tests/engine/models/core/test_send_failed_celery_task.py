@@ -50,7 +50,11 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
     def test_resend__type_error(self):
         task = SendFailedCeleryTask(
-            name="name", kwargs="kwargs_token", type=-1, extra_kwargs="extra_kwargs_token", exec_trace="trace_token",
+            name="name",
+            kwargs="kwargs_token",
+            type=-1,
+            extra_kwargs="extra_kwargs_token",
+            exec_trace="trace_token",
         )
         task.delete = MagicMock()
 
@@ -102,12 +106,16 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.ProcessCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.ProcessCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 self.assertRaises(RuntimeError, task.resend)
 
         mock_start_task.assert_called_once_with(
-            process_id=process_id, task=mock_task, kwargs=task.kwargs_dict, record_error=False,
+            process_id=process_id,
+            task=mock_task,
+            kwargs=task.kwargs_dict,
+            record_error=False,
         )
         task.delete.assert_not_called()
 
@@ -129,7 +137,8 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.NodeCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.NodeCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 self.assertRaises(RuntimeError, task.resend)
 
@@ -156,12 +165,16 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.ScheduleCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.ScheduleCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 self.assertRaises(RuntimeError, task.resend)
 
         mock_start_task.assert_called_once_with(
-            schedule_id=schedule_id, task=mock_task, kwargs=task.kwargs_dict, record_error=False,
+            schedule_id=schedule_id,
+            task=mock_task,
+            kwargs=task.kwargs_dict,
+            record_error=False,
         )
         task.delete.assert_not_called()
 
@@ -204,12 +217,16 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.ProcessCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.ProcessCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 task.resend()
 
         mock_start_task.assert_called_once_with(
-            process_id=process_id, task=mock_task, kwargs=task.kwargs_dict, record_error=False,
+            process_id=process_id,
+            task=mock_task,
+            kwargs=task.kwargs_dict,
+            record_error=False,
         )
         task.delete.assert_called_once()
 
@@ -231,7 +248,8 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.NodeCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.NodeCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 task.resend()
 
@@ -258,12 +276,16 @@ class SendFailedCeleryTaskTestCase(TestCase):
 
         with patch("pipeline.engine.models.core.current_app", current_app):
             with patch(
-                "pipeline.engine.models.core.ScheduleCeleryTask.objects.start_task", mock_start_task,
+                "pipeline.engine.models.core.ScheduleCeleryTask.objects.start_task",
+                mock_start_task,
             ):
                 task.resend()
 
         mock_start_task.assert_called_once_with(
-            schedule_id=schedule_id, task=mock_task, kwargs=task.kwargs_dict, record_error=False,
+            schedule_id=schedule_id,
+            task=mock_task,
+            kwargs=task.kwargs_dict,
+            record_error=False,
         )
         task.delete.assert_called_once()
 

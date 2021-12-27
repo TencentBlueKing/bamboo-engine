@@ -11,24 +11,18 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from mock import MagicMock
 from django.test import TestCase
 
-from pipeline.eri.doctor import DignoseSummary
+from pipeline.eri.doctor import ShouldNotHappendDoctor
 
 
-class DignoseSummaryTestCase(TestCase):
-    def test(self):
-        summary = DignoseSummary(healed=True)
-        self.assertTrue(summary.healed)
-        summary.log("1")
-        summary.log("2")
-        self.assertEqual(summary.logs, ["1", "2"])
-        summary.log_exception("1")
-        summary.log_exception("2")
-        self.assertEqual(summary.exception_cases, ["1", "2"])
-        summary.advice("1")
-        summary.advice("2")
-        self.assertEqual(summary.advices, ["1", "2"])
-        summary.heal_failed("1")
-        summary.heal_failed("2")
-        self.assertEqual(summary.heal_exceptions, ["1", "2"])
+class ShouldNotHappendDoctorTestCase(TestCase):
+    def setUp(self) -> None:
+        self.doctor = ShouldNotHappendDoctor(MagicMock(), MagicMock())
+
+    def test_advice(self):
+        self.assertEqual(self.doctor.advice(), "case should not exist, can't give any advice")
+
+    def test_heal(self):
+        self.doctor.heal()

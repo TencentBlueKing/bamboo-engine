@@ -10,25 +10,3 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
-from django.test import TestCase
-
-from pipeline.eri.doctor import DignoseSummary
-
-
-class DignoseSummaryTestCase(TestCase):
-    def test(self):
-        summary = DignoseSummary(healed=True)
-        self.assertTrue(summary.healed)
-        summary.log("1")
-        summary.log("2")
-        self.assertEqual(summary.logs, ["1", "2"])
-        summary.log_exception("1")
-        summary.log_exception("2")
-        self.assertEqual(summary.exception_cases, ["1", "2"])
-        summary.advice("1")
-        summary.advice("2")
-        self.assertEqual(summary.advices, ["1", "2"])
-        summary.heal_failed("1")
-        summary.heal_failed("2")
-        self.assertEqual(summary.heal_exceptions, ["1", "2"])

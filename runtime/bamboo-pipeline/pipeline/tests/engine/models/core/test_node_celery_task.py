@@ -66,11 +66,15 @@ class TestNodeCeleryTask(TestCase):
             NodeCeleryTask.objects.start_task(node_id, task=task, kwargs=kwargs)
 
         mock_watch.assert_called_once_with(
-            name=task.name, kwargs=kwargs, type=SendFailedCeleryTask.TASK_TYPE_NODE, extra_kwargs={"node_id": node_id},
+            name=task.name,
+            kwargs=kwargs,
+            type=SendFailedCeleryTask.TASK_TYPE_NODE,
+            extra_kwargs={"node_id": node_id},
         )
         task.apply_async.assert_called_with(a="1", b=2)
         self.assertEqual(
-            NodeCeleryTask.objects.filter(node_id=node_id, celery_task_id=task.apply_async.return_value).count(), 1,
+            NodeCeleryTask.objects.filter(node_id=node_id, celery_task_id=task.apply_async.return_value).count(),
+            1,
         )
 
     def test_start_task__no_record_error(self):
@@ -88,7 +92,8 @@ class TestNodeCeleryTask(TestCase):
         mock_watch.assert_not_called()
         task.apply_async.assert_called_with(a="1", b=2)
         self.assertEqual(
-            NodeCeleryTask.objects.filter(node_id=node_id, celery_task_id=task.apply_async.return_value).count(), 1,
+            NodeCeleryTask.objects.filter(node_id=node_id, celery_task_id=task.apply_async.return_value).count(),
+            1,
         )
 
     @mock.patch("pipeline.engine.models.core.revoke", mock.MagicMock())
@@ -102,5 +107,8 @@ class TestNodeCeleryTask(TestCase):
         NodeCeleryTask.objects.revoke(node_id)
         revoke.assert_called_with(celery_task_id)
         self.assertRaises(
-            NodeCeleryTask.DoesNotExist, NodeCeleryTask.objects.get, node_id=node_id, celery_task_id=celery_task_id,
+            NodeCeleryTask.DoesNotExist,
+            NodeCeleryTask.objects.get,
+            node_id=node_id,
+            celery_task_id=celery_task_id,
         )

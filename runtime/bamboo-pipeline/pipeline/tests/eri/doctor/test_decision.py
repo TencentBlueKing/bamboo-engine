@@ -15,6 +15,7 @@ from django.test import TestCase
 
 from pipeline.eri.doctor import Decision
 
+
 class DecisionTestCase(TestCase):
     def test_init(self):
         decision = Decision(asleep=True, suspended=False, state_name="RUNNING")
@@ -29,7 +30,7 @@ class DecisionTestCase(TestCase):
 
         self.assertTrue(decision1 == decision2)
         self.assertFalse(decision1 == decision3)
-    
+
     def test_hash(self):
         decision = Decision(asleep=True, suspended=False, state_name="RUNNING")
 

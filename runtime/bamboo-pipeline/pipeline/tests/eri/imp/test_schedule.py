@@ -86,7 +86,10 @@ class ScheduleMixinTestCase(TransactionTestCase):
 
     def test_get_schedule_with_node_and_version_not_exist(self):
         self.assertRaises(
-            DBSchedule.DoesNotExist, self.mixin.get_schedule_with_node_and_version, self.schedule.node_id, "not_exist",
+            DBSchedule.DoesNotExist,
+            self.mixin.get_schedule_with_node_and_version,
+            self.schedule.node_id,
+            "not_exist",
         )
 
     def test_apply_schedule_lock(self):
