@@ -14,7 +14,7 @@ python manage.py diagnose [--heal] pipeline_id
 
 This command will diagnose the stuck pipeline with `pipeline_id` and generate a diagnose summary for you.
 
-If you want heal this pipeline at mean time, run this command with `--heal` opetion.
+If you want heal this pipeline at mean time, run this command with `--heal` option.
 
 ## python native
 
