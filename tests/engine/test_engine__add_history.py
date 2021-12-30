@@ -16,12 +16,13 @@ from mock import MagicMock
 from bamboo_engine import exceptions
 from bamboo_engine.engine import Engine
 
+
 def test_execution_data_not_fount():
     node_id = "node_id"
     state = MagicMock()
     runtime = MagicMock()
     runtime.get_execution_data = MagicMock(side_effect=exceptions.NotFoundError)
-    
+
     engine = Engine(runtime)
     engine._add_history(node_id, state)
 
