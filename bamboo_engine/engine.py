@@ -708,10 +708,7 @@ class Engine:
                         reset_mark_bit = True
 
                     # 重入前记录历史
-                    if (
-                        node.type in {NodeType.SubProcess, NodeType.ServiceActivity}
-                        and node_state.name == states.FINISHED
-                    ):
+                    if node_state.name == states.FINISHED:
                         self._add_history(node_id=current_node_id, state=node_state)
 
                 version = self.runtime.set_state(
@@ -1031,7 +1028,16 @@ class Engine:
             state = self.runtime.get_state(node_id)
 
         if not exec_data:
-            exec_data = self.runtime.get_execution_data(node_id)
+            try:
+                exec_data = self.runtime.get_execution_data(node_id)
+            except NotFoundError:
+                # execution data may be lack with some node
+                logger.warning("can't not find execution data for %s at loop %s" % (node_id, state.loop))
+                history_inputs = {}
+                history_outputs = {}
+            else:
+                history_inputs = exec_data.inputs
+                history_outputs = exec_data.outputs
 
         return self.runtime.add_history(
             node_id=node_id,
@@ -1041,8 +1047,8 @@ class Engine:
             skip=state.skip,
             retry=state.retry,
             version=state.version,
-            inputs=exec_data.inputs,
-            outputs=exec_data.outputs,
+            inputs=history_inputs,
+            outputs=history_outputs,
         )
 
     def _ensure_state_is_fail_and_return_process_info(self, state: State) -> str:

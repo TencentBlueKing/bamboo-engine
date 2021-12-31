@@ -11,4 +11,29 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-__version__ = "1.6.2"
+from mock import MagicMock
+
+from bamboo_engine import exceptions
+from bamboo_engine.engine import Engine
+
+
+def test_execution_data_not_fount():
+    node_id = "node_id"
+    state = MagicMock()
+    runtime = MagicMock()
+    runtime.get_execution_data = MagicMock(side_effect=exceptions.NotFoundError)
+
+    engine = Engine(runtime)
+    engine._add_history(node_id, state)
+
+    runtime.add_history.assert_called_once_with(
+        node_id=node_id,
+        started_time=state.started_time,
+        archived_time=state.archived_time,
+        loop=state.loop,
+        skip=state.skip,
+        retry=state.retry,
+        version=state.version,
+        inputs={},
+        outputs={},
+    )
