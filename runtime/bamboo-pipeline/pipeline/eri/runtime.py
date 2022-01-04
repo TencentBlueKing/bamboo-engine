@@ -461,7 +461,11 @@ class BambooDjangoRuntime(
                 pipeline_stack='["{}"]'.format(pipeline_id),
             ).id
             self.set_state(
-                node_id=pipeline_id, to_state=states.RUNNING, root_id=pipeline_id, parent_id="", set_started_time=True,
+                node_id=pipeline_id,
+                to_state=states.RUNNING,
+                root_id=pipeline_id,
+                parent_id="",
+                set_started_time=True,
             )
 
             Node.objects.bulk_create(nodes, batch_size=batch_size)
@@ -504,7 +508,7 @@ class BambooDjangoRuntime(
                     )
                     queue.declare(channel=channel)
 
-    def get_plain_log_for_node(self, node_id: str, history_id: int = -1) -> str:
+    def get_plain_log_for_node(self, node_id: str, history_id: int = -1, version: str = None) -> str:
         """
         读取某个节点某一次执行的日志
 
@@ -512,17 +516,20 @@ class BambooDjangoRuntime(
         :type node_id: str
         :param history_id: 执行历史 ID, -1 表示获取最新日志
         :type history_id: int, optional
+        :param version: 节点执行版本，当该参数与执行历史 ID 同时存在时，以版本为准
         :return: 节点日志
         :rtype: str
         """
-        if history_id != -1:
-            qs = ExecutionHistory.objects.filter(id=history_id).only("version")
-        else:
-            qs = State.objects.filter(node_id=node_id).only("version")
+        if not version:
+            if history_id != -1:
+                qs = ExecutionHistory.objects.filter(id=history_id).only("version")
+            else:
+                qs = State.objects.filter(node_id=node_id).only("version")
 
-        if not qs:
-            return ""
-        version = qs.first().version
+            if not qs:
+                return ""
+            version = qs.first().version
+
         return "\n".join(
             [
                 e.message
