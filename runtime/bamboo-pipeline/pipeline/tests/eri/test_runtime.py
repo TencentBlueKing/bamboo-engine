@@ -21,10 +21,8 @@ from bamboo_engine import builder
 from bamboo_engine import validator
 from bamboo_engine.builder import *  # noqa
 
-from pipeline.eri.models import LogEntry, Process, Node, Data, ContextValue, ContextOutputs
+from pipeline.eri.models import Process, Node, Data, ContextValue, ContextOutputs
 from pipeline.eri.runtime import BambooDjangoRuntime
-
-from bamboo_engine.eri.models import ExecutionHistory
 
 
 class BambooDjangoRuntimeTestCase(TransactionTestCase):
