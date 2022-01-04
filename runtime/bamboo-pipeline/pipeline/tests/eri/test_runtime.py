@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
+from mock import MagicMock, patch
 
 from django.test import TransactionTestCase
 
@@ -831,40 +832,45 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
         pipeline_id = "1"
         node_id = "2"
         node_inputs = {
-            "n0001": {
-                "type": "lazy",
-                "value": "${_system.task_url}",
-                "need_render": False
-            },
-            "n0002": {
-                "type": "splice",
-                "value": "${_system.task_url}",
-                "need_render": False
-            },
-            "n0003": {
-                "type": "plain",
-                "value": "${_system.task_url}",
-                "need_render": True
-            },
-            "n0004": {
-                "type": "splice",
-                "value": "${_system.task_url}",
-                "need_render": True
-            }
+            "n0001": {"type": "lazy", "value": "${_system.task_url}", "need_render": False},
+            "n0002": {"type": "splice", "value": "${_system.task_url}", "need_render": False},
+            "n0003": {"type": "plain", "value": "${_system.task_url}", "need_render": True},
+            "n0004": {"type": "splice", "value": "${_system.task_url}", "need_render": True},
         }
         test_inputs = {
-            "n0001": {
-                "need_render": False, "value": "${n0001_2}"
-            },
-            "n0002": {
-                "need_render": False, "value": "${_system.task_url}"
-            },
-            "n0003": {
-                "need_render": False, "value": "${_system.task_url}"
-            },
-            "n0004": {
-                "need_render": True, "value": "${_system.task_url}"
-            }
+            "n0001": {"need_render": False, "value": "${n0001_2}"},
+            "n0002": {"need_render": False, "value": "${_system.task_url}"},
+            "n0003": {"need_render": False, "value": "${_system.task_url}"},
+            "n0004": {"need_render": True, "value": "${_system.task_url}"},
         }
         inputs, _ = self.runtime._data_inputs_assemble(pipeline_id, node_id, node_inputs)
         self.assertEqual(test_inputs, inputs)
+
+    def test_get_plain_log_for_node__with_history_id(self):
+        node_id = "1"
+        history_id = 2
+
+        ExecutionHistory = MagicMock()
+        LogEntry = MagicMock()
+
+        with patch("pipeline.eri.runtime.ExecutionHistory", ExecutionHistory):
+            with patch("pipeline.eri.runtime.LogEntry", LogEntry):
+                self.runtime.get_plain_log_for_node(node_id=node_id, history_id=history_id)
+
+        ExecutionHistory.objects.filter(id=history_id).only.assert_called_once_with("version")
+        version = ExecutionHistory.objects.filter(id=history_id).only("version").first().version
+        LogEntry.objects.order_by("id").filter(node_id=node_id, version=version).only.assert_called_once_with("message")
+
+    def test_get_plain_log_for_node__with_version(self):
+        node_id = "1"
+        version = "2"
+
+        ExecutionHistory = MagicMock()
+        LogEntry = MagicMock()
+
+        with patch("pipeline.eri.runtime.ExecutionHistory", ExecutionHistory):
+            with patch("pipeline.eri.runtime.LogEntry", LogEntry):
+                self.runtime.get_plain_log_for_node(node_id=node_id, version=version)
+
+        ExecutionHistory.objects.filter.assert_not_called()
+        LogEntry.objects.order_by("id").filter(node_id=node_id, version=version).only.assert_called_once_with("message")
