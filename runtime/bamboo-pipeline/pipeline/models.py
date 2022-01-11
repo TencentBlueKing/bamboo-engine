@@ -330,8 +330,8 @@ class PipelineTemplate(models.Model):
             item["expired"] = (
                 False
                 if item["version"] is None
-                or item["descendant_template_id"] not in temp_current_versions
-                or item["always_use_latest"]
+                   or item["descendant_template_id"] not in temp_current_versions
+                   or item["always_use_latest"]
                 else (item["version"] != temp_current_versions[item["descendant_template_id"]].current_version)
             )
             info["details"].append(item)
@@ -442,6 +442,8 @@ class TemplateRelationship(models.Model):
     subprocess_node_id = models.CharField(_("子流程节点 ID"), max_length=32, null=False)
     version = models.CharField(_("快照字符串的md5"), max_length=32, null=False)
     always_use_latest = models.BooleanField(_("是否永远使用最新版本"), default=False)
+    subproces_use_scheme_ids = CompressJSONField(compress_level=1, verbose_name=_("子流程引用的执行方案ID列表"), null=True,
+                                                 blank=True)
 
     objects = TemplateRelationShipManager()
 

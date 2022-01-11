@@ -10,6 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import json
 
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
@@ -53,14 +54,19 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
         for sp in subprocess_nodes:
             version = sp.get("version") or PipelineTemplate.objects.get(template_id=sp["template_id"]).version
             always_use_latest = sp.get("always_use_latest", False)
+            kwargs = {
+                "ancestor_template_id": template.template_id,
+                "descendant_template_id": sp["template_id"],
+                "subprocess_node_id": sp["id"],
+                "version": version,
+                "always_use_latest": always_use_latest,
+            }
+
+            if "scheme_id_list" in sp:
+                kwargs["subproces_use_scheme_ids"] = json.dumps(sp["scheme_id_list"])
+
             rs.append(
-                TemplateRelationship(
-                    ancestor_template_id=template.template_id,
-                    descendant_template_id=sp["template_id"],
-                    subprocess_node_id=sp["id"],
-                    version=version,
-                    always_use_latest=always_use_latest,
-                )
+                TemplateRelationship(**kwargs)
             )
         if rs:
             TemplateRelationship.objects.bulk_create(rs)
