@@ -63,7 +63,7 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
             }
 
             if "scheme_id_list" in sp:
-                kwargs["subproces_use_scheme_ids"] = json.dumps(sp["scheme_id_list"])
+                kwargs["subproces_use_scheme_ids"] = sp["scheme_id_list"]
 
             rs.append(
                 TemplateRelationship(**kwargs)
