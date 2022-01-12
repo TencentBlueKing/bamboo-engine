@@ -442,7 +442,7 @@ class TemplateRelationship(models.Model):
     subprocess_node_id = models.CharField(_("子流程节点 ID"), max_length=32, null=False)
     version = models.CharField(_("快照字符串的md5"), max_length=32, null=False)
     always_use_latest = models.BooleanField(_("是否永远使用最新版本"), default=False)
-    scheme_id_list = models.TextField(_("子流程引用的执行方案ID列表"), default=[])
+    scheme_id_list = models.TextField(_("子流程引用的执行方案ID列表"), default="")
 
     objects = TemplateRelationShipManager()
 

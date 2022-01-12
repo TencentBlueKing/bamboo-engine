@@ -53,6 +53,14 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
         for sp in subprocess_nodes:
             version = sp.get("version") or PipelineTemplate.objects.get(template_id=sp["template_id"]).version
             always_use_latest = sp.get("always_use_latest", False)
+
+            scheme_id_list = sp.get("scheme_id_list", [])
+            if scheme_id_list:
+                _scheme_id_list = [str(scheme_id) for scheme_id in scheme_id_list]
+                scheme_id_list_str = ",{},".format(",".join(_scheme_id_list))
+            else:
+                scheme_id_list_str = ""
+
             rs.append(
                 TemplateRelationship(
                     ancestor_template_id=template.template_id,
@@ -60,7 +68,7 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
                     subprocess_node_id=sp["id"],
                     version=version,
                     always_use_latest=always_use_latest,
-                    scheme_id_list=sp.get("scheme_id_list", [])
+                    scheme_id_list=scheme_id_list_str
                 )
             )
         if rs:
