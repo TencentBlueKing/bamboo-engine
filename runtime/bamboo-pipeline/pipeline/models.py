@@ -330,8 +330,8 @@ class PipelineTemplate(models.Model):
             item["expired"] = (
                 False
                 if item["version"] is None
-                   or item["descendant_template_id"] not in temp_current_versions
-                   or item["always_use_latest"]
+                or item["descendant_template_id"] not in temp_current_versions
+                or item["always_use_latest"]
                 else (item["version"] != temp_current_versions[item["descendant_template_id"]].current_version)
             )
             info["details"].append(item)
