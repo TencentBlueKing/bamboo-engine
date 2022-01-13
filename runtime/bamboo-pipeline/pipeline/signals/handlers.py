@@ -24,7 +24,6 @@ from pipeline.models import (
     TemplateCurrentVersion,
     TemplateRelationship,
     TemplateVersion,
-    TemplateScheme,
 )
 
 
@@ -52,16 +51,13 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
         subprocess_nodes = [act for act in acts if act["type"] == PE.SubProcess]
         rs = []
         template_scheme_dict = {}
-        scheme_id_set = set()
         for sp in subprocess_nodes:
             version = sp.get("version") or PipelineTemplate.objects.get(template_id=sp["template_id"]).version
             always_use_latest = sp.get("always_use_latest", False)
 
-            scheme_id_list = sp.get("scheme_id_list", [])
             template_scheme_dict.update({
-                sp["template_id"]: scheme_id_list
+                sp["template_id"]: sp.get("scheme_id_list", [])
             })
-            scheme_id_set = scheme_id_set.union(set(scheme_id_list))
 
             rs.append(
                 TemplateRelationship(
@@ -75,12 +71,10 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
         if rs:
             TemplateRelationship.objects.bulk_create(rs)
 
-            scheme_queryset_dict = TemplateScheme.objects.in_bulk(list(scheme_id_set))
             relation_queryset = TemplateRelationship.objects.filter(ancestor_template_id=template.template_id)
             for relation in relation_queryset:
                 scheme_id_list = template_scheme_dict[relation.descendant_template_id]
-                scheme_list = [scheme_queryset_dict[scheme_id] for scheme_id in scheme_id_list]
-                relation.templatescheme_set.add(*scheme_list)
+                relation.templatescheme_set.add(*scheme_id_list)
 
         TemplateVersion.objects.track(template)
         TemplateCurrentVersion.objects.update_current_version(template)
