@@ -514,6 +514,8 @@ class TemplateScheme(models.Model):
     edit_time = models.DateTimeField(_("修改时间"), auto_now=True)
     data = CompressJSONField(verbose_name=_("方案数据"))
 
+    subprocess_scheme_relation = models.ManyToManyField(verbose_name=_("子流程节点引用执行方案的关系"), to=TemplateRelationship)
+
 
 class InstanceManager(models.Manager):
     def create_instance(self, template, exec_data, spread=False, inputs=None, **kwargs):
