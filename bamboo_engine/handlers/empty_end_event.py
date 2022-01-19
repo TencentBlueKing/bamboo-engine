@@ -12,19 +12,28 @@ specific language governing permissions and limitations under the License.
 """
 
 import logging
+from typing import Optional
 
 from bamboo_engine import states
 from bamboo_engine.config import Settings
-from bamboo_engine.eri import ProcessInfo, NodeType
+from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.context import Context
+from bamboo_engine.interrupt import ExecuteKeyPoint
 
 logger = logging.getLogger("bamboo_engine")
 
 
 @register_handler(NodeType.EmptyEndEvent)
 class EmptyEndEventHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -61,7 +70,31 @@ class EmptyEndEventHandler(NodeHandler):
         )
 
         context = Context(self.runtime, context_values, root_pipeline_inputs)
-        hydrated_context = context.hydrate(deformat=False)
+        try:
+            hydrated_context = context.hydrate(deformat=False)
+        except Exception:
+            logger.exception(
+                "root_pipeline[%s] node(%s) context hydrate error",
+                root_pipeline_id,
+                self.node.id,
+            )
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.FAILED,
+                set_archive_time=True,
+                idempotent=recover_point is not None,
+            )
+
+            return ExecuteResult(
+                should_sleep=True,
+                schedule_ready=False,
+                schedule_type=None,
+                schedule_after=-1,
+                dispatch_processes=[],
+                next_node_id=None,
+            )
+
         logger.info(
             "root_pipeline[%s] pipeline(%s) hydrated context: %s",
             root_pipeline_id,
@@ -75,11 +108,26 @@ class EmptyEndEventHandler(NodeHandler):
         if not root_pipeline_finished:
             outputs[self.LOOP_KEY] = subproc_state.loop + Settings.RERUN_INDEX_OFFSET
             outputs[self.INNER_LOOP_KEY] = subproc_state.inner_loop + Settings.RERUN_INDEX_OFFSET
+
         self.runtime.set_execution_data_outputs(node_id=pipeline_id, outputs=outputs)
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            idempotent=recover_point is not None,
+        )
 
-        self.runtime.set_state(node_id=pipeline_id, to_state=states.FINISHED, set_archive_time=True)
+        pipeline_state = self.runtime.get_state_or_none(node_id=pipeline_id)
+        top_pipeline_state_version = pipeline_state.version if pipeline_state else None
+        self.runtime.set_state(
+            node_id=pipeline_id,
+            version=top_pipeline_state_version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            idempotent=recover_point is not None,
+        )
 
         # root pipeline finish
         if root_pipeline_finished:
@@ -95,7 +143,6 @@ class EmptyEndEventHandler(NodeHandler):
 
         # subprocess finish
         subprocess = self.runtime.get_node(pipeline_id)
-        self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
 
         # extract subprocess outputs to parent context
         subprocess_outputs = self.runtime.get_data_outputs(pipeline_id)
@@ -104,6 +151,8 @@ class EmptyEndEventHandler(NodeHandler):
             data_outputs=subprocess_outputs,
             execution_data_outputs=outputs,
         )
+
+        self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
 
         return ExecuteResult(
             should_sleep=False,

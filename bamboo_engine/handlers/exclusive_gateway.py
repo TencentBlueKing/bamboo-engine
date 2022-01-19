@@ -12,13 +12,14 @@ specific language governing permissions and limitations under the License.
 """
 import json
 import logging
+from typing import Optional
 
 from bamboo_engine import states
 from bamboo_engine.context import Context
 from bamboo_engine.template import Template
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.utils.boolrule import BoolRule
-from bamboo_engine.eri import NodeType, ProcessInfo
+from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
 
 from bamboo_engine.utils.string import transform_escape_char
 
@@ -27,7 +28,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.ExclusiveGateway)
 class ExclusiveGatewayHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -126,7 +134,13 @@ class ExclusiveGatewayHandler(NodeHandler):
         if len(meet_targets) != 1:
             return self._execute_fail("multiple conditions meet: {}".format(meet_conditions))
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            idempotent=recover_point is not None,
+        )
 
         return ExecuteResult(
             should_sleep=False,

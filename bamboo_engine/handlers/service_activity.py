@@ -19,6 +19,8 @@ from bamboo_engine import states
 from bamboo_engine.config import Settings
 
 from bamboo_engine.context import Context
+from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
+from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
 from bamboo_engine.template import Template
 from bamboo_engine.eri import (
     ProcessInfo,
@@ -29,6 +31,8 @@ from bamboo_engine.eri import (
     ScheduleType,
     NodeType,
     Schedule,
+    ExecuteInterruptPoint,
+    FancyDict,
 )
 from bamboo_engine.handler import (
     register_handler,
@@ -46,7 +50,14 @@ class ServiceActivityHandler(NodeHandler):
     其中所有 set_state 调用都会传入 state version 来确保能够在用户强制失败节点后放弃后续无效的任务执行
     """
 
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -143,6 +154,7 @@ class ServiceActivityHandler(NodeHandler):
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
+                idempotent=recover_point is not None,
             )
             return ExecuteResult(
                 should_sleep=True,
@@ -179,18 +191,7 @@ class ServiceActivityHandler(NodeHandler):
             inner_loop=inner_loop,
         )
 
-        # start monitor
-        monitoring = False
-        if self.node.timeout is not None:
-            monitoring = True
-            self.runtime.start_timeout_monitor(
-                process_id=process_info.process_id,
-                node_id=self.node.id,
-                version=version,
-                timeout=self.node.timeout,
-            )
-
-        # pre_execute and excute
+        # excute
         logger.debug(
             "root_pipeline[%s] node(%s) service data before execute: %s",
             self.node.id,
@@ -203,15 +204,35 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_id,
             root_pipeline_data,
         )
-        execute_success = False
-        try:
-            service.pre_execute(data=service_data, root_pipeline_data=root_pipeline_data)
-            execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
-        except Exception:
-            ex_data = traceback.format_exc()
-            service_data.outputs.ex_data = ex_data
-            logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
-        logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
+
+        # try recover from executed recover point
+        if recover_point and recover_point.handler_data.service_executed:
+            execute_success = not recover_point.handler_data.service_execute_fail
+            service_data.outputs = FancyDict(
+                self.runtime.deserialize_execution_data(
+                    recover_point.handler_data.execute_serialize_outputs,
+                    recover_point.handler_data.execute_outputs_serializer,
+                )
+            )
+        else:
+            try:
+                execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
+            except Exception:
+                ex_data = traceback.format_exc()
+                service_data.outputs.ex_data = ex_data
+                logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
+            logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
+
+        serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
+        self.interrupter.check_and_set(
+            ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE,
+            service_executed=True,
+            service_execute_fail=not execute_success,
+            execute_serialize_outputs=serialize_ouputs,
+            execute_outputs_serializer=ouputs_serializer,
+            from_handler=True,
+        )
+
         service_data.outputs._result = execute_success
         service_data.outputs._loop = loop
         service_data.outputs._inner_loop = inner_loop
@@ -223,19 +244,12 @@ class ServiceActivityHandler(NodeHandler):
             next_node_id = None
 
             if not need_schedule:
-                if monitoring:
-                    self.runtime.stop_timeout_monitor(
-                        process_id=process_info.process_id,
-                        node_id=self.node.id,
-                        version=version,
-                        timeout=self.node.timeout,
-                    )
-
                 self.runtime.set_state(
                     node_id=self.node.id,
                     version=version,
                     to_state=states.FINISHED,
                     set_archive_time=True,
+                    idempotent=recover_point is not None,
                 )
 
                 context.extract_outputs(
@@ -260,21 +274,13 @@ class ServiceActivityHandler(NodeHandler):
                 next_node_id=next_node_id,
             )
 
-        # pre_execute failed or execute failed
-        if monitoring:
-            self.runtime.stop_timeout_monitor(
-                process_id=process_info.process_id,
-                node_id=self.node.id,
-                version=version,
-                timeout=self.node.timeout,
-            )
-
         if not self.node.error_ignorable:
             self.runtime.set_state(
                 node_id=self.node.id,
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
+                idempotent=recover_point is not None,
             )
 
             self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
@@ -294,13 +300,14 @@ class ServiceActivityHandler(NodeHandler):
                 next_node_id=None,
             )
 
-        # pre_execute failed or execute failed and error ignore
+        # execute failed and error ignore
         self.runtime.set_state(
             node_id=self.node.id,
             version=version,
             to_state=states.FINISHED,
             set_archive_time=True,
             error_ignored=True,
+            idempotent=recover_point is not None,
         )
 
         self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
@@ -328,21 +335,15 @@ class ServiceActivityHandler(NodeHandler):
         execution_data: ExecutionData,
         error_ignored: bool,
         root_pipeline_inputs: dict,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
-        if self.node.timeout is not None:
-            self.runtime.stop_timeout_monitor(
-                process_id=process_info.process_id,
-                node_id=self.node.id,
-                version=schedule.version,
-                timeout=self.node.timeout,
-            )
-
         self.runtime.set_state(
             node_id=self.node.id,
             version=schedule.version,
             to_state=states.FINISHED,
             set_archive_time=True,
             error_ignored=error_ignored,
+            idempotent=recover_point is not None,
         )
 
         context = Context(self.runtime, [], root_pipeline_inputs)
@@ -366,6 +367,7 @@ class ServiceActivityHandler(NodeHandler):
         inner_loop: int,
         schedule: Schedule,
         callback_data: Optional[CallbackData] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         """
         节点的 schedule 处理逻辑
@@ -407,17 +409,37 @@ class ServiceActivityHandler(NodeHandler):
             inner_loop=inner_loop,
         )
 
+        # TODO
         schedule_success = False
         schedule.times += 1
-        try:
-            schedule_success = service.schedule(
-                schedule=schedule,
-                data=service_data,
-                root_pipeline_data=root_pipeline_data,
-                callback_data=callback_data,
+        if recover_point and recover_point.handler_data.service_scheduled:
+            schedule_success = not recover_point.handler_data.service_schedule_fail
+            service_data.outputs = FancyDict(
+                self.runtime.deserialize_execution_data(
+                    recover_point.handler_data.schedule_serialize_outputs,
+                    recover_point.handler_data.schedule_outputs_serializer,
+                )
             )
-        except Exception:
-            service_data.outputs.ex_data = traceback.format_exc()
+        else:
+            try:
+                schedule_success = service.schedule(
+                    schedule=schedule,
+                    data=service_data,
+                    root_pipeline_data=root_pipeline_data,
+                    callback_data=callback_data,
+                )
+            except Exception:
+                service_data.outputs.ex_data = traceback.format_exc()
+
+        serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
+        self.interrupter.check_and_set(
+            ScheduleKeyPoint.SA_SERVICE_SCHEDULE_DONE,
+            service_scheduled=True,
+            service_schedule_fail=not schedule_success,
+            schedule_serialize_outputs=serialize_ouputs,
+            schedule_outputs_serializer=ouputs_serializer,
+            from_handler=True,
+        )
 
         service_data.outputs._result = schedule_success
         service_data.outputs._loop = loop
@@ -426,7 +448,6 @@ class ServiceActivityHandler(NodeHandler):
         self.runtime.add_schedule_times(schedule.id)
         self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
-        monitoring = self.node.timeout is not None
         schedule_type = service.schedule_type()
 
         # schedule success
@@ -439,6 +460,7 @@ class ServiceActivityHandler(NodeHandler):
                     execution_data=service_data,
                     error_ignored=False,
                     root_pipeline_inputs=root_pipeline_inputs,
+                    recover_point=recover_point,
                 )
             else:
                 is_schedule_done = service.is_schedule_done()
@@ -452,6 +474,7 @@ class ServiceActivityHandler(NodeHandler):
                         execution_data=service_data,
                         error_ignored=False,
                         root_pipeline_inputs=root_pipeline_inputs,
+                        recover_point=recover_point,
                     )
 
                 has_next_schedule = schedule_type == ScheduleType.POLL
@@ -466,14 +489,6 @@ class ServiceActivityHandler(NodeHandler):
                     next_node_id=None,
                 )
 
-        if monitoring:
-            self.runtime.stop_timeout_monitor(
-                process_id=process_info.process_id,
-                node_id=self.node.id,
-                version=schedule.version,
-                timeout=self.node.timeout,
-            )
-
         # schedule fail
         if not self.node.error_ignorable:
             self.runtime.set_state(
@@ -481,6 +496,7 @@ class ServiceActivityHandler(NodeHandler):
                 version=schedule.version,
                 to_state=states.FAILED,
                 set_archive_time=True,
+                idempotent=recover_point is not None,
             )
 
             context = Context(self.runtime, [], root_pipeline_inputs)
@@ -505,4 +521,5 @@ class ServiceActivityHandler(NodeHandler):
             execution_data=service_data,
             error_ignored=True,
             root_pipeline_inputs=root_pipeline_inputs,
+            recover_point=recover_point,
         )

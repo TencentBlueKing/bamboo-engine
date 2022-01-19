@@ -16,15 +16,14 @@ specific language governing permissions and limitations under the License.
 import time
 import random
 import logging
-import traceback
+from functools import wraps
 from typing import Optional
-from contextlib import contextmanager
 
 
 from . import states
 from . import validator
 from .local import set_node_info, clear_node_info, CurrentNodeInfo
-from .exceptions import InvalidOperationError, NotFoundError, StateVersionNotMatchError
+from .exceptions import InvalidOperationError, NotFoundError
 from .handler import HandlerFactory
 from .metrics import (
     ENGINE_RUNNING_PROCESSES,
@@ -45,10 +44,24 @@ from .eri import (
     DataInput,
     Node,
 )
+from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, IntruptException
 from .utils.string import get_lower_case_name
 from .utils.host import get_hostname
 
 logger = logging.getLogger("bamboo_engine")
+
+
+def interrupt_exception_catcher(func):
+    @wraps(func)
+    def _wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except IntruptException:
+            pass
+        finally:
+            clear_node_info()
+
+    return _wrapper
 
 
 class Engine:
@@ -231,7 +244,7 @@ class Engine:
         node = self.runtime.get_node(node_id)
 
         if not node.can_retry:
-            raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can))
+            raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can_retry))
 
         state = self.runtime.get_state(node_id)
 
@@ -546,7 +559,15 @@ class Engine:
     # engine event
     @setup_gauge(ENGINE_RUNNING_PROCESSES)
     @setup_histogram(ENGINE_PROCESS_RUNNING_TIME)
-    def execute(self, process_id: int, node_id: str, root_pipeline_id: str, parent_pipeline_id: str):
+    @interrupt_exception_catcher
+    def execute(
+        self,
+        process_id: int,
+        node_id: str,
+        root_pipeline_id: str,
+        parent_pipeline_id: str,
+        interrupter: ExecuteInterrupter,
+    ):
         """
         在某个进程上从某个节点开始进入推进循环
 
@@ -559,54 +580,27 @@ class Engine:
         :param parent_pipeline_id: 父流程 ID
         :type parent_pipeline_id: str
         """
-        current_node_id = node_id
-
         # 推进前准备
-        try:
+        current_node_id = node_id
+        with interrupter():
             process_info = self.runtime.get_process_info(process_id)
             self.runtime.wake_up(process_id)
-        except Exception:
-            ex_data = traceback.format_exc()
-            logger.exception(
-                "[%s]execute node(%s) prepare fail",
-                root_pipeline_id,
-                current_node_id,
-            )
 
-            self.runtime.sleep(process_id)
+            # 推进循环
+            while True:
+                idempotent_set_state = interrupter.recover_point is not None
+                # 进程心跳
+                try:
+                    self.runtime.beat(process_id)
+                except Exception:
+                    # do not fail the flow when beat failed
+                    logger.exception("process(%s) beat error" % process_id)
 
-            outputs = self.runtime.get_execution_data_outputs(current_node_id)
-            outputs["ex_data"] = ex_data
-            self.runtime.set_execution_data_outputs(current_node_id, outputs)
-
-            self.runtime.set_state(
-                node_id=current_node_id,
-                to_state=states.FAILED,
-                root_id=root_pipeline_id,
-                parent_id=parent_pipeline_id,
-                set_started_time=True,
-                set_archive_time=True,
-            )
-
-            return
-
-        # 推进循环
-        while True:
-            # 进程心跳
-            try:
-                self.runtime.beat(process_id)
-            except Exception:
-                # do not fail the flow when beat failed
-                logger.exception("process(%s) beat error" % process_id)
-
-            try:
                 # 遇到推进终点后需要尝试唤醒父进程
                 if current_node_id == process_info.destination_id:
-                    self.runtime.die(process_id)
                     wake_up_seccess = self.runtime.child_process_finish(process_info.parent_id, process_id)
 
                     if wake_up_seccess:
-
                         self.runtime.execute(
                             process_id=process_info.parent_id,
                             node_id=process_info.destination_id,
@@ -619,21 +613,12 @@ class Engine:
                 logger.info("[pipeline-trace](root_pipeline: %s) execute node %s" % (root_pipeline_id, current_node_id))
                 self.runtime.set_current_node(process_id, current_node_id)
 
-                # 冻结检测
-                if self.runtime.is_frozen(process_id):
-                    logger.info(
-                        "root pipeline[%s] freeze at node %s",
-                        process_info.root_pipeline_id,
-                        current_node_id,
-                    )
-                    self.runtime.freeze(process_id)
-                    return
-
                 node_state_map = self.runtime.batch_get_state_name(process_info.pipeline_stack)
 
                 # 检测根流程是否被撤销
                 if node_state_map[process_info.root_pipeline_id] == states.REVOKED:
                     self.runtime.die(process_id)
+
                     logger.info(
                         "root pipeline[%s] revoked checked at node %s",
                         process_info.root_pipeline_id,
@@ -650,17 +635,20 @@ class Engine:
                             process_id,
                             pid,
                         )
+
                         self.runtime.suspend(process_id, pid)
                         return
 
                 node = self.runtime.get_node(current_node_id)
                 node_state = self.runtime.get_state_or_none(current_node_id)
+
                 loop = 1
                 inner_loop = 1
                 reset_mark_bit = False
 
                 if node_state:
                     rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
+
                     # 重入次数超过限制
                     if (
                         node_state.name == states.FINISHED
@@ -668,15 +656,20 @@ class Engine:
                         and node_state.loop > rerun_limit
                     ):
                         exec_outputs = self.runtime.get_execution_data_outputs(current_node_id)
+
                         exec_outputs["ex_data"] = "node execution exceed rerun limit {}".format(rerun_limit)
 
                         self.runtime.set_execution_data_outputs(current_node_id, exec_outputs)
+
+                        self.runtime.sleep(process_id)
+
                         self.runtime.set_state(
                             node_id=current_node_id,
+                            version=node_state.version,
                             to_state=states.FAILED,
                             set_archive_time=True,
+                            idempotent=idempotent_set_state,
                         )
-                        self.runtime.sleep(process_id)
 
                         return
 
@@ -688,7 +681,9 @@ class Engine:
                             root_id=process_info.root_pipeline_id,
                             parent_id=process_info.top_pipeline_id,
                         )
+
                         self.runtime.suspend(process_id, current_node_id)
+
                         logger.info(
                             "root_pipeline[%s] process %s suspended by node %s",
                             process_info.root_pipeline_id,
@@ -714,6 +709,7 @@ class Engine:
                 version = self.runtime.set_state(
                     node_id=current_node_id,
                     to_state=states.RUNNING,
+                    version=interrupter.recover_point.running_node_version if interrupter.recover_point else None,
                     loop=loop,
                     inner_loop=inner_loop,
                     root_id=process_info.root_pipeline_id,
@@ -723,7 +719,10 @@ class Engine:
                     reset_retry=reset_mark_bit,
                     reset_error_ignored=reset_mark_bit,
                     refresh_version=reset_mark_bit,
+                    idempotent=idempotent_set_state,
                 )
+                interrupter.check_and_set(ExecuteKeyPoint.SET_NODE_RUNNING_DONE, running_node_version=version)
+
                 set_node_info(CurrentNodeInfo(node_id=current_node_id, version=version, loop=loop))
 
                 logger.info(
@@ -733,10 +732,22 @@ class Engine:
                     current_node_id,
                     node_state,
                 )
-                handler = HandlerFactory.get_handler(node, self.runtime)
+                handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
                 type_label = self._get_metrics_node_type(node)
                 execute_start = time.time()
-                execute_result = handler.execute(process_info, loop, inner_loop, version)
+
+                if interrupter.recover_point and interrupter.recover_point.execute_result:
+                    execute_result = interrupter.recover_point.execute_result
+                else:
+                    execute_result = handler.execute(
+                        process_info=process_info,
+                        loop=loop,
+                        inner_loop=inner_loop,
+                        version=version,
+                        recover_point=interrupter.recover_point,
+                    )
+                interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_NODE_DONE, execute_result=execute_result)
+
                 logger.info(
                     "root pipeline[%s] node(%s) execute result: %s",
                     process_info.root_pipeline_id,
@@ -754,14 +765,22 @@ class Engine:
 
                 # 节点是否准备好进入调度
                 if execute_result.schedule_ready:
-                    schedule = self.runtime.set_schedule(
-                        process_id=process_id,
-                        node_id=current_node_id,
-                        version=version,
-                        schedule_type=execute_result.schedule_type,
-                    )
+                    if interrupter.recover_point and interrupter.recover_point.schedule_id:
+                        schedule_id = interrupter.recover_point.schedule_id
+                    else:
+                        schedule = self.runtime.set_schedule(
+                            process_id=process_id,
+                            node_id=current_node_id,
+                            version=version,
+                            schedule_type=execute_result.schedule_type,
+                        )
+                        schedule_id = schedule.id
+
+                    interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, schedule_id=schedule_id)
+
                     if execute_result.schedule_type == ScheduleType.POLL:
-                        self.runtime.schedule(process_id, current_node_id, schedule.id)
+                        self.runtime.schedule(process_id, current_node_id, schedule_id)
+
                 # 是否有待调度的子进程
                 elif execute_result.dispatch_processes:
                     children = [d.process_id for d in execute_result.dispatch_processes]
@@ -772,7 +791,9 @@ class Engine:
                         len(execute_result.dispatch_processes),
                         execute_result.dispatch_processes,
                     )
+
                     self.runtime.join(process_id, children)
+
                     for d in execute_result.dispatch_processes:
                         self.runtime.execute(
                             process_id=d.process_id,
@@ -788,52 +809,17 @@ class Engine:
                     return
 
                 current_node_id = execute_result.next_node_id
-            except Exception as e:
-                ex_data = traceback.format_exc()
-                logger.warning(
-                    "[%s]execute exception catch at node(%s): %s",
-                    process_info.root_pipeline_id,
-                    current_node_id,
-                    ex_data,
-                )
-
-                # state version already changed, so give up this execute
-                if isinstance(e, StateVersionNotMatchError):
-                    logger.warning(
-                        "[%s]execute exception catch StateVersionNotMatchError at node(%s): %s",
-                        process_info.root_pipeline_id,
-                        current_node_id,
-                        ex_data,
-                    )
-                    return
-
-                # make sure sleep call at first, because remain operations may have been completed in execute
-                self.runtime.sleep(process_info.process_id)
-
-                outputs = self.runtime.get_execution_data_outputs(current_node_id)
-                outputs["ex_data"] = ex_data
-                self.runtime.set_execution_data_outputs(current_node_id, outputs)
-
-                self.runtime.set_state(
-                    node_id=current_node_id,
-                    to_state=states.FAILED,
-                    root_id=process_info.root_pipeline_id,
-                    parent_id=process_info.top_pipeline_id,
-                    set_started_time=True,
-                    set_archive_time=True,
-                )
-
-                return
-            finally:
-                clear_node_info()
+                interrupter.to_node(current_node_id)
 
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)
+    @interrupt_exception_catcher
     def schedule(
         self,
         process_id: int,
         node_id: str,
         schedule_id: str,
+        interrupter: ScheduleInterrupter,
         callback_data_id: Optional[int] = None,
     ):
         """
@@ -849,7 +835,8 @@ class Engine:
         :type callback_data_id: Optional[int], optional
         """
         root_pipeline_id = ""
-        try:
+
+        with interrupter():
             process_info = self.runtime.get_process_info(process_id)
             root_pipeline_id = process_info.root_pipeline_id
 
@@ -871,7 +858,13 @@ class Engine:
                 return
 
             # 检查 schedule 是否过期
-            if state.version != schedule.version:
+            version_mismatch = False
+            if interrupter.recover_point and interrupter.recover_point.version_mismatch:
+                version_mismatch = True
+            elif state.version != schedule.version:
+                version_mismatch = True
+
+            if version_mismatch:
                 logger.info(
                     "root pipeline[%s] schedule(%s) %s with version %s expired, current version: %s",
                     root_pipeline_id,
@@ -880,11 +873,18 @@ class Engine:
                     schedule.version,
                     state.version,
                 )
+                interrupter.check_and_set(ScheduleKeyPoint.VERSION_MISMATCH, version_mismatch=True)
                 self.runtime.expire_schedule(schedule_id)
                 return
 
             # 检查节点状态是否合法
-            if state.name != states.RUNNING:
+            node_not_running = False
+            if interrupter.recover_point and interrupter.recover_point.node_not_running:
+                node_not_running = True
+            elif state.name != states.RUNNING:
+                node_not_running = True
+
+            if node_not_running:
                 logger.info(
                     "root pipeline[%s] schedule(%s) %s with version %s state is not running: %s",
                     root_pipeline_id,
@@ -893,11 +893,16 @@ class Engine:
                     schedule.version,
                     state.name,
                 )
+                interrupter.check_and_set(ScheduleKeyPoint.NODE_NOT_RUNNING, node_not_running=True)
                 self.runtime.expire_schedule(schedule_id)
                 return
 
             # try to get lock
-            lock_get = self.runtime.apply_schedule_lock(schedule_id)
+            if interrupter.recover_point and interrupter.recover_point.lock_get:
+                lock_get = True
+            else:
+                lock_get = self.runtime.apply_schedule_lock(schedule_id)
+            interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
                 # only retry at multiple calback type
@@ -933,90 +938,74 @@ class Engine:
                 "[pipeline-trace](root_pipeline: %s) schedule node %s with version %s"
                 % (root_pipeline_id, node_id, schedule.version)
             )
-            with self._schedule_lock_keeper(schedule_id):
-                # 进程心跳
+            # 进程心跳
+            try:
                 self.runtime.beat(process_id)
+            except Exception:
+                pass
 
-                # fetch callback data
-                callback_data = None
-                if callback_data_id:
-                    callback_data = self.runtime.get_callback_data(callback_data_id)
+            # fetch callback data
+            callback_data = None
+            if callback_data_id:
+                callback_data = self.runtime.get_callback_data(callback_data_id)
 
-                # fetch node info and start schedule
-                node = self.runtime.get_node(node_id)
-                handler = HandlerFactory.get_handler(node, self.runtime)
-                type_label = self._get_metrics_node_type(node)
+            # fetch node info and start schedule
+            node = self.runtime.get_node(node_id)
+            handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
+            type_label = self._get_metrics_node_type(node)
 
-                logger.info(
-                    "root pipeline[%s] before schedule node %s with data %s",
-                    root_pipeline_id,
-                    node,
-                    callback_data,
-                )
-                schedule_start = time.time()
-                schedule_result = handler.schedule(process_info, state.loop, state.inner_loop, schedule, callback_data)
-                ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
-                    time.time() - schedule_start
-                )
-                logger.info(
-                    "root pipeline[%s] node(%s) schedule result: %s",
-                    process_info.root_pipeline_id,
-                    node.id,
-                    schedule_result.__dict__,
-                )
-
-                if schedule_result.has_next_schedule:
-                    self.runtime.set_next_schedule(
-                        process_info.process_id,
-                        node_id,
-                        schedule_id,
-                        schedule_result.schedule_after,
-                    )
-
-                if schedule_result.schedule_done:
-                    self.runtime.finish_schedule(schedule_id)
-                    self.runtime.execute(
-                        process_id=process_id,
-                        node_id=schedule_result.next_node_id,
-                        root_pipeline_id=process_info.root_pipeline_id,
-                        parent_pipeline_id=process_info.top_pipeline_id,
-                    )
-        except Exception as e:
-            ex_data = traceback.format_exc()
-            logger.warning(
-                "root pipeline[%s] schedule exception catch at node(%s): %s",
+            logger.info(
+                "root pipeline[%s] before schedule node %s with data %s",
                 root_pipeline_id,
-                node_id,
-                ex_data,
+                node,
+                callback_data,
+            )
+            schedule_start = time.time()
+
+            if interrupter.recover_point and interrupter.recover_point.schedule_result:
+                schedule_result = interrupter.recover_point.schedule_result
+            else:
+                schedule_result = handler.schedule(
+                    process_info=process_info,
+                    loop=state.loop,
+                    inner_loop=state.inner_loop,
+                    schedule=schedule,
+                    callback_data=callback_data,
+                    recover_point=interrupter.recover_point,
+                )
+            interrupter.check_and_set(ScheduleKeyPoint.SCHEDULE_NODE_DONE, schedule_result=schedule_result)
+
+            ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
+                time.time() - schedule_start
+            )
+            logger.info(
+                "root pipeline[%s] node(%s) schedule result: %s",
+                process_info.root_pipeline_id,
+                node.id,
+                schedule_result.__dict__,
             )
 
-            # state version already changed, so give up this schedule
-            if isinstance(e, StateVersionNotMatchError):
-                logger.exception(
-                    "root pipeline[%s] schedule exception catch StateVersionNotMatchError at node(%s): %s",
-                    root_pipeline_id,
+            # release lock first
+            if not interrupter.recover_point or not interrupter.recover_point.lock_released:
+                self.runtime.release_schedule_lock(schedule_id)
+            interrupter.check_and_set(ScheduleKeyPoint.RELEASE_LOCK_DONE, lock_released=True)
+
+            if schedule_result.has_next_schedule:
+                self.runtime.set_next_schedule(
+                    process_info.process_id,
                     node_id,
-                    ex_data,
+                    schedule_id,
+                    schedule_result.schedule_after,
                 )
-                return
 
-            # make sure release_schedule_lock call at first,
-            # because remain operations may have been completed in execute
-            self.runtime.release_schedule_lock(schedule_id)
-
-            outputs = self.runtime.get_execution_data_outputs(node_id)
-            outputs["ex_data"] = ex_data
-            self.runtime.set_execution_data_outputs(node_id, outputs)
-
-            self.runtime.set_state(node_id=node_id, to_state=states.FAILED, set_archive_time=True)
-        finally:
-            clear_node_info()
-
-    # help method
-    @contextmanager
-    def _schedule_lock_keeper(self, schedule_id: int):
-        yield
-        self.runtime.release_schedule_lock(schedule_id)
+            if schedule_result.schedule_done:
+                self.runtime.finish_schedule(schedule_id)
+                self.runtime.execute(
+                    process_id=process_id,
+                    node_id=schedule_result.next_node_id,
+                    root_pipeline_id=process_info.root_pipeline_id,
+                    parent_pipeline_id=process_info.top_pipeline_id,
+                )
 
     def _add_history(
         self,

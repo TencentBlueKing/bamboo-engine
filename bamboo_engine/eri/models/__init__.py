@@ -11,16 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from django.apps import AppConfig
-
-from bamboo_engine.handlers import register
-
-
-class ERIConfig(AppConfig):
-    name = "pipeline.eri"
-    verbose_name = "PipelineEngineRuntimeInterface"
-
-    def ready(self):
-        from .celery.tasks import execute, schedule  # noqa
-
-        register()
+from .handler import *  # noqa
+from .interrupt import *  # noqa
+from .node import *  # noqa
+from .runtime import *  # noqa

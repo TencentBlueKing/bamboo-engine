@@ -35,6 +35,7 @@ from pipeline.eri.imp.data import DataMixin
 from pipeline.eri.imp.context import ContextMixin
 from pipeline.eri.imp.execution_history import ExecutionHistoryMixin
 from pipeline.eri.imp.task import TaskMixin
+from pipeline.eri.imp.interrupt import InterruptMixin
 from pipeline.eri.celery.queues import QueueResolver
 
 from pipeline.eri.models import Node, Data, ContextValue, Process, ContextOutputs, LogEntry, ExecutionHistory, State
@@ -51,6 +52,7 @@ class BambooDjangoRuntime(
     ProcessMixin,
     PipelinePluginManagerMixin,
     HooksMixin,
+    InterruptMixin,
     EngineRuntimeInterface,
 ):
     CONTEXT_VALUE_TYPE_MAP = {
@@ -59,7 +61,7 @@ class BambooDjangoRuntime(
         "lazy": ContextValueType.COMPUTE.value,
     }
 
-    ERI_SUPPORT_VERSION = 5
+    ERI_SUPPORT_VERSION = 6
 
     def __init__(self):
         try:
@@ -201,7 +203,6 @@ class BambooDjangoRuntime(
                     "can_skip": act["skippable"],
                     "code": act["component"]["code"],
                     "version": act["component"].get("version", "legacy"),
-                    "timeout": act.get("timeout"),
                     "error_ignorable": act["error_ignorable"],
                     "can_retry": act["retryable"],
                 }

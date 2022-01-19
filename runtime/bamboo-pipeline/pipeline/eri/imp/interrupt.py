@@ -11,16 +11,14 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from django.apps import AppConfig
+from typing import Tuple
 
-from bamboo_engine.handlers import register
+from django import db
 
 
-class ERIConfig(AppConfig):
-    name = "pipeline.eri"
-    verbose_name = "PipelineEngineRuntimeInterface"
-
-    def ready(self):
-        from .celery.tasks import execute, schedule  # noqa
-
-        register()
+class InterruptMixin:
+    def interrupt_errors(self) -> Tuple[Exception]:
+        return (
+            db.OperationalError,
+            db.InternalError,
+        )

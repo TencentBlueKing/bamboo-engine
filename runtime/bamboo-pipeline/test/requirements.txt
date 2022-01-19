@@ -1,0 +1,3 @@
+bamboo-pipeline
+pytest
+pytest-django
