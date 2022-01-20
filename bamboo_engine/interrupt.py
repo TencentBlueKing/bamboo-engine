@@ -28,6 +28,7 @@ class IntruptException(Exception):
 
 class ExecuteKeyPoint:
     ENTRY = "ENTRY"
+    SET_NODE_RUNNING_PRE_CHECK_DONE = "SET_NODE_RUNNING_PRE_CHECK_DONE"
     SET_NODE_RUNNING_DONE = "SET_NODE_RUNNING_DONE"
     # after handler
     EXECUTE_NODE_DONE = "EXECUTE_NODE_DONE"
@@ -146,8 +147,8 @@ class ExecuteInterrupter(Interrupter):
                 recover_point=recover_point,
             )
             logger.error(
-                "[interrupt({})] execute interrupt with point({}), exception trace: {}".format(
-                    self.current_node_id, recover_point.__dict__, traceback.format_exc()
+                "[interrupt({})] execute interrupt with point({}), trying to recover, {}".format(
+                    self.current_node_id, recover_point.to_json(), traceback.format_exc()
                 )
             )
 
@@ -208,8 +209,8 @@ class ScheduleInterrupter(Interrupter):
                 recover_point=recover_point,
             )
             logger.error(
-                "[interrupt({})] execute interrupt with point({}), exception trace: {}".format(
-                    self.current_node_id, recover_point.__dict__, traceback.format_exc()
+                "[interrupt({})] execute interrupt with point({}), trying to recover, {}".format(
+                    self.current_node_id, recover_point.to_json(), traceback.format_exc()
                 )
             )
 

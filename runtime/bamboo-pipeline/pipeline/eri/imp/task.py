@@ -140,6 +140,7 @@ class TaskMixin:
                     "node_id": node_id,
                     "schedule_id": schedule_id,
                     "callback_data_id": callback_data_id,
+                    "recover_point": "{}",
                 },
                 countdown=schedule_after,
                 **route_params,

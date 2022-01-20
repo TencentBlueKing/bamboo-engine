@@ -47,6 +47,7 @@ from .eri import (
 from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, IntruptException
 from .utils.string import get_lower_case_name
 from .utils.host import get_hostname
+from bamboo_engine import interrupt
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -620,7 +621,7 @@ class Engine:
                     self.runtime.die(process_id)
 
                     logger.info(
-                        "root pipeline[%s] revoked checked at node %s",
+                        "[pipeline-trace](root_pipeline: %s) revoked checked at node %s",
                         process_info.root_pipeline_id,
                         current_node_id,
                     )
@@ -630,7 +631,7 @@ class Engine:
                 for pid in process_info.pipeline_stack:
                     if node_state_map[pid] == states.SUSPENDED:
                         logger.info(
-                            "root pipeline[%s] process %s suspended by subprocess %s",
+                            "[pipeline-trace](root_pipeline: %s) process %s suspended by subprocess %s",
                             process_info.root_pipeline_id,
                             process_id,
                             pid,
@@ -647,64 +648,74 @@ class Engine:
                 reset_mark_bit = False
 
                 if node_state:
-                    rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
+                    if interrupter.recover_point and interrupter.recover_point.set_node_running_pre_check_done:
+                        interrupter.recover_point.running_node_version = node_state.version
+                    else:
+                        rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
+                        # 重入次数超过限制
+                        if (
+                            node_state.name == states.FINISHED
+                            and node.type != NodeType.SubProcess
+                            and node_state.loop > rerun_limit
+                        ):
+                            exec_outputs = self.runtime.get_execution_data_outputs(current_node_id)
 
-                    # 重入次数超过限制
-                    if (
-                        node_state.name == states.FINISHED
-                        and node.type != NodeType.SubProcess
-                        and node_state.loop > rerun_limit
-                    ):
-                        exec_outputs = self.runtime.get_execution_data_outputs(current_node_id)
+                            exec_outputs["ex_data"] = "node execution exceed rerun limit {}".format(rerun_limit)
 
-                        exec_outputs["ex_data"] = "node execution exceed rerun limit {}".format(rerun_limit)
+                            self.runtime.set_execution_data_outputs(current_node_id, exec_outputs)
 
-                        self.runtime.set_execution_data_outputs(current_node_id, exec_outputs)
+                            self.runtime.sleep(process_id)
 
-                        self.runtime.sleep(process_id)
+                            self.runtime.set_state(
+                                node_id=current_node_id,
+                                version=node_state.version,
+                                to_state=states.FAILED,
+                                set_archive_time=True,
+                                idempotent=idempotent_set_state,
+                            )
 
-                        self.runtime.set_state(
-                            node_id=current_node_id,
-                            version=node_state.version,
-                            to_state=states.FAILED,
-                            set_archive_time=True,
-                            idempotent=idempotent_set_state,
-                        )
+                            return
 
-                        return
+                        # 检测节点是否被预约暂停
+                        if node_state.name == states.SUSPENDED:
+                            # 预约暂停的节点在预约时获取不到 root_id 和 parent_id，故在此进行设置
+                            self.runtime.set_state_root_and_parent(
+                                node_id=current_node_id,
+                                root_id=process_info.root_pipeline_id,
+                                parent_id=process_info.top_pipeline_id,
+                            )
 
-                    # 检测节点是否被预约暂停
-                    if node_state.name == states.SUSPENDED:
-                        # 预约暂停的节点在预约时获取不到 root_id 和 parent_id，故在此进行设置
-                        self.runtime.set_state_root_and_parent(
-                            node_id=current_node_id,
-                            root_id=process_info.root_pipeline_id,
-                            parent_id=process_info.top_pipeline_id,
-                        )
+                            self.runtime.suspend(process_id, current_node_id)
 
-                        self.runtime.suspend(process_id, current_node_id)
+                            logger.info(
+                                "[pipeline-trace](root_pipeline: %s) process %s suspended by node %s",
+                                process_info.root_pipeline_id,
+                                process_id,
+                                current_node_id,
+                            )
+                            return
 
-                        logger.info(
-                            "root_pipeline[%s] process %s suspended by node %s",
-                            process_info.root_pipeline_id,
-                            process_id,
-                            current_node_id,
-                        )
-                        return
+                        # 设置状态前检测
+                        if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
+                            logger.info(
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",
+                                process_info.root_pipeline_id,
+                                node_state.name,
+                            )
+                            self.runtime.sleep(process_id)
+                            return
 
-                    # 设置状态前检测
-                    if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
-                        self.runtime.sleep(process_id)
-                        return
+                        if node_state.name == states.FINISHED:
+                            loop = node_state.loop + 1
+                            inner_loop = node_state.inner_loop + 1
+                            reset_mark_bit = True
 
-                    if node_state.name == states.FINISHED:
-                        loop = node_state.loop + 1
-                        inner_loop = node_state.inner_loop + 1
-                        reset_mark_bit = True
-
-                    # 重入前记录历史
-                    if node_state.name == states.FINISHED:
-                        self._add_history(node_id=current_node_id, state=node_state)
+                        # 重入前记录历史
+                        if node_state.name == states.FINISHED:
+                            self._add_history(node_id=current_node_id, state=node_state)
+                interrupter.check_and_set(
+                    ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, set_node_running_pre_check_done=True
+                )
 
                 version = self.runtime.set_state(
                     node_id=current_node_id,

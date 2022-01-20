@@ -85,12 +85,14 @@ class ExecuteInterruptPoint(InterruptPoint):
         self,
         name: str,
         version: int = 0,
+        set_node_running_pre_check_done: bool = False,
         running_node_version: Optional[str] = None,
         execute_result: Optional[ExecuteResult] = None,
         schedule_id: Optional[int] = None,
         handler_data: Optional[HandlerExecuteData] = None,
     ) -> None:
         super().__init__(name=name, version=version)
+        self.set_node_running_pre_check_done = set_node_running_pre_check_done
         self.running_node_version = running_node_version
         self.execute_result = execute_result
         self.schedule_id = schedule_id
@@ -108,6 +110,7 @@ class ExecuteInterruptPoint(InterruptPoint):
         return cls(
             name=obj["name"],
             version=obj["version"],
+            set_node_running_pre_check_done=obj["set_node_running_pre_check_done"],
             running_node_version=obj["running_node_version"],
             execute_result=ExecuteResult.from_dict(obj["execute_result"]) if obj["execute_result"] else None,
             schedule_id=obj["schedule_id"],
@@ -120,6 +123,7 @@ class ExecuteInterruptPoint(InterruptPoint):
         obj = {
             "name": self.name,
             "version": self.version,
+            "set_node_running_pre_check_done": self.set_node_running_pre_check_done,
             "running_node_version": self.running_node_version,
             "execute_result": execute_result,
             "schedule_id": self.schedule_id,
