@@ -1001,6 +1001,7 @@ class ScheduleMixin:
         schedule_type: ScheduleType,
     ) -> Schedule:
         """
+        幂等接口
         设置 schedule 对象
 
         :param process_id: 进程 ID

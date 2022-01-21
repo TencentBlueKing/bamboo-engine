@@ -85,17 +85,17 @@ class ExecuteInterruptPoint(InterruptPoint):
         self,
         name: str,
         version: int = 0,
-        set_node_running_pre_check_done: bool = False,
+        state_already_exist: bool = False,
         running_node_version: Optional[str] = None,
         execute_result: Optional[ExecuteResult] = None,
-        schedule_id: Optional[int] = None,
+        set_schedule_done: bool = False,
         handler_data: Optional[HandlerExecuteData] = None,
     ) -> None:
         super().__init__(name=name, version=version)
-        self.set_node_running_pre_check_done = set_node_running_pre_check_done
+        self.state_already_exist = state_already_exist
         self.running_node_version = running_node_version
         self.execute_result = execute_result
-        self.schedule_id = schedule_id
+        self.set_schedule_done = set_schedule_done
         self.handler_data = handler_data or HandlerExecuteData()
 
     @classmethod
@@ -110,10 +110,10 @@ class ExecuteInterruptPoint(InterruptPoint):
         return cls(
             name=obj["name"],
             version=obj["version"],
-            set_node_running_pre_check_done=obj["set_node_running_pre_check_done"],
+            state_already_exist=obj["state_already_exist"],
             running_node_version=obj["running_node_version"],
             execute_result=ExecuteResult.from_dict(obj["execute_result"]) if obj["execute_result"] else None,
-            schedule_id=obj["schedule_id"],
+            set_schedule_done=obj["set_schedule_done"],
             handler_data=HandlerExecuteData.from_dict(obj["handler_data"]) if obj["handler_data"] else None,
         )
 
@@ -123,10 +123,10 @@ class ExecuteInterruptPoint(InterruptPoint):
         obj = {
             "name": self.name,
             "version": self.version,
-            "set_node_running_pre_check_done": self.set_node_running_pre_check_done,
+            "state_already_exist": self.state_already_exist,
             "running_node_version": self.running_node_version,
             "execute_result": execute_result,
-            "schedule_id": self.schedule_id,
+            "set_schedule_done": self.set_schedule_done,
             "handler_data": handler_data,
         }
         return json.dumps(obj)

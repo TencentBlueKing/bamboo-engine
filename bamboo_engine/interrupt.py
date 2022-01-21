@@ -120,9 +120,10 @@ class ExecuteInterrupter(Interrupter):
 
     def to_node(self, node_id: str):
         self.current_node_id = node_id
+        self.check_point.state_already_exist = False
         self.check_point.running_node_version = None
         self.check_point.execute_result = None
-        self.check_point.schedule_id = None
+        self.check_point.set_schedule_done = False
         self.check_point.handler_data = HandlerExecuteData()
         self.recover_point = None
 

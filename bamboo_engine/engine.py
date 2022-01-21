@@ -668,12 +668,18 @@ class Engine:
                 reset_mark_bit = False
 
                 if node_state:
-                    if interrupter.recover_point and interrupter.recover_point.set_node_running_pre_check_done:
+                    if interrupter.recover_point and not interrupter.recover_point.state_already_exist:
+                        interrupter.check_and_set(
+                            ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, state_already_exist=False
+                        )
                         # 如果 running_node_version 不为空，则说明节点是在设置 RUNNING 成功后失败
                         # 此时不能够设置 running_node_version，防止当前实际 version 和 running_node_version 不一致
                         if not interrupter.recover_point.running_node_version:
                             interrupter.recover_point.running_node_version = node_state.version
                     else:
+                        interrupter.check_and_set(
+                            ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, state_already_exist=True
+                        )
                         rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
                         # 重入次数超过限制
                         if (
@@ -736,26 +742,29 @@ class Engine:
                         # 重入前记录历史
                         if node_state.name == states.FINISHED:
                             self._add_history(node_id=current_node_id, state=node_state)
+                else:
+                    interrupter.check_and_set(
+                        ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, state_already_exist=False
+                    )
 
-                interrupter.check_and_set(
-                    ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, set_node_running_pre_check_done=True
-                )
-
-                version = self.runtime.set_state(
-                    node_id=current_node_id,
-                    to_state=states.RUNNING,
-                    version=interrupter.recover_point.running_node_version if interrupter.recover_point else None,
-                    loop=loop,
-                    inner_loop=inner_loop,
-                    root_id=process_info.root_pipeline_id,
-                    parent_id=process_info.top_pipeline_id,
-                    set_started_time=True,
-                    reset_skip=reset_mark_bit,
-                    reset_retry=reset_mark_bit,
-                    reset_error_ignored=reset_mark_bit,
-                    refresh_version=reset_mark_bit,
-                    idempotent=idempotent_set_state,
-                )
+                if interrupter.recover_point and interrupter.recover_point.running_node_version:
+                    version = interrupter.recover_point.running_node_version
+                else:
+                    version = self.runtime.set_state(
+                        node_id=current_node_id,
+                        to_state=states.RUNNING,
+                        version=interrupter.recover_point.running_node_version if interrupter.recover_point else None,
+                        loop=loop,
+                        inner_loop=inner_loop,
+                        root_id=process_info.root_pipeline_id,
+                        parent_id=process_info.top_pipeline_id,
+                        set_started_time=True,
+                        reset_skip=reset_mark_bit,
+                        reset_retry=reset_mark_bit,
+                        reset_error_ignored=reset_mark_bit,
+                        refresh_version=reset_mark_bit,
+                        idempotent=idempotent_set_state,
+                    )
                 interrupter.check_and_set(ExecuteKeyPoint.SET_NODE_RUNNING_DONE, running_node_version=version)
 
                 set_node_info(CurrentNodeInfo(node_id=current_node_id, version=version, loop=loop))
@@ -800,21 +809,20 @@ class Engine:
 
                 # 节点是否准备好进入调度
                 if execute_result.schedule_ready:
-                    if interrupter.recover_point and interrupter.recover_point.schedule_id:
-                        schedule_id = interrupter.recover_point.schedule_id
-                    else:
-                        schedule = self.runtime.set_schedule(
-                            process_id=process_id,
-                            node_id=current_node_id,
-                            version=version,
-                            schedule_type=execute_result.schedule_type,
-                        )
-                        schedule_id = schedule.id
+                    schedule = self.runtime.set_schedule(
+                        process_id=process_id,
+                        node_id=current_node_id,
+                        version=version,
+                        schedule_type=execute_result.schedule_type,
+                    )
+                    schedule_id = schedule.id
 
-                    interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, schedule_id=schedule_id)
-
-                    if execute_result.schedule_type == ScheduleType.POLL:
+                    if execute_result.schedule_type == ScheduleType.POLL and (
+                        not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
+                    ):
                         self.runtime.schedule(process_id, current_node_id, schedule_id)
+
+                    interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, set_schedule_done=True)
 
                 # 是否有待调度的子进程
                 elif execute_result.dispatch_processes:
