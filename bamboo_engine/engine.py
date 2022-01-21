@@ -581,7 +581,13 @@ class Engine:
         :param parent_pipeline_id: 父流程 ID
         :type parent_pipeline_id: str
         """
-        # 推进前准备
+        if interrupter.recover_point:
+            logger.info(
+                "[pipeline-trace](root_pipeline: %s) recover execute with point(%s)",
+                root_pipeline_id,
+                interrupter.recover_point.to_json(),
+            )
+
         current_node_id = node_id
         with interrupter():
             process_info = self.runtime.get_process_info(process_id)
@@ -589,6 +595,7 @@ class Engine:
 
             # 推进循环
             while True:
+                interrupter.check(ExecuteKeyPoint.START_PUSH_NODE)
                 idempotent_set_state = interrupter.recover_point is not None
                 # 进程心跳
                 try:
@@ -599,9 +606,16 @@ class Engine:
 
                 # 遇到推进终点后需要尝试唤醒父进程
                 if current_node_id == process_info.destination_id:
+                    # runtime 应该保证 child_process_finish 的事务性
                     wake_up_seccess = self.runtime.child_process_finish(process_info.parent_id, process_id)
 
                     if wake_up_seccess:
+                        logger.info(
+                            "[pipeline-trace](root_pipeline: %s) child(%s) wake up parent(%s) success",
+                            root_pipeline_id,
+                            process_id,
+                            process_info.parent_id,
+                        )
                         self.runtime.execute(
                             process_id=process_info.parent_id,
                             node_id=process_info.destination_id,
@@ -609,9 +623,15 @@ class Engine:
                             parent_pipeline_id=process_info.top_pipeline_id,
                         )
 
+                    logger.info(
+                        "[pipeline-trace](root_pipeline: %s) child(%s) wake up parent(%s) fail",
+                        root_pipeline_id,
+                        process_id,
+                        process_info.parent_id,
+                    )
                     return
 
-                logger.info("[pipeline-trace](root_pipeline: %s) execute node %s" % (root_pipeline_id, current_node_id))
+                logger.info("[pipeline-trace](root_pipeline: %s) execute node %s", root_pipeline_id, current_node_id)
                 self.runtime.set_current_node(process_id, current_node_id)
 
                 node_state_map = self.runtime.batch_get_state_name(process_info.pipeline_stack)
@@ -649,7 +669,10 @@ class Engine:
 
                 if node_state:
                     if interrupter.recover_point and interrupter.recover_point.set_node_running_pre_check_done:
-                        interrupter.recover_point.running_node_version = node_state.version
+                        # 如果 running_node_version 不为空，则说明节点是在设置 RUNNING 成功后失败
+                        # 此时不能够设置 running_node_version，防止当前实际 version 和 running_node_version 不一致
+                        if not interrupter.recover_point.running_node_version:
+                            interrupter.recover_point.running_node_version = node_state.version
                     else:
                         rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
                         # 重入次数超过限制
@@ -713,6 +736,7 @@ class Engine:
                         # 重入前记录历史
                         if node_state.name == states.FINISHED:
                             self._add_history(node_id=current_node_id, state=node_state)
+
                 interrupter.check_and_set(
                     ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, set_node_running_pre_check_done=True
                 )

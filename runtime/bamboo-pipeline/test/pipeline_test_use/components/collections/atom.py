@@ -372,3 +372,98 @@ class EmptyComponent(Component):
     code = "empty_node"
     bound_service = EmptyService
     form = "index.html"
+
+
+class InterruptService(Service):
+    def __init__(self, name=None):
+        super().__init__(name=name)
+        self.execute_count = 0
+
+    def execute(self, data, parent_data):
+        self.logger.info("execute id: {}".format(self.id))
+        self.logger.info("execute root_pipeline_id: {}".format(self.root_pipeline_id))
+        logger.info("debug_node execute data %s " % pprint.pformat(data.inputs))
+        logger.info("debug_node execute parent data %s " % pprint.pformat(parent_data.inputs))
+        for key, val in data.inputs.items():
+            data.set_outputs(key, val)
+        logger.info("debug_node output data %s " % pprint.pformat(data.outputs))
+        self.execute_count += 1
+        data.set_outputs("execute_count", self.execute_count)
+        return True
+
+    def outputs_format(self):
+        return []
+
+
+class InterruptComponent(Component):
+    name = u"debug 组件"
+    code = "interrupt_test"
+    bound_service = InterruptService
+    form = "index.html"
+
+
+class InterruptScheduleService(Service):
+    __need_schedule__ = True
+    interval = StaticIntervalGenerator(0)
+
+    def __init__(self, name=None):
+        super().__init__(name=name)
+        self.execute_count = 0
+        self.schedule_count = 0
+
+    def execute(self, data, parent_data):
+        self.logger.info("execute id: {}".format(self.id))
+        self.logger.info("execute root_pipeline_id: {}".format(self.root_pipeline_id))
+        logger.info("debug_node execute data %s " % pprint.pformat(data.inputs))
+        logger.info("debug_node execute parent data %s " % pprint.pformat(parent_data.inputs))
+        for key, val in data.inputs.items():
+            data.set_outputs(key, val)
+        logger.info("debug_node output data %s " % pprint.pformat(data.outputs))
+        self.execute_count += 1
+        data.set_outputs("execute_count", self.execute_count)
+        return True
+
+    def schedule(self, data, parent_data, callback_data=None):
+        self.logger.info("schedule id: {}".format(self.id))
+        self.logger.info("schedule root_pipeline_id: {}".format(self.root_pipeline_id))
+        logger.info("debug_node schedule data %s " % pprint.pformat(data.inputs))
+        logger.info("debug_node schedule parent data %s " % pprint.pformat(parent_data.inputs))
+        logger.info("debug_node schedule output data %s " % pprint.pformat(data.outputs))
+        self.schedule_count += 1
+        data.set_outputs("schedule_count", self.schedule_count)
+
+        self.finish_schedule()
+        return True
+
+    def outputs_format(self):
+        return []
+
+
+class InterruptScheduleComponent(Component):
+    name = u"debug 组件"
+    code = "interrupt_schedule_test"
+    bound_service = InterruptScheduleService
+    form = "index.html"
+
+
+class InterruptDummyExecuteService(Service):
+    def __init__(self, name=None):
+        super().__init__(name=name)
+        self.execute_count = 0
+
+    def execute(self, data, parent_data):
+        time.sleep(int(data.inputs.time))
+        self.execute_count += 1
+        data.set_outputs("execute_count", self.execute_count)
+
+        return True
+
+    def outputs_format(self):
+        return []
+
+
+class InterruptDummyExecuteComponent(Component):
+    name = "dummy execute component"
+    code = "interrupt_dummy_exec_node"
+    bound_service = InterruptDummyExecuteService
+    form = "index.html"

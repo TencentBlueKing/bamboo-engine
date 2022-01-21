@@ -28,6 +28,7 @@ class IntruptException(Exception):
 
 class ExecuteKeyPoint:
     ENTRY = "ENTRY"
+    START_PUSH_NODE = "START_PUSH_NODE"
     SET_NODE_RUNNING_PRE_CHECK_DONE = "SET_NODE_RUNNING_PRE_CHECK_DONE"
     SET_NODE_RUNNING_DONE = "SET_NODE_RUNNING_DONE"
     # after handler

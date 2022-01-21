@@ -35,6 +35,12 @@ def assert_all_running(node_id_list):
     _assert_all_state_equal(node_id_list, states.RUNNING)
 
 
+def assert_all_revoked(node_id_list):
+    _assert_all_state_equal(node_id_list, states.REVOKED)
+
+def assert_all_suspended(node_id_list):
+    _assert_all_state_equal(node_id_list, states.SUSPENDED)
+
 def assert_not_executed(node_id_list):
     qs = DBState.objects.filter(node_id__in=node_id_list)
     assert len(qs) == 0
