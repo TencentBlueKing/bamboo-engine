@@ -18,6 +18,7 @@ from bamboo_engine.config import Settings
 from bamboo_engine.eri import ProcessInfo, NodeType
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.context import Context
+from bamboo_engine.template.template import Template
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -59,6 +60,16 @@ class EmptyEndEventHandler(NodeHandler):
             pipeline_id,
             context_values,
         )
+
+        # caculate outputs values references
+        output_value_refs = set(Template([cv.value for cv in context_values]).get_reference())
+        logger.info(
+            "root_pipeline[%s] node(%s) outputs values refs: %s",
+            root_pipeline_id,
+            self.node.id,
+            output_value_refs,
+        )
+        context_values.extend(self.runtime.get_context_values(pipeline_id=pipeline_id, keys=output_value_refs))
 
         context = Context(self.runtime, context_values, root_pipeline_inputs)
         hydrated_context = context.hydrate(deformat=False)

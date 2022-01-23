@@ -72,6 +72,4 @@ def test_parallel_gateway_handler__execute_success():
         },
     )
 
-    runtime.set_state.assert_called_once_with(
-        node_id=node.id, to_state=states.FINISHED, set_archive_time=True
-    )
+    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FINISHED, set_archive_time=True)
