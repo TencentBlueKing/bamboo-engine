@@ -63,13 +63,9 @@ def test_executable_end_event_handler__event_execute_error():
     assert result.should_die == False
 
     runtime.get_executable_end_event.assert_called_once_with(code=node.code)
-    event.execute.assert_called_once_with(
-        pipeline_stack=["root"], root_pipeline_id="root"
-    )
+    event.execute.assert_called_once_with(pipeline_stack=["root"], root_pipeline_id="root")
     runtime.set_execution_data_outputs.assert_called_once()
-    runtime.set_state.assert_called_once_with(
-        node_id=node.id, to_state=states.FAILED, set_archive_time=True
-    )
+    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
 
 
 def test_executable_end_event_handler__event_execute_success():
@@ -121,13 +117,11 @@ def test_executable_end_event_handler__event_execute_success():
     assert result.should_die == True
 
     runtime.get_executable_end_event.assert_called_once_with(code=node.code)
-    event.execute.assert_called_once_with(
-        pipeline_stack=["root"], root_pipeline_id="root"
-    )
+    event.execute.assert_called_once_with(pipeline_stack=["root"], root_pipeline_id="root")
     runtime.get_data_inputs.assert_called_once_with("root")
     runtime.get_context_outputs.assert_called_once_with("root")
-    runtime.get_context_values.assert_called_once_with(
-        pipeline_id="root", keys=context_outputs
+    runtime.get_context_values.assert_has_calls(
+        [call(pipeline_id="root", keys=context_outputs), call(pipeline_id="root", keys=set())]
     )
     runtime.set_execution_data_outputs.assert_called_once_with(
         node_id="root",

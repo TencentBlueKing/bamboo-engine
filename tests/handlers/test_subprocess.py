@@ -55,9 +55,7 @@ def test_subprocess_handler__execute_success():
         outputs={"_loop": "${sub_loop}"},
     )
 
-    context_values = [
-        ContextValue(key="${v1}", value="var", type=ContextValueType.PLAIN)
-    ]
+    context_values = [ContextValue(key="${v1}", value="var", type=ContextValueType.PLAIN)]
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -77,12 +75,8 @@ def test_subprocess_handler__execute_success():
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_context_key_references.assert_called_once_with(
-        pipeline_id="root", keys={"${v1}", "${sub_loop}"}
-    )
-    runtime.get_context_values.assert_called_once_with(
-        pipeline_id="root", keys={"${v1}", "${sub_loop}"}
-    )
+    runtime.get_context_key_references.assert_called_once_with(pipeline_id="root", keys={"${v1}", "${sub_loop}"})
+    runtime.get_context_values.assert_called_once_with(pipeline_id="root", keys={"${v1}", "${sub_loop}"})
     runtime.reset_children_state_inner_loop.assert_called_once_with(node.id)
     upsert_call_args = runtime.upsert_plain_context_values.call_args.args
     assert upsert_call_args[0] == node.id
