@@ -102,7 +102,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
             should_raise = raise_time != "never" and self.raise_call_times.get(method_name, 1) == raise_call_time
 
             if should_raise:
-                logger.error(
+                logger.warning(
                     "[choas]current_method: <{}>, current_stage: <{}>, current_plan: {}, raise_time: <{}>, raise_call_time<{}>".format(
                         method_name, self.stage, plan, raise_time, raise_call_time
                     )
@@ -198,7 +198,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
                 "execute_choas_plans": json.dumps(self.execute_choas_plans),
                 "execute_plan_index": self.execute_plan_index,
                 "schedule_choas_plans": json.dumps(self.schedule_choas_plans),
-                "schedule_plan_index": self.schedule_plan_index,
+                "schedule_plan_index": self.schedule_plan_index + 1,
             },
             **{
                 "queue": "er_schedule",

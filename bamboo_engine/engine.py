@@ -781,6 +781,11 @@ class Engine:
                 execute_start = time.time()
 
                 if interrupter.recover_point and interrupter.recover_point.execute_result:
+                    logger.info(
+                        "root pipeline[%s] skip real execute node %s, using recover result",
+                        root_pipeline_id,
+                        node,
+                    )
                     execute_result = interrupter.recover_point.execute_result
                 else:
                     execute_result = handler.execute(
@@ -877,6 +882,13 @@ class Engine:
         :param callback_data_id: 回调数据 ID, defaults to None
         :type callback_data_id: Optional[int], optional
         """
+        if interrupter.recover_point:
+            logger.info(
+                "[pipeline-trace](schedule: %s) recover schedule with point(%s)",
+                schedule_id,
+                interrupter.recover_point.to_json(),
+            )
+
         root_pipeline_id = ""
 
         with interrupter():
@@ -902,11 +914,12 @@ class Engine:
 
             # 检查 schedule 是否过期
             version_mismatch = False
-            if interrupter.recover_point and interrupter.recover_point.version_mismatch:
-                version_mismatch = True
+            if interrupter.recover_point and interrupter.recover_point.version_mismatch is not None:
+                version_mismatch = interrupter.recover_point.version_mismatch
             elif state.version != schedule.version:
                 version_mismatch = True
 
+            interrupter.check_and_set(ScheduleKeyPoint.VERSION_MISMATCH_CHECKED, version_mismatch=version_mismatch)
             if version_mismatch:
                 logger.info(
                     "root pipeline[%s] schedule(%s) %s with version %s expired, current version: %s",
@@ -916,17 +929,17 @@ class Engine:
                     schedule.version,
                     state.version,
                 )
-                interrupter.check_and_set(ScheduleKeyPoint.VERSION_MISMATCH, version_mismatch=True)
                 self.runtime.expire_schedule(schedule_id)
                 return
 
             # 检查节点状态是否合法
             node_not_running = False
-            if interrupter.recover_point and interrupter.recover_point.node_not_running:
-                node_not_running = True
+            if interrupter.recover_point and interrupter.recover_point.node_not_running is not None:
+                node_not_running = interrupter.recover_point.node_not_running
             elif state.name != states.RUNNING:
                 node_not_running = True
 
+            interrupter.check_and_set(ScheduleKeyPoint.NODE_NOT_RUNNING_CHECKED, node_not_running=node_not_running)
             if node_not_running:
                 logger.info(
                     "root pipeline[%s] schedule(%s) %s with version %s state is not running: %s",
@@ -936,13 +949,12 @@ class Engine:
                     schedule.version,
                     state.name,
                 )
-                interrupter.check_and_set(ScheduleKeyPoint.NODE_NOT_RUNNING, node_not_running=True)
                 self.runtime.expire_schedule(schedule_id)
                 return
 
             # try to get lock
-            if interrupter.recover_point and interrupter.recover_point.lock_get:
-                lock_get = True
+            if interrupter.recover_point and interrupter.recover_point.lock_get is not None:
+                lock_get = interrupter.recover_point.lock_get
             else:
                 lock_get = self.runtime.apply_schedule_lock(schedule_id)
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
@@ -1006,6 +1018,11 @@ class Engine:
             schedule_start = time.time()
 
             if interrupter.recover_point and interrupter.recover_point.schedule_result:
+                logger.info(
+                    "root pipeline[%s] skip real schedule node %s, using recover result",
+                    root_pipeline_id,
+                    node,
+                )
                 schedule_result = interrupter.recover_point.schedule_result
             else:
                 schedule_result = handler.schedule(
