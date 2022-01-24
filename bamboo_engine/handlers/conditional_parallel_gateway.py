@@ -112,7 +112,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                 # test failed
                 return self._execute_fail(
                     "evaluate[{}] fail with data[{}] message: {}".format(
-                        c.resolved_evaluate, json.dumps(hydrated_context), e
+                        c.evaluation, json.dumps(hydrated_context), e
                     )
                 )
 

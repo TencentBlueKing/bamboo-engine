@@ -11,22 +11,22 @@ from ..utils import *  # noqa
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"get_process_info": {"raise_time": "pre"}}], [], id="get_process_info_raise"),
-        pytest.param([{"wake_up": {"raise_time": "pre"}}], [], id="pre_wake_up_raise"),
-        pytest.param([{"wake_up": {"raise_time": "post"}}], [], id="post_wake_up_raise"),
-        pytest.param([{"beat": {"raise_time": "pre"}}], [], id="beat_raise"),
-        pytest.param([{"set_current_node": {"raise_time": "pre"}}], [], id="pre_set_current_node_raise"),
-        pytest.param([{"set_current_node": {"raise_time": "post"}}], [], id="post_set_current_node_raise"),
-        pytest.param([{"batch_get_state_name": {"raise_time": "pre"}}], [], id="batch_get_state_name_raise"),
-        pytest.param([{"get_node": {"raise_time": "pre"}}], [], id="get_node_raise"),
-        pytest.param([{"get_state_or_none": {"raise_time": "pre"}}], [], id="get_state_or_none_raise"),
-        pytest.param([{"set_state": {"raise_time": "pre"}}], [], id="pre_set_state_raise"),
-        pytest.param([{"set_state": {"raise_time": "post"}}], [], id="post_set_state_raise"),
+        pytest.param([{"get_process_info": {"raise_time": "pre"}}], id="get_process_info_raise"),
+        pytest.param([{"wake_up": {"raise_time": "pre"}}], id="pre_wake_up_raise"),
+        pytest.param([{"wake_up": {"raise_time": "post"}}], id="post_wake_up_raise"),
+        pytest.param([{"beat": {"raise_time": "pre"}}], id="beat_raise"),
+        pytest.param([{"set_current_node": {"raise_time": "pre"}}], id="pre_set_current_node_raise"),
+        pytest.param([{"set_current_node": {"raise_time": "post"}}], id="post_set_current_node_raise"),
+        pytest.param([{"batch_get_state_name": {"raise_time": "pre"}}], id="batch_get_state_name_raise"),
+        pytest.param([{"get_node": {"raise_time": "pre"}}], id="get_node_raise"),
+        pytest.param([{"get_state_or_none": {"raise_time": "pre"}}], id="get_state_or_none_raise"),
+        pytest.param([{"set_state": {"raise_time": "pre"}}], id="pre_set_state_raise"),
+        pytest.param([{"set_state": {"raise_time": "post"}}], id="post_set_state_raise"),
     ],
 )
-def test(execute_choas_plans, schedule_choas_plans):
+def test(execute_choas_plans):
     start = EmptyStartEvent()
     act = ServiceActivity(component_code="interrupt_test")
     end = EmptyEndEvent()
@@ -36,9 +36,7 @@ def test(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
@@ -55,12 +53,12 @@ def test(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{}, {"child_process_finish": {"raise_time": "pre"}}], [], id="pre_child_process_finish_raise"),
+        pytest.param([{}, {"child_process_finish": {"raise_time": "pre"}}], id="pre_child_process_finish_raise"),
     ],
 )
-def test_child_process_finish(execute_choas_plans, schedule_choas_plans):
+def test_child_process_finish(execute_choas_plans):
     start = EmptyStartEvent()
     pg = ParallelGateway()
     act_1 = ServiceActivity(component_code="interrupt_test")
@@ -74,9 +72,7 @@ def test_child_process_finish(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
@@ -101,13 +97,13 @@ def test_child_process_finish(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"die": {"raise_time": "pre"}}], [], id="pre_die_raise"),
-        pytest.param([{"die": {"raise_time": "post"}}], [], id="post_die_raise"),
+        pytest.param([{"die": {"raise_time": "pre"}}], id="pre_die_raise"),
+        pytest.param([{"die": {"raise_time": "post"}}], id="post_die_raise"),
     ],
 )
-def test_revoke_die(execute_choas_plans, schedule_choas_plans):
+def test_revoke_die(execute_choas_plans):
     start = EmptyStartEvent()
     act = ServiceActivity(component_code="interrupt_dummy_exec_node")
     act.component.inputs.time = Var(type=Var.PLAIN, value=5)
@@ -118,9 +114,7 @@ def test_revoke_die(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
     sleep(1)
@@ -141,13 +135,13 @@ def test_revoke_die(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"suspend": {"raise_time": "pre"}}], [], id="pre_suspend_raise"),
-        pytest.param([{"suspend": {"raise_time": "post"}}], [], id="post_suspend_raise"),
+        pytest.param([{"suspend": {"raise_time": "pre"}}], id="pre_suspend_raise"),
+        pytest.param([{"suspend": {"raise_time": "post"}}], id="post_suspend_raise"),
     ],
 )
-def test_pipeline_suspended(execute_choas_plans, schedule_choas_plans):
+def test_pipeline_suspended(execute_choas_plans):
     start = EmptyStartEvent()
     act = ServiceActivity(component_code="interrupt_dummy_exec_node")
     act.component.inputs.time = Var(type=Var.PLAIN, value=5)
@@ -158,9 +152,7 @@ def test_pipeline_suspended(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
     sleep(1)
@@ -181,13 +173,13 @@ def test_pipeline_suspended(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"node_rerun_limit": {"raise_time": "pre"}}], [], id="pre_node_rerun_limit_raise"),
-        pytest.param([{"node_rerun_limit": {"raise_time": "post"}}], [], id="post_node_rerun_limit_raise"),
+        pytest.param([{"node_rerun_limit": {"raise_time": "pre"}}], id="pre_node_rerun_limit_raise"),
+        pytest.param([{"node_rerun_limit": {"raise_time": "post"}}], id="post_node_rerun_limit_raise"),
     ],
 )
-def test_node_rerun_limit(execute_choas_plans, schedule_choas_plans):
+def test_node_rerun_limit(execute_choas_plans):
     start = EmptyStartEvent()
     act_1 = ServiceActivity(component_code="interrupt_test")
     act_2 = ServiceActivity(component_code="interrupt_test")
@@ -207,9 +199,7 @@ def test_node_rerun_limit(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start, data=pipeline_data)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
@@ -272,15 +262,15 @@ def test_node_rerun_limit(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"sleep": {"raise_time": "pre"}}], [], id="pre_after_execute_sleep_raise"),
-        pytest.param([{"sleep": {"raise_time": "post"}}], [], id="post_after_execute_sleep_raise"),
-        pytest.param([{"set_schedule": {"raise_time": "pre"}}], [], id="pre_after_execute_set_schedule_raise"),
-        pytest.param([{"set_schedule": {"raise_time": "post"}}], [], id="post_after_execute_set_schedule_raise"),
+        pytest.param([{"sleep": {"raise_time": "pre"}}], id="pre_after_execute_sleep_raise"),
+        pytest.param([{"sleep": {"raise_time": "post"}}], id="post_after_execute_sleep_raise"),
+        pytest.param([{"set_schedule": {"raise_time": "pre"}}], id="pre_after_execute_set_schedule_raise"),
+        pytest.param([{"set_schedule": {"raise_time": "post"}}], id="post_after_execute_set_schedule_raise"),
     ],
 )
-def test_schedule_prepare(execute_choas_plans, schedule_choas_plans):
+def test_schedule_prepare(execute_choas_plans):
     start = EmptyStartEvent()
     act = ServiceActivity(component_code="interrupt_schedule_test")
     end = EmptyEndEvent()
@@ -290,9 +280,7 @@ def test_schedule_prepare(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
@@ -309,13 +297,13 @@ def test_schedule_prepare(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"die": {"raise_time": "pre"}}], [], id="pre_finish_die_raise"),
-        pytest.param([{"die": {"raise_time": "post"}}], [], id="post_finish_die_raise"),
+        pytest.param([{"die": {"raise_time": "pre"}}], id="pre_finish_die_raise"),
+        pytest.param([{"die": {"raise_time": "post"}}], id="post_finish_die_raise"),
     ],
 )
-def test_finish_die(execute_choas_plans, schedule_choas_plans):
+def test_finish_die(execute_choas_plans):
     start = EmptyStartEvent()
     act = ServiceActivity(component_code="interrupt_test")
     end = EmptyEndEvent()
@@ -325,9 +313,7 @@ def test_finish_die(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
@@ -344,13 +330,13 @@ def test_finish_die(execute_choas_plans, schedule_choas_plans):
 
 
 @pytest.mark.parametrize(
-    "execute_choas_plans, schedule_choas_plans",
+    "execute_choas_plans",
     [
-        pytest.param([{"join": {"raise_time": "pre"}}], [], id="pre_join_raise"),
-        pytest.param([{"join": {"raise_time": "post"}}], [], id="post_join_raise"),
+        pytest.param([{"join": {"raise_time": "pre"}}], id="pre_join_raise"),
+        pytest.param([{"join": {"raise_time": "post"}}], id="post_join_raise"),
     ],
 )
-def test_join(execute_choas_plans, schedule_choas_plans):
+def test_join(execute_choas_plans):
     start = EmptyStartEvent()
     pg = ParallelGateway()
     act_1 = ServiceActivity(component_code="interrupt_test")
@@ -364,9 +350,7 @@ def test_join(execute_choas_plans, schedule_choas_plans):
     pipeline = build_tree(start)
 
     engine = Engine(
-        ChoasBambooDjangoRuntime(
-            stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
-        )
+        ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 

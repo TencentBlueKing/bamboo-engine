@@ -722,6 +722,7 @@ class ProcessMixin:
     def child_process_finish(self, parent_id: int, process_id: int) -> bool:
         """
         幂等接口
+        该接口需要做好事务性保证
         标记某个进程的子进程执行完成，并返回是否能够唤醒父进程继续执行的标志位
 
         :param parent_id: 父进程 ID
@@ -761,6 +762,7 @@ class ProcessMixin:
         from_to: Dict[str, str],
     ) -> List[DispatchProcess]:
         """
+        该接口需要做好事务性保证
         根据当前进程 fork 出多个子进程
 
         :param parent_id: 父进程 ID
@@ -1043,6 +1045,7 @@ class ScheduleMixin:
     @abstractmethod
     def apply_schedule_lock(self, schedule_id: str) -> bool:
         """
+        该接口需要做好事务性保证
         获取 Schedule 对象的调度锁，返回是否成功获取锁
 
         :param schedule_id: 调度实例 ID
@@ -1054,6 +1057,7 @@ class ScheduleMixin:
     @abstractmethod
     def release_schedule_lock(self, schedule_id: int):
         """
+        该接口需要做好事务性保证
         释放指定 Schedule 的调度锁
 
         :param schedule_id: Schedule ID

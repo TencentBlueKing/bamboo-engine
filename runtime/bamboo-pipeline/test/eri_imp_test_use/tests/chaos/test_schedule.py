@@ -39,6 +39,7 @@ def test(execute_choas_plans, schedule_choas_plans):
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
     assert_all_finish([start.id, act.id, end.id, pipeline["id"]])
+    assert_schedule_finish(act.id, times=1)
     assert_exec_data_equal(
         {
             pipeline["id"]: {"inputs": {}, "outputs": {}},
@@ -48,3 +49,35 @@ def test(execute_choas_plans, schedule_choas_plans):
             },
         }
     )
+
+
+@pytest.mark.parametrize(
+    "execute_choas_plans, schedule_choas_plans",
+    [
+        pytest.param([], [{"get_callback_data": {"raise_time": "pre"}}], id="get_callback_data_raise"),
+    ],
+)
+def test_callback(execute_choas_plans, schedule_choas_plans):
+    start = EmptyStartEvent()
+    act_1 = ServiceActivity(component_code="callback_node")
+    end = EmptyEndEvent()
+
+    start.extend(act_1).extend(end)
+
+    pipeline = build_tree(start)
+    runtime = ChoasBambooDjangoRuntime(
+        stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=schedule_choas_plans
+    )
+    engine = Engine(runtime)
+    engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
+
+    sleep(2)
+
+    assert_all_running([act_1.id])
+    state = runtime.get_state(act_1.id)
+    engine.callback(act_1.id, state.version, {})
+
+    sleep(2)
+
+    assert_all_finish([start.id, act_1.id, end.id])
+    assert_schedule_finish(act_1.id, times=1)
