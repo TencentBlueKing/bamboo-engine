@@ -50,20 +50,32 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
         acts = list(template.data[PE.activities].values())
         subprocess_nodes = [act for act in acts if act["type"] == PE.SubProcess]
         rs = []
+        template_scheme_dict = {}
         for sp in subprocess_nodes:
             version = sp.get("version") or PipelineTemplate.objects.get(template_id=sp["template_id"]).version
             always_use_latest = sp.get("always_use_latest", False)
+
+            template_scheme_dict.update({
+                sp["template_id"]: sp.get("scheme_id_list", [])
+            })
+
             rs.append(
                 TemplateRelationship(
                     ancestor_template_id=template.template_id,
                     descendant_template_id=sp["template_id"],
                     subprocess_node_id=sp["id"],
                     version=version,
-                    always_use_latest=always_use_latest,
+                    always_use_latest=always_use_latest
                 )
             )
         if rs:
             TemplateRelationship.objects.bulk_create(rs)
+
+            relation_queryset = TemplateRelationship.objects.filter(ancestor_template_id=template.template_id)
+            for relation in relation_queryset:
+                scheme_id_list = template_scheme_dict[relation.descendant_template_id]
+                relation.templatescheme_set.add(*scheme_id_list)
+
         TemplateVersion.objects.track(template)
         TemplateCurrentVersion.objects.update_current_version(template)
 

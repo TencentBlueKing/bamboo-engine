@@ -20,7 +20,8 @@ from bamboo_engine.eri import (
     EmptyStartEvent,
     Data,
     ContextValue,
-    ContextValueType, DataInput,
+    ContextValueType,
+    DataInput,
 )
 from bamboo_engine.handlers.empty_start_event import EmptyStartEventHandler
 
@@ -29,10 +30,7 @@ def test_empty_start_event_handler__execute_success():
     # ContextValue 各个属性值相等即判断为相等，用于assert生成的函数入参
     def mock_eq_func(self, other):
         return (
-            self.key == other.key
-            and self.value == other.value
-            and self.type == other.type
-            and self.code == other.code
+            self.key == other.key and self.value == other.value and self.type == other.type and self.code == other.code
         )
 
     setattr(ContextValue, "__eq__", mock_eq_func)
@@ -67,11 +65,7 @@ def test_empty_start_event_handler__execute_success():
             value="b: ${a}",
             type=ContextValueType.SPLICE,
         ),
-        ContextValue(
-            key="${c}",
-            value="1",
-            type=ContextValueType.PLAIN
-        )
+        ContextValue(key="${c}", value="1", type=ContextValueType.PLAIN),
     ]
 
     upsert_context_dict = {
@@ -114,6 +108,4 @@ def test_empty_start_event_handler__execute_success():
         set_archive_time=True,
     )
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${a}", "${b}", "${c}"})
-    runtime.upsert_plain_context_values.assert_called_once_with(
-        pi.top_pipeline_id, upsert_context_dict
-    )
+    runtime.upsert_plain_context_values.assert_called_once_with(pi.top_pipeline_id, upsert_context_dict)
