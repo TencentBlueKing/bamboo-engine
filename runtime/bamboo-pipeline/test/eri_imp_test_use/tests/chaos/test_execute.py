@@ -117,7 +117,8 @@ def test_revoke_die(execute_choas_plans):
         ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-    sleep(1)
+
+    assert_all_running([pipeline["id"]])
 
     engine.revoke_pipeline(pipeline["id"])
 
@@ -155,7 +156,8 @@ def test_pipeline_suspended(execute_choas_plans):
         ChoasBambooDjangoRuntime(stage="start", execute_choas_plans=execute_choas_plans, schedule_choas_plans=[])
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-    sleep(1)
+
+    assert_all_running([pipeline["id"]])
 
     engine.pause_pipeline((pipeline["id"]))
 

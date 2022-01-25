@@ -71,13 +71,9 @@ def test_callback(execute_choas_plans, schedule_choas_plans):
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
-
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
     engine.callback(act_1.id, state.version, {})
-
-    sleep(2)
 
     assert_all_finish([start.id, act_1.id, end.id])
     assert_schedule_finish(act_1.id, times=1)
