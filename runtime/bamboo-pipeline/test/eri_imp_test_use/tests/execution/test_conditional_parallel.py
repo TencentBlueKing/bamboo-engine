@@ -22,7 +22,7 @@ def test_parallel_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    
 
     node_id_list = [pipeline["id"], start.id, cpg.id, acts[0].id, acts[1].id, acts[2].id, cg.id, end.id]
     node_data_dict = {
@@ -60,7 +60,7 @@ def test_nest_parallel_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    
 
     node_id_list = [
         pipeline["id"],
@@ -120,7 +120,7 @@ def test_template_parallel_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    
 
     node_id_list = [pipeline["id"], start.id, cpg.id, acts[0].id, acts[1].id, cg.id, end.id]
     node_data_dict = {
@@ -151,7 +151,7 @@ def test_parallel_execution_no_match():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    
 
     node_id_list = [start.id]
     node_data_dict = {cpg.id: {"inputs": {}, "outputs": {"ex_data": "all conditions of branches are not meet"}}}
