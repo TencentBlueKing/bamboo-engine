@@ -137,11 +137,15 @@ class HandlerScheduleData:
         self,
         service_scheduled: bool = False,
         service_schedule_fail: bool = False,
+        is_schedule_done: bool = False,
+        schedule_times_added: bool = False,
         schedule_serialize_outputs: str = "{}",
         schedule_outputs_serializer: str = "",
     ) -> None:
         self.service_scheduled = service_scheduled
         self.service_schedule_fail = service_schedule_fail
+        self.is_schedule_done = is_schedule_done
+        self.schedule_times_added = schedule_times_added
         self.schedule_serialize_outputs = schedule_serialize_outputs
         self.schedule_outputs_serializer = schedule_outputs_serializer
 
@@ -149,6 +153,8 @@ class HandlerScheduleData:
         return {
             "service_scheduled": self.service_scheduled,
             "service_schedule_fail": self.service_schedule_fail,
+            "is_schedule_done": self.is_schedule_done,
+            "schedule_times_added": self.schedule_times_added,
             "schedule_serialize_outputs": self.schedule_serialize_outputs,
             "schedule_outputs_serializer": self.schedule_outputs_serializer,
         }
@@ -158,6 +164,8 @@ class HandlerScheduleData:
         return cls(
             service_scheduled=obj["service_scheduled"],
             service_schedule_fail=obj["service_schedule_fail"],
+            is_schedule_done=obj["is_schedule_done"],
+            schedule_times_added=obj["schedule_times_added"],
             schedule_serialize_outputs=obj["schedule_serialize_outputs"],
             schedule_outputs_serializer=obj["schedule_outputs_serializer"],
         )

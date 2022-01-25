@@ -166,6 +166,7 @@ class ScheduleKeyPoint:
     RELEASE_LOCK_DONE = "RELEASE_LOCK_DONE"
     # service_activity
     SA_SERVICE_SCHEDULE_DONE = "SA_SERVICE_SCHEDULE_DONE"
+    SA_SERVICE_SCHEDULE_TIME_ADDED = "SA_SERVICE_SCHEDULE_TIME_ADDED"
 
 
 class ScheduleInterrupter(Interrupter):

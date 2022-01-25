@@ -111,9 +111,9 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
             if should_raise and raise_time == "pre":
                 raise random.choice(self.interrupt_errors())("[pre]let's make some choas.")
 
-            result = runtime_method(*args, **kwargs)
             self.raise_call_times.setdefault(method_name, 1)
             self.raise_call_times[method_name] += 1
+            result = runtime_method(*args, **kwargs)
 
             if should_raise and raise_time == "post":
                 raise random.choice(self.interrupt_errors())("[after]let's make some choas.")

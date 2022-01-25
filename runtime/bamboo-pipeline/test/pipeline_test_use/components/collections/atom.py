@@ -467,3 +467,39 @@ class InterruptDummyExecuteComponent(Component):
     code = "interrupt_dummy_exec_node"
     bound_service = InterruptDummyExecuteService
     form = "index.html"
+
+
+class InterruptRaiseService(Service):
+    __need_schedule__ = True
+    interval = StaticIntervalGenerator(0)
+
+    def __init__(self, name=None):
+        super().__init__(name=name)
+        self.execute_count = 0
+        self.schedule_count = 0
+
+    def execute(self, data, parent_data):
+        if data.get_one_of_inputs("execute_raise", False):
+            raise Exception()
+        self.execute_count += 1
+        data.set_outputs("execute_count", self.execute_count)
+        return True
+
+    def schedule(self, data, parent_data, callback_data=None):
+        if data.get_one_of_inputs("schedule_raise", False):
+            raise Exception()
+        self.schedule_count += 1
+        data.set_outputs("schedule_count", self.schedule_count)
+
+        self.finish_schedule()
+        return True
+
+    def outputs_format(self):
+        return []
+
+
+class InterruptScheduleComponent(Component):
+    name = u"debug 组件"
+    code = "interrupt_raise_test"
+    bound_service = InterruptRaiseService
+    form = "index.html"

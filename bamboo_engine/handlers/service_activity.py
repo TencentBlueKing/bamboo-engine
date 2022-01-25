@@ -15,6 +15,8 @@ import logging
 import traceback
 from typing import Optional
 
+from django.dispatch import receiver
+
 from bamboo_engine import states
 from bamboo_engine.config import Settings
 
@@ -206,6 +208,7 @@ class ServiceActivityHandler(NodeHandler):
         )
 
         # try recover from executed recover point
+        execute_success = False
         if recover_point and recover_point.handler_data.service_executed:
             execute_success = not recover_point.handler_data.service_execute_fail
             service_data.outputs = FancyDict(
@@ -409,11 +412,12 @@ class ServiceActivityHandler(NodeHandler):
             inner_loop=inner_loop,
         )
 
-        # TODO
         schedule_success = False
+        is_schedule_done = False
         schedule.times += 1
         if recover_point and recover_point.handler_data.service_scheduled:
             schedule_success = not recover_point.handler_data.service_schedule_fail
+            is_schedule_done = recover_point.handler_data.is_schedule_done
             service_data.outputs = FancyDict(
                 self.runtime.deserialize_execution_data(
                     recover_point.handler_data.schedule_serialize_outputs,
@@ -430,11 +434,14 @@ class ServiceActivityHandler(NodeHandler):
                 )
             except Exception:
                 service_data.outputs.ex_data = traceback.format_exc()
+            else:
+                is_schedule_done = service.is_schedule_done()
 
         serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
         self.interrupter.check_and_set(
             ScheduleKeyPoint.SA_SERVICE_SCHEDULE_DONE,
             service_scheduled=True,
+            is_schedule_done=is_schedule_done,
             service_schedule_fail=not schedule_success,
             schedule_serialize_outputs=serialize_ouputs,
             schedule_outputs_serializer=ouputs_serializer,
@@ -445,7 +452,11 @@ class ServiceActivityHandler(NodeHandler):
         service_data.outputs._loop = loop
         service_data.outputs._inner_loop = inner_loop
 
-        self.runtime.add_schedule_times(schedule.id)
+        if not recover_point or not recover_point.handler_data.schedule_times_added:
+            self.runtime.add_schedule_times(schedule.id)
+        self.interrupter.check_and_set(
+            ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED, schedule_times_added=True, from_handler=True
+        )
         self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
         schedule_type = service.schedule_type()
@@ -463,8 +474,6 @@ class ServiceActivityHandler(NodeHandler):
                     recover_point=recover_point,
                 )
             else:
-                is_schedule_done = service.is_schedule_done()
-
                 # poll or multi-callback finished
                 if is_schedule_done:
                     return self._finish_schedule(
