@@ -118,7 +118,7 @@ def test_revoke_die(execute_choas_plans):
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    assert_all_running([pipeline["id"]])
+    assert_all_running([act.id])
 
     engine.revoke_pipeline(pipeline["id"])
 
@@ -157,7 +157,7 @@ def test_pipeline_suspended(execute_choas_plans):
     )
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    assert_all_running([pipeline["id"]])
+    assert_all_running([act.id])
 
     engine.pause_pipeline((pipeline["id"]))
 
