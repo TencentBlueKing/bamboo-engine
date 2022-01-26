@@ -15,8 +15,6 @@ import logging
 import traceback
 from typing import Optional
 
-from django.dispatch import receiver
-
 from bamboo_engine import states
 from bamboo_engine.config import Settings
 
@@ -156,7 +154,7 @@ class ServiceActivityHandler(NodeHandler):
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
-                idempotent=recover_point is not None,
+                ignore_boring_set=recover_point is not None,
             )
             return ExecuteResult(
                 should_sleep=True,
@@ -252,7 +250,7 @@ class ServiceActivityHandler(NodeHandler):
                     version=version,
                     to_state=states.FINISHED,
                     set_archive_time=True,
-                    idempotent=recover_point is not None,
+                    ignore_boring_set=recover_point is not None,
                 )
 
                 context.extract_outputs(
@@ -283,7 +281,7 @@ class ServiceActivityHandler(NodeHandler):
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
-                idempotent=recover_point is not None,
+                ignore_boring_set=recover_point is not None,
             )
 
             self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
@@ -310,7 +308,7 @@ class ServiceActivityHandler(NodeHandler):
             to_state=states.FINISHED,
             set_archive_time=True,
             error_ignored=True,
-            idempotent=recover_point is not None,
+            ignore_boring_set=recover_point is not None,
         )
 
         self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
@@ -346,7 +344,7 @@ class ServiceActivityHandler(NodeHandler):
             to_state=states.FINISHED,
             set_archive_time=True,
             error_ignored=error_ignored,
-            idempotent=recover_point is not None,
+            ignore_boring_set=recover_point is not None,
         )
 
         context = Context(self.runtime, [], root_pipeline_inputs)
@@ -505,7 +503,7 @@ class ServiceActivityHandler(NodeHandler):
                 version=schedule.version,
                 to_state=states.FAILED,
                 set_archive_time=True,
-                idempotent=recover_point is not None,
+                ignore_boring_set=recover_point is not None,
             )
 
             context = Context(self.runtime, [], root_pipeline_inputs)

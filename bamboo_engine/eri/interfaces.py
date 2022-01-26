@@ -586,6 +586,7 @@ class ProcessMixin:
     @abstractmethod
     def wake_up(self, process_id: int):
         """
+        该接口应为幂等接口
         将当前进程标记为唤醒状态
 
         :param process_id: 进程 ID
@@ -595,7 +596,7 @@ class ProcessMixin:
     @abstractmethod
     def sleep(self, process_id: int):
         """
-        幂等接口
+        该接口应为幂等接口
         将当前进程标记为睡眠状态
 
         :param process_id: 进程 ID
@@ -605,7 +606,7 @@ class ProcessMixin:
     @abstractmethod
     def suspend(self, process_id: int, by: str):
         """
-        幂等接口
+        该接口应为幂等接口
         将当前进程标记为阻塞状态
 
         :param process_id: 进程 ID
@@ -617,6 +618,7 @@ class ProcessMixin:
     @abstractmethod
     def resume(self, process_id: int):
         """
+        该接口应为幂等接口
         将进程标记为非阻塞状态
 
         :param process_id: 进程 ID
@@ -626,6 +628,7 @@ class ProcessMixin:
     @abstractmethod
     def batch_resume(self, process_id_list: List[int]):
         """
+        该接口应为幂等接口
         批量将进程标记为非阻塞状态
 
         :param process_id_list: 进程 ID 列表
@@ -635,7 +638,7 @@ class ProcessMixin:
     @abstractmethod
     def die(self, process_id: int):
         """
-        幂等接口
+        该接口应为幂等接口
         将当前进程标记为非存活状态
 
         :param process_id: 进程 ID
@@ -667,6 +670,7 @@ class ProcessMixin:
     @abstractmethod
     def kill(self, process_id: int):
         """
+        该接口应为幂等接口
         强制结束某个进程正在进行的活动，并将其标志为睡眠状态
 
         :param process_id: 进程 ID
@@ -709,7 +713,7 @@ class ProcessMixin:
     @abstractmethod
     def set_current_node(self, process_id: int, node_id: str):
         """
-        幂等接口
+        该接口应为幂等接口
         将进程当前处理节点标记为 node
 
         :param process_id: 进程 ID
@@ -721,8 +725,7 @@ class ProcessMixin:
     @abstractmethod
     def child_process_finish(self, parent_id: int, process_id: int) -> bool:
         """
-        幂等接口
-        该接口需要做好事务性保证
+        该接口应为幂等接口
         标记某个进程的子进程执行完成，并返回是否能够唤醒父进程继续执行的标志位
 
         :param parent_id: 父进程 ID
@@ -747,6 +750,7 @@ class ProcessMixin:
     @abstractmethod
     def freeze(self, process_id: int):
         """
+        该接口应为幂等接口
         冻结当前进程
 
         :param process_id: 进程 ID
@@ -762,7 +766,6 @@ class ProcessMixin:
         from_to: Dict[str, str],
     ) -> List[DispatchProcess]:
         """
-        该接口需要做好事务性保证
         根据当前进程 fork 出多个子进程
 
         :param parent_id: 父进程 ID
@@ -780,7 +783,7 @@ class ProcessMixin:
     @abstractmethod
     def join(self, process_id: int, children_id: List[str]):
         """
-        幂等接口
+        该接口应为幂等接口
         让父进程等待子进程
 
         :param process_id: 父进程 ID
@@ -792,7 +795,7 @@ class ProcessMixin:
     @abstractmethod
     def set_pipeline_stack(self, process_id: int, stack: List[str]):
         """
-        幂等接口
+        该接口应为幂等接口
         设置进程的流程栈
 
         :param process_id: 进程 ID
@@ -876,6 +879,7 @@ class StateMixin:
     @abstractmethod
     def reset_state_inner_loop(self, node_id: str) -> str:
         """
+        该接口应为幂等接口
         设置节点的当前流程重入次数
 
         :param node_id: 节点 ID
@@ -885,6 +889,7 @@ class StateMixin:
     @abstractmethod
     def reset_children_state_inner_loop(self, node_id: str):
         """
+        该接口应为幂等接口
         批量设置子流程节点的所有子节点inner_loop次数
 
         :param node_id: 子流程节点 ID
@@ -912,7 +917,7 @@ class StateMixin:
         set_started_time: bool = False,
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
-        idempotent: bool = False
+        ignore_boring_set: bool = False,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -953,7 +958,7 @@ class StateMixin:
         :type clear_archived_time: bool, optional
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
-        :param idempotent: 是否让本次操作带有幂等属性
+        :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
         :return: 该节点最新版本
         :rtype: str
         """
@@ -961,6 +966,7 @@ class StateMixin:
     @abstractmethod
     def set_state_root_and_parent(self, node_id: str, root_id: str, parent_id: str):
         """
+        该接口应为幂等接口
         设置节点的根流程和父流程 ID
 
         :param node_id: 节点 ID
@@ -1003,7 +1009,7 @@ class ScheduleMixin:
         schedule_type: ScheduleType,
     ) -> Schedule:
         """
-        幂等接口
+        该接口应为幂等接口
         设置 schedule 对象
 
         :param process_id: 进程 ID
@@ -1045,7 +1051,6 @@ class ScheduleMixin:
     @abstractmethod
     def apply_schedule_lock(self, schedule_id: str) -> bool:
         """
-        该接口需要做好事务性保证
         获取 Schedule 对象的调度锁，返回是否成功获取锁
 
         :param schedule_id: 调度实例 ID
@@ -1057,7 +1062,6 @@ class ScheduleMixin:
     @abstractmethod
     def release_schedule_lock(self, schedule_id: int):
         """
-        该接口需要做好事务性保证
         释放指定 Schedule 的调度锁
 
         :param schedule_id: Schedule ID
@@ -1067,7 +1071,7 @@ class ScheduleMixin:
     @abstractmethod
     def expire_schedule(self, schedule_id: int):
         """
-        幂等接口
+        该接口应为幂等接口
         将某个 Schedule 对象标记为已过期
 
         :param schedule_id: 调度实例 ID
@@ -1077,7 +1081,7 @@ class ScheduleMixin:
     @abstractmethod
     def finish_schedule(self, schedule_id: int):
         """
-        幂等接口
+        该接口应为幂等接口
         将某个 Schedule 对象标记为已完成
 
         :param schedule_id: 调度实例 ID
@@ -1128,7 +1132,7 @@ class ContextMixin:
     @abstractmethod
     def upsert_plain_context_values(self, pipeline_id: str, update: Dict[str, ContextValue]):
         """
-        幂等接口
+        该接口应为幂等接口
         更新或创建新的普通上下文数据
 
         :param pipeline_id: 流程 ID
@@ -1199,6 +1203,7 @@ class DataMixin:
     @abstractmethod
     def set_data_inputs(self, node_id: str, data: Dict[str, DataInput]):
         """
+        该接口应为幂等接口
         将节点数据对象的 inputs 设置为 data
 
         : param node_id: 节点 ID
@@ -1244,7 +1249,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data(self, node_id: str, data: ExecutionData):
         """
-        幂等接口
+        该接口应为幂等接口
         设置某个节点的执行数据
 
         :param node_id: 节点 ID
@@ -1256,6 +1261,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data_inputs(self, node_id: str, inputs: dict):
         """
+        该接口应为幂等接口
         设置某个节点的执行数据输入
 
         :param node_id: 节点 ID
@@ -1267,6 +1273,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data_outputs(self, node_id: str, outputs: dict):
         """
+        该接口应为幂等接口
         设置某个节点的执行数据输出
 
         :param node_id: 节点 ID
@@ -1279,6 +1286,7 @@ class DataMixin:
     @abstractmethod
     def set_callback_data(self, node_id: str, version: str, data: dict) -> int:
         """
+        该接口应为幂等接口
         设置某个节点执行数据的回调数据
 
         :param node_id: 节点 ID

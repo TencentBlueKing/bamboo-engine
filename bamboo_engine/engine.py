@@ -596,7 +596,7 @@ class Engine:
             # 推进循环
             while True:
                 interrupter.check(ExecuteKeyPoint.START_PUSH_NODE)
-                idempotent_set_state = interrupter.recover_point is not None
+                ignore_boring_set = interrupter.recover_point is not None
                 # 进程心跳
                 try:
                     self.runtime.beat(process_id)
@@ -700,7 +700,7 @@ class Engine:
                                 version=node_state.version,
                                 to_state=states.FAILED,
                                 set_archive_time=True,
-                                idempotent=idempotent_set_state,
+                                ignore_boring_set=ignore_boring_set,
                             )
 
                             return
@@ -763,7 +763,7 @@ class Engine:
                         reset_retry=reset_mark_bit,
                         reset_error_ignored=reset_mark_bit,
                         refresh_version=reset_mark_bit,
-                        idempotent=idempotent_set_state,
+                        ignore_boring_set=ignore_boring_set,
                     )
                 interrupter.check_and_set(ExecuteKeyPoint.SET_NODE_RUNNING_DONE, running_node_version=version)
 

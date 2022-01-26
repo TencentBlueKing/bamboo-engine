@@ -90,7 +90,7 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
-                idempotent=recover_point is not None,
+                ignore_boring_set=recover_point is not None,
             )
 
             return ExecuteResult(

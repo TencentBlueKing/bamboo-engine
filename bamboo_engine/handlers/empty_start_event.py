@@ -91,7 +91,7 @@ class EmptyStartEventHandler(NodeHandler):
             version=version,
             to_state=states.FINISHED,
             set_archive_time=True,
-            idempotent=recover_point is not None,
+            ignore_boring_set=recover_point is not None,
         )
 
         return ExecuteResult(

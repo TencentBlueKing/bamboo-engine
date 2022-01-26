@@ -94,7 +94,7 @@ class EmptyEndEventHandler(NodeHandler):
                 version=version,
                 to_state=states.FAILED,
                 set_archive_time=True,
-                idempotent=recover_point is not None,
+                ignore_boring_set=recover_point is not None,
             )
 
             return ExecuteResult(
@@ -127,7 +127,7 @@ class EmptyEndEventHandler(NodeHandler):
             version=version,
             to_state=states.FINISHED,
             set_archive_time=True,
-            idempotent=recover_point is not None,
+            ignore_boring_set=recover_point is not None,
         )
 
         pipeline_state = self.runtime.get_state_or_none(node_id=pipeline_id)
@@ -137,7 +137,7 @@ class EmptyEndEventHandler(NodeHandler):
             version=top_pipeline_state_version,
             to_state=states.FINISHED,
             set_archive_time=True,
-            idempotent=recover_point is not None,
+            ignore_boring_set=recover_point is not None,
         )
 
         # root pipeline finish

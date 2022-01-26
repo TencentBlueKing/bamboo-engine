@@ -50,7 +50,6 @@ def test_execute__raise_not_ignore():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     data = Data({}, {})
@@ -224,7 +223,6 @@ def test_context_hydrate__raise():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     data = Data({}, {})
@@ -289,7 +287,6 @@ def test_execute__success_and_schedule():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     data = Data({}, {})
@@ -379,7 +376,6 @@ def test_execute__success_and_no_schedule():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     data = Data(
@@ -504,7 +500,6 @@ def test_execute__fail_and_schedule():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     data = Data({}, {})
@@ -601,7 +596,6 @@ def test_schedule__raise_not_ignore():
         code="test_service",
         version="legacy",
         error_ignorable=False,
-        timeout=10,
     )
 
     schedule = Schedule(
@@ -780,7 +774,6 @@ def test_schedule__poll_success_and_not_done():
         code="test_service",
         version="legacy",
         error_ignorable=True,
-        timeout=10,
     )
 
     schedule = Schedule(
@@ -870,7 +863,6 @@ def test_schedule__poll_success_and_done():
         code="test_service",
         version="legacy",
         error_ignorable=True,
-        timeout=10,
     )
 
     schedule = Schedule(
@@ -971,7 +963,6 @@ def test_schedule__callback_success():
         code="test_service",
         version="legacy",
         error_ignorable=True,
-        timeout=10,
     )
 
     schedule = Schedule(
@@ -1072,7 +1063,6 @@ def test_schedule__multi_callback_success_and_not_done():
         code="test_service",
         version="legacy",
         error_ignorable=True,
-        timeout=10,
     )
 
     schedule = Schedule(
@@ -1162,7 +1152,6 @@ def test_schedule__multi_callback_success_and_done():
         code="test_service",
         version="legacy",
         error_ignorable=True,
-        timeout=10,
     )
 
     schedule = Schedule(
