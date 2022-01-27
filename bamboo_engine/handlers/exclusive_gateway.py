@@ -90,7 +90,11 @@ class ExclusiveGatewayHandler(NodeHandler):
                 root_pipeline_id,
                 self.node.id,
             )
-            return self._execute_fail("evaluation context hydrate failed(%s), check node log for details." % e)
+            return self._execute_fail(
+                ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # check conditions
         meet_targets = []
@@ -117,9 +121,11 @@ class ExclusiveGatewayHandler(NodeHandler):
             except Exception as e:
                 # test failed
                 return self._execute_fail(
-                    "evaluate[{}] fail with data[{}] message: {}".format(
+                    ex_data="evaluate[{}] fail with data[{}] message: {}".format(
                         resolved_evaluate, json.dumps(hydrated_context), e
-                    )
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
             else:
                 if result:
@@ -128,11 +134,19 @@ class ExclusiveGatewayHandler(NodeHandler):
 
         # all miss
         if not meet_targets:
-            return self._execute_fail("all conditions of branches are not meet")
+            return self._execute_fail(
+                ex_data="all conditions of branches are not meet",
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # multiple branch hit
         if len(meet_targets) != 1:
-            return self._execute_fail("multiple conditions meet: {}".format(meet_conditions))
+            return self._execute_fail(
+                ex_data="multiple conditions meet: {}".format(meet_conditions),
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         self.runtime.set_state(
             node_id=self.node.id,

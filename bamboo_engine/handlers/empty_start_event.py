@@ -72,7 +72,11 @@ class EmptyStartEventHandler(NodeHandler):
                     process_info.root_pipeline_id,
                     self.node.id,
                 )
-                return self._execute_fail("context hydrate failed(%s), check node log for details." % e)
+                return self._execute_fail(
+                    ex_data="context hydrate failed(%s), check node log for details." % e,
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
+                )
 
             for context_value in context_values:
                 context_key = context_value.key

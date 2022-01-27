@@ -55,8 +55,8 @@ def node():
 @pytest.mark.parametrize(
     "recover_point",
     [
-        pytest.param([MagicMock()], id="recover_is_not_none"),
-        pytest.param([None], id="recover_is_none"),
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
     ],
 )
 def test_empty_end_event_handler__root_pipeline_execute_success(pi, node, recover_point):
@@ -124,8 +124,8 @@ def test_empty_end_event_handler__root_pipeline_execute_success(pi, node, recove
 @pytest.mark.parametrize(
     "recover_point",
     [
-        pytest.param([MagicMock()], id="recover_is_not_none"),
-        pytest.param([None], id="recover_is_none"),
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
     ],
 )
 def test_empty_end_event_handler__subprocess_execute_success(pi, node, recover_point):
@@ -214,8 +214,8 @@ def test_empty_end_event_handler__subprocess_execute_success(pi, node, recover_p
 @pytest.mark.parametrize(
     "recover_point",
     [
-        pytest.param([MagicMock()], id="recover_is_not_none"),
-        pytest.param([None], id="recover_is_none"),
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
     ],
 )
 def test_empty_end_event_handler__outputs_context_values_refs(pi, node, recover_point):

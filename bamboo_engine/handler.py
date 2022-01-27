@@ -120,13 +120,19 @@ class NodeHandler(metaclass=ABCMeta):
         """
         raise NotImplementedError()
 
-    def _execute_fail(self, ex_data: str) -> ExecuteResult:
+    def _execute_fail(self, ex_data: str, version: str, ignore_boring_set: bool) -> ExecuteResult:
         exec_outputs = self.runtime.get_execution_data_outputs(self.node.id)
         exec_outputs["ex_data"] = ex_data
 
         self.runtime.set_execution_data_outputs(self.node.id, exec_outputs)
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FAILED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            to_state=states.FAILED,
+            set_archive_time=True,
+            version=version,
+            ignore_boring_set=ignore_boring_set,
+        )
 
         return ExecuteResult(
             should_sleep=True,

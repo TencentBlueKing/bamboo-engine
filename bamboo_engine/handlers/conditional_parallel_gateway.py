@@ -84,7 +84,11 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                 root_pipeline_id,
                 self.node.id,
             )
-            return self._execute_fail("evaluation context hydrate failed(%s), check node log for details." % e)
+            return self._execute_fail(
+                ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # check conditions
         fork_targets = []
@@ -111,9 +115,11 @@ class ConditionalParallelGatewayHandler(NodeHandler):
             except Exception as e:
                 # test failed
                 return self._execute_fail(
-                    "evaluate[{}] fail with data[{}] message: {}".format(
+                    ex_data="evaluate[{}] fail with data[{}] message: {}".format(
                         c.evaluation, json.dumps(hydrated_context), e
-                    )
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
 
             else:
@@ -122,7 +128,11 @@ class ConditionalParallelGatewayHandler(NodeHandler):
 
         # all miss
         if not fork_targets:
-            return self._execute_fail("all conditions of branches are not meet")
+            return self._execute_fail(
+                ex_data="all conditions of branches are not meet",
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # fork
         from_to = {}

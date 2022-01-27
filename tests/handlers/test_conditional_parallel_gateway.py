@@ -75,7 +75,14 @@ def recover_point():
     return ExecuteInterruptPoint(name=ExecuteKeyPoint.CPG_PROCESS_FORK_DONE, version=2)
 
 
-def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter, recover_point):
     additional_refs = []
 
     runtime = MagicMock()
@@ -90,7 +97,7 @@ def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter):
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     with patch("bamboo_engine.handlers.conditional_parallel_gateway.Context", MagicMock(return_value=raise_context)):
         with patch("bamboo_engine.handlers.conditional_parallel_gateway.BoolRule", MagicMock(side_effect=Exception)):
-            result = handler.execute(pi, 1, 1, "v1")
+            result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -104,11 +111,24 @@ def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter):
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${k}"})
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${k}"})
     runtime.get_execution_data_outputs.assert_called_once_with(node.id)
-    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
+    )
     runtime.set_execution_data_outputs.assert_called_once()
 
 
-def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, interrupter):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, interrupter, recover_point):
     additional_refs = []
 
     runtime = MagicMock()
@@ -118,7 +138,7 @@ def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, in
     runtime.get_data_inputs = MagicMock(return_value={})
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -132,11 +152,24 @@ def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, in
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${k}"})
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${k}"})
     runtime.get_execution_data_outputs.assert_called_once_with(node.id)
-    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
+    )
     runtime.set_execution_data_outputs.assert_called_once()
 
 
-def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interrupter):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interrupter, recover_point):
     additional_refs = []
 
     runtime = MagicMock()
@@ -146,7 +179,7 @@ def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interr
     runtime.get_data_inputs = MagicMock(return_value={})
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -160,13 +193,26 @@ def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interr
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set({"${k}"}))
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set({"${k}"}))
     runtime.get_execution_data_outputs.assert_called_once_with(node.id)
-    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
+    )
     runtime.set_execution_data_outputs.assert_called_once_with(
         node.id, {"ex_data": "all conditions of branches are not meet"}
     )
 
 
-def test_conditional_parallel_gateway__execute_success(pi, node, interrupter):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint(name="v1"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_conditional_parallel_gateway__execute_success(pi, node, interrupter, recover_point):
     node.conditions = [
         Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
         Condition(name="c2", evaluation="1 == 1", target_id="t2", flow_id="f2"),
@@ -182,7 +228,7 @@ def test_conditional_parallel_gateway__execute_success(pi, node, interrupter):
     runtime.get_data_inputs = MagicMock(return_value={})
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -202,7 +248,7 @@ def test_conditional_parallel_gateway__execute_success(pi, node, interrupter):
         from_to={"t2": "cg", "t3": "cg"},
     )
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=recover_point is not None
     )
 
     assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE
