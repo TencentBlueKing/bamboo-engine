@@ -70,6 +70,11 @@ def interrupter():
     )
 
 
+@pytest.fixture
+def recover_point():
+    return ExecuteInterruptPoint(name=ExecuteKeyPoint.CPG_PROCESS_FORK_DONE, version=2)
+
+
 def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter):
     additional_refs = []
 
@@ -198,6 +203,44 @@ def test_conditional_parallel_gateway__execute_success(pi, node, interrupter):
     )
     runtime.set_state.assert_called_once_with(
         node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+    )
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE
+    assert len(interrupter.check_point.handler_data.dispatch_processes) > 0
+
+
+def test_conditional_parallel_gateway__recover_with_dispatch_processes(pi, node, interrupter, recover_point):
+    node.conditions = [
+        Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
+        Condition(name="c2", evaluation="1 == 1", target_id="t2", flow_id="f2"),
+        Condition(name="c3", evaluation="1 == 1", target_id="t3", flow_id="f3"),
+    ]
+    recover_point.handler_data.dispatch_processes = ["p1", "p2", "p3"]
+    interrupter.recover_point = recover_point
+    additional_refs = []
+
+    runtime = MagicMock()
+    runtime.get_context_key_references = MagicMock(return_value=additional_refs)
+    runtime.get_context_values = MagicMock(return_value=[])
+    runtime.get_data_inputs = MagicMock(return_value={})
+
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
+
+    assert result.should_sleep == True
+    assert result.schedule_ready == False
+    assert result.schedule_type == None
+    assert result.schedule_after == -1
+    assert result.dispatch_processes == recover_point.handler_data.dispatch_processes
+    assert result.next_node_id == None
+    assert result.should_die == False
+
+    runtime.get_data_inputs.assert_called_once_with("root")
+    runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.fork.assert_not_called()
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=True
     )
 
     assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE
