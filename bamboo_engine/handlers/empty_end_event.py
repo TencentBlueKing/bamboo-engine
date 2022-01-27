@@ -19,7 +19,6 @@ from bamboo_engine.config import Settings
 from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.context import Context
-from bamboo_engine.interrupt import ExecuteKeyPoint
 from bamboo_engine.template.template import Template
 
 logger = logging.getLogger("bamboo_engine")
