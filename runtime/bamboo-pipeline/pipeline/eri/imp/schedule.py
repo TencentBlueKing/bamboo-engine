@@ -18,8 +18,6 @@ from bamboo_engine.eri import Schedule, ScheduleType
 
 from pipeline.eri.models import Schedule as DBSchedule
 
-from bamboo_engine.eri.models import node
-
 
 class ScheduleMixin:
     @metrics.setup_histogram(metrics.ENGINE_RUNTIME_SCHEDULE_WRITE_TIME)

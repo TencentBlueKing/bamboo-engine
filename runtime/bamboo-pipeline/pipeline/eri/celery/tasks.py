@@ -12,11 +12,9 @@ specific language governing permissions and limitations under the License.
 """
 from typing import Optional
 
-import json
 from celery import task
 
 from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
-from bamboo_engine import states
 from bamboo_engine.engine import Engine
 from bamboo_engine.interrupt import (
     ExecuteInterrupter,

@@ -47,7 +47,6 @@ from .eri import (
 from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, InterruptException
 from .utils.string import get_lower_case_name
 from .utils.host import get_hostname
-from bamboo_engine import interrupt
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -727,7 +726,7 @@ class Engine:
                         # 设置状态前检测
                         if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
                             logger.info(
-                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",  # noqa
                                 process_info.root_pipeline_id,
                                 node_state.name,
                             )
