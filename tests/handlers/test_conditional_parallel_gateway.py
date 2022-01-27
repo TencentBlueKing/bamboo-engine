@@ -11,26 +11,39 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import pytest
 from mock import MagicMock, patch
 
 from bamboo_engine import states
-from bamboo_engine.eri import (
-    ProcessInfo,
-    NodeType,
-    ConditionalParallelGateway,
-    Condition,
-)
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
+from bamboo_engine.eri import ProcessInfo, NodeType, ConditionalParallelGateway, Condition, ExecuteInterruptPoint
 from bamboo_engine.handlers.conditional_parallel_gateway import (
     ConditionalParallelGatewayHandler,
 )
 
 
-def test_exclusive_gateway__context_hydrate_raise():
-    conditions = [
+@pytest.fixture
+def pi():
+    return ProcessInfo(
+        process_id="pid",
+        destination_id="",
+        root_pipeline_id="root",
+        pipeline_stack=["root"],
+        parent_id="parent",
+    )
+
+
+@pytest.fixture
+def conditions():
+    return [
         Condition(name="c1", evaluation="${k} == 1", target_id="t1", flow_id="f1"),
         Condition(name="c2", evaluation="0 == 1", target_id="t2", flow_id="f2"),
     ]
-    node = ConditionalParallelGateway(
+
+
+@pytest.fixture
+def node(conditions):
+    return ConditionalParallelGateway(
         conditions=conditions,
         id="nid",
         type=NodeType.ConditionalParallelGateway,
@@ -42,13 +55,22 @@ def test_exclusive_gateway__context_hydrate_raise():
         can_skip=True,
         converge_gateway_id="cg",
     )
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
+
+
+@pytest.fixture
+def interrupter():
+    return ExecuteInterrupter(
+        runtime=MagicMock(),
+        current_node_id="nid",
+        process_id=1,
+        parent_pipeline_id="parent",
         root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
+        check_point=ExecuteInterruptPoint(name="s1"),
+        recover_point=None,
     )
+
+
+def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter):
     additional_refs = []
 
     runtime = MagicMock()
@@ -60,7 +82,7 @@ def test_exclusive_gateway__context_hydrate_raise():
     raise_context = MagicMock()
     raise_context.hydrate = MagicMock(side_effect=Exception)
 
-    handler = ConditionalParallelGatewayHandler(node, runtime)
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     with patch("bamboo_engine.handlers.conditional_parallel_gateway.Context", MagicMock(return_value=raise_context)):
         with patch("bamboo_engine.handlers.conditional_parallel_gateway.BoolRule", MagicMock(side_effect=Exception)):
             result = handler.execute(pi, 1, 1, "v1")
@@ -81,32 +103,8 @@ def test_exclusive_gateway__context_hydrate_raise():
     runtime.set_execution_data_outputs.assert_called_once()
 
 
-def test_conditional_parallel_gateway__execute_bool_rule_test_raise():
-    conditions = [
-        Condition(name="c1", evaluation="${k} == 1", target_id="t1", flow_id="f1"),
-        Condition(name="c2", evaluation="0 == 1", target_id="t2", flow_id="f2"),
-    ]
-    node = ConditionalParallelGateway(
-        conditions=conditions,
-        id="nid",
-        type=NodeType.ConditionalParallelGateway,
-        target_flows=["f1", "f2"],
-        target_nodes=["t1", "t2"],
-        targets={"f1": "t1", "f2": "t2"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        converge_gateway_id="cg",
-    )
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
+def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, interrupter):
     additional_refs = []
-    context_values = []
 
     runtime = MagicMock()
     runtime.get_context_key_references = MagicMock(return_value=additional_refs)
@@ -114,7 +112,7 @@ def test_conditional_parallel_gateway__execute_bool_rule_test_raise():
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
 
-    handler = ConditionalParallelGatewayHandler(node, runtime)
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1")
 
     assert result.should_sleep == True
@@ -133,32 +131,8 @@ def test_conditional_parallel_gateway__execute_bool_rule_test_raise():
     runtime.set_execution_data_outputs.assert_called_once()
 
 
-def test_conditional_parallel_gateway__execute_not_fork_targets():
-    conditions = [
-        Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
-        Condition(name="c2", evaluation="0 == 1", target_id="t2", flow_id="f2"),
-    ]
-    node = ConditionalParallelGateway(
-        conditions=conditions,
-        id="nid",
-        type=NodeType.ConditionalParallelGateway,
-        target_flows=["f1", "f2"],
-        target_nodes=["t1", "t2"],
-        targets={"f1": "t1", "f2": "t2"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        converge_gateway_id="cg",
-    )
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
+def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interrupter):
     additional_refs = []
-    context_values = []
 
     runtime = MagicMock()
     runtime.get_context_key_references = MagicMock(return_value=additional_refs)
@@ -166,7 +140,7 @@ def test_conditional_parallel_gateway__execute_not_fork_targets():
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
 
-    handler = ConditionalParallelGatewayHandler(node, runtime)
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1")
 
     assert result.should_sleep == True
@@ -178,8 +152,8 @@ def test_conditional_parallel_gateway__execute_not_fork_targets():
     assert result.should_die == False
 
     runtime.get_data_inputs.assert_called_once_with("root")
-    runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set({"${k}"}))
+    runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set({"${k}"}))
     runtime.get_execution_data_outputs.assert_called_once_with(node.id)
     runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
     runtime.set_execution_data_outputs.assert_called_once_with(
@@ -187,33 +161,13 @@ def test_conditional_parallel_gateway__execute_not_fork_targets():
     )
 
 
-def test_conditional_parallel_gateway__execute_success():
-    conditions = [
+def test_conditional_parallel_gateway__execute_success(pi, node, interrupter):
+    node.conditions = [
         Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
         Condition(name="c2", evaluation="1 == 1", target_id="t2", flow_id="f2"),
         Condition(name="c3", evaluation="1 == 1", target_id="t3", flow_id="f3"),
     ]
-    node = ConditionalParallelGateway(
-        conditions=conditions,
-        id="nid",
-        type=NodeType.ConditionalParallelGateway,
-        target_flows=["f1", "f2", "f3"],
-        target_nodes=["t1", "t2", "t3"],
-        targets={"f1": "t1", "f2": "t2", "f3": "t3"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        converge_gateway_id="cg",
-    )
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
     additional_refs = []
-    context_values = []
     dispatch_processes = ["p1", "p2", "p3"]
 
     runtime = MagicMock()
@@ -222,7 +176,7 @@ def test_conditional_parallel_gateway__execute_success():
     runtime.fork = MagicMock(return_value=dispatch_processes)
     runtime.get_data_inputs = MagicMock(return_value={})
 
-    handler = ConditionalParallelGatewayHandler(node, runtime)
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1")
 
     assert result.should_sleep == True
@@ -242,4 +196,9 @@ def test_conditional_parallel_gateway__execute_success():
         pipeline_stack=pi.pipeline_stack,
         from_to={"t2": "cg", "t3": "cg"},
     )
-    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FINISHED, set_archive_time=True)
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+    )
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE
+    assert len(interrupter.check_point.handler_data.dispatch_processes) > 0
