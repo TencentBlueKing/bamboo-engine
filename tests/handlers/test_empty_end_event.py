@@ -52,7 +52,14 @@ def node():
     )
 
 
-def test_empty_end_event_handler__root_pipeline_execute_success(pi, node):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param([MagicMock()], id="recover_is_not_none"),
+        pytest.param([None], id="recover_is_none"),
+    ],
+)
+def test_empty_end_event_handler__root_pipeline_execute_success(pi, node, recover_point):
     context_outputs = ["${a}", "${b}", "${c}", "${d}"]
     context_values = [
         ContextValue(key="${a}", value="1", type=ContextValueType.PLAIN),
@@ -69,7 +76,7 @@ def test_empty_end_event_handler__root_pipeline_execute_success(pi, node):
     runtime.get_state_or_none = MagicMock(return_value=pipeline_state)
 
     handler = EmptyEndEventHandler(node, runtime, MagicMock())
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -96,17 +103,32 @@ def test_empty_end_event_handler__root_pipeline_execute_success(pi, node):
     runtime.set_state.assert_has_calls(
         [
             call(
-                node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+                node_id=node.id,
+                version="v1",
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
             call(
-                node_id="root", version="v2", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+                node_id="root",
+                version="v2",
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
         ]
     )
     assert pi.pipeline_stack == []
 
 
-def test_empty_end_event_handler__subprocess_execute_success(pi, node):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param([MagicMock()], id="recover_is_not_none"),
+        pytest.param([None], id="recover_is_none"),
+    ],
+)
+def test_empty_end_event_handler__subprocess_execute_success(pi, node, recover_point):
     pi.pipeline_stack = ["root", "sub1"]
     subprocess_node = SubProcess(
         id="nid",
@@ -145,7 +167,7 @@ def test_empty_end_event_handler__subprocess_execute_success(pi, node):
     runtime.get_state_or_none = MagicMock(return_value=pipeline_state)
 
     handler = EmptyEndEventHandler(node, runtime, MagicMock())
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -170,10 +192,18 @@ def test_empty_end_event_handler__subprocess_execute_success(pi, node):
     runtime.set_state.assert_has_calls(
         [
             call(
-                node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+                node_id=node.id,
+                version="v1",
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
             call(
-                node_id="sub1", version="v2", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
+                node_id="sub1",
+                version="v2",
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
         ]
     )
@@ -181,7 +211,14 @@ def test_empty_end_event_handler__subprocess_execute_success(pi, node):
     assert pi.pipeline_stack == ["root"]
 
 
-def test_empty_end_event_handler__outputs_context_values_refs(pi, node):
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param([MagicMock()], id="recover_is_not_none"),
+        pytest.param([None], id="recover_is_none"),
+    ],
+)
+def test_empty_end_event_handler__outputs_context_values_refs(pi, node, recover_point):
     context_outputs = ["${a}", "${b}", "${c}", "${d}"]
     pipeline_state = MagicMock()
     pipeline_state.version = "v2"
@@ -204,7 +241,7 @@ def test_empty_end_event_handler__outputs_context_values_refs(pi, node):
     runtime.get_state_or_none = MagicMock(return_value=pipeline_state)
 
     handler = EmptyEndEventHandler(node, runtime, MagicMock())
-    result = handler.execute(pi, 1, 1, "v1")
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -235,14 +272,14 @@ def test_empty_end_event_handler__outputs_context_values_refs(pi, node):
                 version="v1",
                 to_state=states.FINISHED,
                 set_archive_time=True,
-                ignore_boring_set=False,
+                ignore_boring_set=recover_point is not None,
             ),
             call(
                 node_id="root",
                 version="v2",
                 to_state=states.FINISHED,
                 set_archive_time=True,
-                ignore_boring_set=False,
+                ignore_boring_set=recover_point is not None,
             ),
         ]
     )
