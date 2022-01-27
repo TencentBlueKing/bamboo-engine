@@ -248,7 +248,11 @@ def test_conditional_parallel_gateway__execute_success(pi, node, interrupter, re
         from_to={"t2": "cg", "t3": "cg"},
     )
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=recover_point is not None
+        node_id=node.id,
+        version="v1",
+        to_state=states.FINISHED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
 
     assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE

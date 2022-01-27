@@ -179,20 +179,10 @@ def test_multi_or():
     assert BoolRule('("s" > "s" or "su" > "st") or (1 > 3 and 2 < 3)').test() == True
     assert BoolRule('(1 > 3 and 2 < 3)  or ("s" > "s" or "su" > "st")').test() == True
     assert BoolRule('(1 < 3 and 2 < 3)  or ("s" > "s" or "su" > "st")').test() == True
-    assert (
-        BoolRule(
-            '(1 > 2 or 2 > 3) or ("s" > "s" or "su" > "st") or (4  > 5 and 5 < 6)'
-        ).test()
-        == True
-    )
+    assert BoolRule('(1 > 2 or 2 > 3) or ("s" > "s" or "su" > "st") or (4  > 5 and 5 < 6)').test() == True
 
     assert BoolRule('(1 > 2 or 2 > 3) or ("s" > "s" or "su" < "st")').test() == False
-    assert (
-        BoolRule(
-            '(1 > 2 or 2 > 3) or ("s" > "s" or "su" < "st") or (4  > 5 and 5 < 6)'
-        ).test()
-        == False
-    )
+    assert BoolRule('(1 > 2 or 2 > 3) or ("s" > "s" or "su" < "st") or (4  > 5 and 5 < 6)').test() == False
 
 
 def test_multi_and():
@@ -201,9 +191,4 @@ def test_multi_and():
     assert BoolRule('(1 < 2 or 2 > 3) and ("s" > "s" or "su" < "st")').test() == False
     assert BoolRule('(1 > 2 or 2 > 3) and ("s" > "s" or "su" > "st")').test() == False
     assert BoolRule('(1 > 2 or 2 > 3) and ("s" > "s" or "su" < "st")').test() == False
-    assert (
-        BoolRule(
-            '(1 < 3 and 2 < 3)  and ("s" > "s" or "su" > "st") and (4 > 5 and 5 < 6)'
-        ).test()
-        == False
-    )
+    assert BoolRule('(1 < 3 and 2 < 3)  and ("s" > "s" or "su" > "st") and (4 > 5 and 5 < 6)').test() == False
