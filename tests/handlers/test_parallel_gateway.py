@@ -17,7 +17,7 @@ from mock import MagicMock
 
 from bamboo_engine import states
 from bamboo_engine.eri.models.interrupt import HandlerExecuteData
-from bamboo_engine.interrupt import ExecuteInterrupter
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
 from bamboo_engine.eri import ProcessInfo, NodeType, ParallelGateway, ExecuteInterruptPoint
 from bamboo_engine.handlers.parallel_gateway import (
     ParallelGatewayHandler,
@@ -106,3 +106,5 @@ def test_parallel_gateway_handler__execute_success(recover_point):
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.PG_PROCESS_FORK_DONE
