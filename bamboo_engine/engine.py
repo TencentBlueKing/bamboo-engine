@@ -44,7 +44,7 @@ from .eri import (
     DataInput,
     Node,
 )
-from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, IntruptException
+from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, InterruptException
 from .utils.string import get_lower_case_name
 from .utils.host import get_hostname
 from bamboo_engine import interrupt
@@ -57,7 +57,7 @@ def interrupt_exception_catcher(func):
     def _wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except IntruptException:
+        except InterruptException:
             pass
         finally:
             clear_node_info()
@@ -776,7 +776,6 @@ class Engine:
                     current_node_id,
                     node_state,
                 )
-                handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
                 type_label = self._get_metrics_node_type(node)
                 execute_start = time.time()
 
@@ -788,6 +787,7 @@ class Engine:
                     )
                     execute_result = interrupter.recover_point.execute_result
                 else:
+                    handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
                     execute_result = handler.execute(
                         process_info=process_info,
                         loop=loop,

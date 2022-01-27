@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 import logging
 import traceback
-from typing import Optional, Any
+from typing import Optional
 from contextlib import contextmanager
 
 from bamboo_engine.eri.models import ScheduleInterruptPoint
@@ -22,7 +22,7 @@ from .eri import EngineRuntimeInterface, InterruptPoint, ExecuteInterruptPoint, 
 logger = logging.getLogger("bamboo_engine")
 
 
-class IntruptException(Exception):
+class InterruptException(Exception):
     pass
 
 
@@ -154,7 +154,7 @@ class ExecuteInterrupter(Interrupter):
                 )
             )
 
-            raise IntruptException()
+            raise InterruptException()
 
 
 class ScheduleKeyPoint:
@@ -197,7 +197,7 @@ class ScheduleInterrupter(Interrupter):
         except Exception as e:
             if not isinstance(e, self.runtime.interrupt_errors()):
                 logger.exception(
-                    "[interrupt({})] execute catch unexpect error with {}".format(
+                    "[interrupt({})] schedule catch unexpect error with {}".format(
                         self.current_node_id, self.check_point_string
                     )
                 )
@@ -212,9 +212,9 @@ class ScheduleInterrupter(Interrupter):
                 recover_point=recover_point,
             )
             logger.error(
-                "[interrupt({})] execute interrupt with point({}), trying to recover, {}".format(
+                "[interrupt({})] schedule interrupt with point({}), trying to recover, {}".format(
                     self.current_node_id, recover_point.to_json(), traceback.format_exc()
                 )
             )
 
-            raise IntruptException()
+            raise InterruptException()
