@@ -40,7 +40,7 @@ def test_empty_start_event_handler__execute_success():
 
     runtime = MagicMock()
 
-    handler = ConvergeGatewayHandler(node, runtime)
+    handler = ConvergeGatewayHandler(node, runtime, MagicMock())
     result = handler.execute(pi, 1, 1, "v1")
 
     assert result.should_sleep == False
@@ -52,7 +52,5 @@ def test_empty_start_event_handler__execute_success():
     assert result.should_die == False
 
     runtime.set_state.assert_called_once_with(
-        node_id=node.id,
-        to_state=states.FINISHED,
-        set_archive_time=True,
+        node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=False
     )
