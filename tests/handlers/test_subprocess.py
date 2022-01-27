@@ -27,7 +27,7 @@ from bamboo_engine.eri import (
 )
 from bamboo_engine.eri.models.interrupt import HandlerExecuteData
 from bamboo_engine.handlers.subprocess import SubProcessHandler
-from bamboo_engine.interrupt import ExecuteInterrupter
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
 
 
 @pytest.mark.parametrize(
@@ -116,3 +116,5 @@ def test_subprocess_handler__execute_success(recover_point):
     else:
         runtime.set_pipeline_stack.assert_called_once_with(pi.process_id, ["root", "nid"])
         assert pi.pipeline_stack == ["root", "nid"]
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.SP_SET_PIPELINE_STACK_DONE

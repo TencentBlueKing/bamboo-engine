@@ -11,9 +11,12 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations underExecutableEndEvent the License.
 """
 
+import pytest
 from mock import MagicMock, call, patch
 
 from bamboo_engine import states
+from bamboo_engine.eri.models.interrupt import HandlerExecuteData, HandlerScheduleData, ScheduleInterruptPoint
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint
 from bamboo_engine.eri import (
     ProcessInfo,
     NodeType,
@@ -25,12 +28,15 @@ from bamboo_engine.eri import (
     ScheduleType,
     Schedule,
     ExecutionData,
+    ExecuteInterruptPoint,
 )
 from bamboo_engine.handlers.service_activity import ServiceActivityHandler
+from tests.engine.test_engine_execute import recover_point
 
 
-def test_execute__raise_not_ignore():
-    pi = ProcessInfo(
+@pytest.fixture
+def pi():
+    return ProcessInfo(
         process_id="pid",
         destination_id="",
         root_pipeline_id="root",
@@ -38,7 +44,10 @@ def test_execute__raise_not_ignore():
         parent_id="",
     )
 
-    node = ServiceActivity(
+
+@pytest.fixture
+def node():
+    return ServiceActivity(
         id="nid",
         type=NodeType.ServiceActivity,
         target_flows=["f1"],
@@ -52,6 +61,56 @@ def test_execute__raise_not_ignore():
         error_ignorable=False,
     )
 
+
+@pytest.fixture
+def interrupter():
+    return ExecuteInterrupter(
+        runtime=MagicMock(),
+        current_node_id="nid",
+        process_id=1,
+        parent_pipeline_id="parent",
+        root_pipeline_id="root",
+        check_point=ExecuteInterruptPoint(name="s1"),
+        recover_point=None,
+    )
+
+
+@pytest.fixture
+def schedule(pi, node):
+    return Schedule(
+        id=1,
+        type=ScheduleType.POLL,
+        process_id=pi.process_id,
+        node_id=node.id,
+        finished=False,
+        expired=False,
+        version="v1",
+        times=1,
+    )
+
+
+@pytest.fixture
+def schedule_interrupter():
+    return ScheduleInterrupter(
+        runtime=MagicMock(),
+        schedule_id=1,
+        current_node_id="nid",
+        process_id=1,
+        callback_data_id=None,
+        check_point=ScheduleInterruptPoint(name="n"),
+        recover_point=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
+
     data = Data({}, {})
 
     service = MagicMock()
@@ -63,9 +122,10 @@ def test_execute__raise_not_ignore():
     runtime.get_context_key_references = MagicMock(return_value=set())
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ServiceActivityHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -80,20 +140,12 @@ def test_execute__raise_not_ignore():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
-    runtime.start_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FAILED, set_archive_time=True
-    )
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
         node_id=node.id,
         version="v1",
-        timeout=node.timeout,
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -108,39 +160,27 @@ def test_execute__raise_not_ignore():
         loop=1,
         inner_loop=1,
     )
-    assert service.pre_execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert "ex_data" in service.pre_execute.call_args.kwargs["data"].outputs
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].outputs == {}
     assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in service.execute.call_args.kwargs["data"].outputs
     assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
     assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
+    assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
+    assert interrupter.check_point.handler_data.service_executed is True
+    assert interrupter.check_point.handler_data.service_execute_fail is True
+    assert interrupter.check_point.handler_data.execute_serialize_outputs == "{}"
+    assert interrupter.check_point.handler_data.execute_outputs_serializer == "json"
 
-def test_execute__raise_ignore():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-        timeout=None,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_execute__raise_ignore(pi, node, interrupter, recover_point):
+    node.error_ignorable = True
 
     data = Data({}, {})
 
@@ -153,9 +193,10 @@ def test_execute__raise_ignore():
     runtime.get_context_key_references = MagicMock(return_value=set())
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ServiceActivityHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -170,15 +211,14 @@ def test_execute__raise_ignore():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
-    runtime.start_timeout_monitor.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
         to_state=states.FINISHED,
         set_archive_time=True,
         error_ignored=True,
+        ignore_boring_set=recover_point is not None,
     )
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
@@ -192,38 +232,27 @@ def test_execute__raise_ignore():
         loop=1,
         inner_loop=1,
     )
-    assert service.pre_execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert "ex_data" in service.pre_execute.call_args.kwargs["data"].outputs
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+
     assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in service.execute.call_args.kwargs["data"].outputs
     assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
     assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
+    assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
+    assert interrupter.check_point.handler_data.service_executed is True
+    assert interrupter.check_point.handler_data.service_execute_fail is True
+    assert interrupter.check_point.handler_data.execute_serialize_outputs == "{}"
+    assert interrupter.check_point.handler_data.execute_outputs_serializer == "json"
 
-def test_context_hydrate__raise():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_context_hydrate__raise(pi, node, interrupter, recover_point):
 
     data = Data({}, {})
 
@@ -239,9 +268,9 @@ def test_context_hydrate__raise():
     raise_context = MagicMock()
     raise_context.hydrate = MagicMock(side_effect=Exception)
 
-    handler = ServiceActivityHandler(node, runtime)
+    handler = ServiceActivityHandler(node, runtime, interrupter)
     with patch("bamboo_engine.handlers.service_activity.Context", MagicMock(return_value=raise_context)):
-        result = handler.execute(pi, 1, 1, "v1")
+        result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -256,7 +285,11 @@ def test_context_hydrate__raise():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FAILED, set_archive_time=True
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
     runtime.get_service.assert_not_called()
 
@@ -266,28 +299,23 @@ def test_context_hydrate__raise():
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
 
 
-def test_execute__success_and_schedule():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ExecuteInterruptPoint(
+                "n",
+                handler_data=HandlerExecuteData(
+                    service_executed=True, execute_serialize_outputs="{}", execute_outputs_serializer="json"
+                ),
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
 
     data = Data({}, {})
 
@@ -302,9 +330,10 @@ def test_execute__success_and_schedule():
     runtime.get_context_key_references = MagicMock(return_value=set())
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ServiceActivityHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == True
@@ -319,14 +348,7 @@ def test_execute__success_and_schedule():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
-    runtime.start_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_not_called()
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
@@ -344,39 +366,39 @@ def test_execute__success_and_schedule():
         loop=1,
         inner_loop=1,
     )
-    assert service.pre_execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert service.pre_execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
-    assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert service.execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+    if recover_point and recover_point.handler_data.service_executed:
+        service.execute.assert_not_called()
+    else:
+        assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
+        assert service.execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
+    assert interrupter.check_point.handler_data.service_executed is True
+    assert interrupter.check_point.handler_data.service_execute_fail is False
+    assert interrupter.check_point.handler_data.execute_serialize_outputs == "{}"
+    assert interrupter.check_point.handler_data.execute_outputs_serializer == "json"
 
 
-def test_execute__success_and_no_schedule():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ExecuteInterruptPoint(
+                "n",
+                handler_data=HandlerExecuteData(
+                    service_executed=True, execute_serialize_outputs="{}", execute_outputs_serializer="json"
+                ),
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
 
     data = Data(
         {
@@ -398,9 +420,10 @@ def test_execute__success_and_no_schedule():
     runtime.get_context_key_references = MagicMock(return_value=set(["${k6}"]))
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ServiceActivityHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -415,23 +438,12 @@ def test_execute__success_and_no_schedule():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set(["${k4}"]))
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set(["${k4}", "${k6}"]))
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
-    runtime.start_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
         to_state=states.FINISHED,
         set_archive_time=True,
-    )
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
+        ignore_boring_set=recover_point is not None,
     )
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -456,51 +468,47 @@ def test_execute__success_and_no_schedule():
         loop=1,
         inner_loop=1,
     )
-    assert service.pre_execute.call_args.kwargs["data"].inputs == {
-        "k1": "${k4}",
-        "k2": "2",
-        "k3": "${k5}",
-        "_loop": 1,
-        "_inner_loop": 1,
-    }
-    assert service.pre_execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+    if recover_point and recover_point.handler_data.service_executed:
+        service.execute.assert_not_called()
+    else:
+        assert service.execute.call_args.kwargs["data"].inputs == {
+            "k1": "${k4}",
+            "k2": "2",
+            "k3": "${k5}",
+            "_loop": 1,
+            "_inner_loop": 1,
+        }
+        assert service.execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
-    assert service.execute.call_args.kwargs["data"].inputs == {
-        "k1": "${k4}",
-        "k2": "2",
-        "k3": "${k5}",
-        "_loop": 1,
-        "_inner_loop": 1,
-    }
-    assert service.execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+    assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
+    assert interrupter.check_point.handler_data.service_executed is True
+    assert interrupter.check_point.handler_data.service_execute_fail is False
+    assert interrupter.check_point.handler_data.execute_serialize_outputs == "{}"
+    assert interrupter.check_point.handler_data.execute_outputs_serializer == "json"
 
 
-def test_execute__fail_and_schedule():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ExecuteInterruptPoint(
+                "n",
+                handler_data=HandlerExecuteData(
+                    service_executed=True,
+                    service_execute_fail=True,
+                    execute_serialize_outputs="{}",
+                    execute_outputs_serializer="json",
+                ),
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
 
     data = Data({}, {})
 
@@ -515,9 +523,10 @@ def test_execute__fail_and_schedule():
     runtime.get_context_key_references = MagicMock(return_value=set())
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ServiceActivityHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -532,20 +541,12 @@ def test_execute__fail_and_schedule():
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
-    runtime.start_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FAILED, set_archive_time=True
-    )
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
         node_id=node.id,
         version="v1",
-        timeout=node.timeout,
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -564,50 +565,30 @@ def test_execute__fail_and_schedule():
         loop=1,
         inner_loop=1,
     )
-    assert service.pre_execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert service.pre_execute.call_args.kwargs["data"].outputs == {"_result": False, "_loop": 1, "_inner_loop": 1}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.pre_execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
-    assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
-    assert service.execute.call_args.kwargs["data"].outputs == {"_result": False, "_loop": 1, "_inner_loop": 1}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+    if recover_point and recover_point.handler_data.service_executed:
+        service.execute.assert_not_called()
+    else:
+        assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
+        assert service.execute.call_args.kwargs["data"].outputs == {"_result": False, "_loop": 1, "_inner_loop": 1}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
+    assert interrupter.check_point.handler_data.service_executed is True
+    assert interrupter.check_point.handler_data.service_execute_fail is True
+    assert interrupter.check_point.handler_data.execute_serialize_outputs == "{}"
+    assert interrupter.check_point.handler_data.execute_outputs_serializer == "json"
 
 
-def test_schedule__raise_not_ignore():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, recover_point):
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -621,9 +602,10 @@ def test_schedule__raise_not_ignore():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -639,14 +621,12 @@ def test_schedule__raise_not_ignore():
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version=schedule.version,
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
-        node_id=node.id, version="v1", to_state=states.FAILED, set_archive_time=True
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -663,41 +643,25 @@ def test_schedule__raise_not_ignore():
     assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
     assert service.schedule.call_args.kwargs["callback_data"] == None
 
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is False
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is True
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
-def test_schedule__raise_ignore():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-        timeout=None,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recover_point):
 
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+    node.error_ignorable = True
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -711,9 +675,10 @@ def test_schedule__raise_ignore():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -729,13 +694,13 @@ def test_schedule__raise_ignore():
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version=schedule.version,
         to_state=states.FINISHED,
         set_archive_time=True,
         error_ignored=True,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -752,40 +717,27 @@ def test_schedule__raise_ignore():
     assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
     assert service.schedule.call_args.kwargs["callback_data"] == None
 
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is False
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is True
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
-def test_schedule__poll_success_and_not_done():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint("n", handler_data=HandlerScheduleData(service_scheduled=True)),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -801,9 +753,10 @@ def test_schedule__poll_success_and_not_done():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == 5
@@ -819,7 +772,6 @@ def test_schedule__poll_success_and_not_done():
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_state.assert_not_called()
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -830,51 +782,45 @@ def test_schedule__poll_success_and_not_done():
         loop=1,
         inner_loop=1,
     )
-    service.is_schedule_done.assert_called_once()
-    service.schedule_after.call_args.kwargs["schedule"] == schedule
-    service.schedule_after.call_args.kwargs["data"] == service_data
-    service.schedule_after.call_args.kwargs["root_pipeline_data"].inputs == {}
-    service.schedule_after.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+        service.is_schedule_done.assert_not_called()
+    else:
+        service.is_schedule_done.assert_called_once()
+        service.schedule_after.call_args.kwargs["schedule"] == schedule
+        service.schedule_after.call_args.kwargs["data"] == service_data
+        service.schedule_after.call_args.kwargs["root_pipeline_data"].inputs == {}
+        service.schedule_after.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is False
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is False
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
 
-def test_schedule__poll_success_and_done():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint(
+                "n", handler_data=HandlerScheduleData(service_scheduled=True, is_schedule_done=True)
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedule, recover_point):
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -889,9 +835,10 @@ def test_schedule__poll_success_and_done():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -911,18 +858,13 @@ def test_schedule__poll_success_and_done():
         "_loop": 1,
         "_inner_loop": 1,
     }
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version=schedule.version,
         to_state=states.FINISHED,
         set_archive_time=True,
         error_ignored=False,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -933,48 +875,44 @@ def test_schedule__poll_success_and_done():
         loop=1,
         inner_loop=1,
     )
-    service.is_schedule_done.assert_called_once()
-    service.schedule_after.assert_not_called()
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+        service.is_schedule_done.assert_not_called()
+    else:
+        service.is_schedule_done.assert_called_once()
+        service.schedule_after.assert_not_called()
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is True
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is False
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
 
-def test_schedule__callback_success():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint(
+                "n", handler_data=HandlerScheduleData(service_scheduled=True, is_schedule_done=True)
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, recover_point):
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.CALLBACK,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+    schedule.type = ScheduleType.CALLBACK
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -989,9 +927,10 @@ def test_schedule__callback_success():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -1011,18 +950,13 @@ def test_schedule__callback_success():
         "_loop": 1,
         "_inner_loop": 1,
     }
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version=schedule.version,
         to_state=states.FINISHED,
         set_archive_time=True,
         error_ignored=False,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -1033,48 +967,41 @@ def test_schedule__callback_success():
         loop=1,
         inner_loop=1,
     )
-    service.is_schedule_done.assert_called_once()
-    service.schedule_after.assert_not_called()
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+        service.is_schedule_done.assert_not_called()
+    else:
+        service.is_schedule_done.assert_called_once()
+        service.schedule_after.assert_not_called()
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is True
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is False
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
 
-def test_schedule__multi_callback_success_and_not_done():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint("n", handler_data=HandlerScheduleData(service_scheduled=True)),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
 
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.MULTIPLE_CALLBACK,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+    schedule.type = ScheduleType.MULTIPLE_CALLBACK
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -1090,9 +1017,10 @@ def test_schedule__multi_callback_success_and_not_done():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == 5
@@ -1108,7 +1036,6 @@ def test_schedule__multi_callback_success_and_not_done():
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_state.assert_not_called()
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -1119,51 +1046,45 @@ def test_schedule__multi_callback_success_and_not_done():
         loop=1,
         inner_loop=1,
     )
-    service.is_schedule_done.assert_called_once()
-    service.schedule_after.call_args.kwargs["schedule"] == schedule
-    service.schedule_after.call_args.kwargs["data"] == service_data
-    service.schedule_after.call_args.kwargs["root_pipeline_data"].inputs == {}
-    service.schedule_after.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+        service.is_schedule_done.assert_not_called()
+    else:
+        service.is_schedule_done.assert_called_once()
+        service.schedule_after.call_args.kwargs["schedule"] == schedule
+        service.schedule_after.call_args.kwargs["data"] == service_data
+        service.schedule_after.call_args.kwargs["root_pipeline_data"].inputs == {}
+        service.schedule_after.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is False
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is False
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
 
-def test_schedule__multi_callback_success_and_done():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=True,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint(
+                "n", handler_data=HandlerScheduleData(service_scheduled=True, is_schedule_done=True)
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupter, schedule, recover_point):
+    schedule.type = ScheduleType.MULTIPLE_CALLBACK
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
@@ -1178,9 +1099,10 @@ def test_schedule__multi_callback_success_and_done():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -1200,18 +1122,13 @@ def test_schedule__multi_callback_success_and_done():
         "_loop": 1,
         "_inner_loop": 1,
     }
-    runtime.stop_timeout_monitor.assert_called_once_with(
-        process_id=pi.process_id,
-        node_id=node.id,
-        version="v1",
-        timeout=node.timeout,
-    )
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version=schedule.version,
         to_state=states.FINISHED,
         set_archive_time=True,
         error_ignored=False,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -1222,55 +1139,48 @@ def test_schedule__multi_callback_success_and_done():
         loop=1,
         inner_loop=1,
     )
-    service.is_schedule_done.assert_called_once()
-    service.schedule_after.assert_not_called()
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+        service.is_schedule_done.assert_not_called()
+    else:
+        service.is_schedule_done.assert_called_once()
+        service.schedule_after.assert_not_called()
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is True
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is False
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
 
 
-def test_schedule__fail():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="",
-    )
-
-    node = ServiceActivity(
-        id="nid",
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="test_service",
-        version="legacy",
-        error_ignorable=False,
-        timeout=None,
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node.id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=1,
-    )
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ScheduleInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ScheduleInterruptPoint(
+                "n", handler_data=HandlerScheduleData(service_scheduled=True, service_schedule_fail=True)
+            ),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point):
 
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
     service = MagicMock()
     service.schedule = MagicMock(return_value=False)
+    service.is_schedule_done = MagicMock(return_value=False)
 
     runtime = MagicMock()
     runtime.get_data_outputs = MagicMock(return_value=data_outputs)
@@ -1278,9 +1188,10 @@ def test_schedule__fail():
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_service = MagicMock(return_value=service)
+    runtime.serialize_execution_data = MagicMock(return_value=("{}", "json"))
 
-    handler = ServiceActivityHandler(node, runtime)
-    result = handler.schedule(pi, 1, 1, schedule, None)
+    handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
+    result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
     assert result.has_next_schedule == False
     assert result.schedule_after == -1
@@ -1300,12 +1211,12 @@ def test_schedule__fail():
         "_loop": 1,
         "_inner_loop": 1,
     }
-    runtime.stop_timeout_monitor.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version=schedule.version,
         to_state=states.FAILED,
         set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
 
     service.setup_runtime_attributes.assert_called_once_with(
@@ -1316,8 +1227,20 @@ def test_schedule__fail():
         loop=1,
         inner_loop=1,
     )
-    assert service.schedule.call_args.kwargs["schedule"] == schedule
-    assert service.schedule.call_args.kwargs["data"] == service_data
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
-    assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    if recover_point and recover_point.handler_data.service_scheduled:
+        service.schedule.assert_not_called()
+    else:
+        assert service.schedule.call_args.kwargs["schedule"] == schedule
+        assert service.schedule.call_args.kwargs["data"] == service_data
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
+        assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
+        assert service.schedule.call_args.kwargs["callback_data"] == None
+
+    assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
+    assert schedule_interrupter.check_point.handler_data.service_scheduled is True
+    assert schedule_interrupter.check_point.handler_data.schedule_times_added is True
+    assert schedule_interrupter.check_point.handler_data.is_schedule_done is False
+    assert schedule_interrupter.check_point.handler_data.service_schedule_fail is True
+    assert schedule_interrupter.check_point.handler_data.schedule_serialize_outputs == "{}"
+    assert schedule_interrupter.check_point.handler_data.schedule_outputs_serializer == "json"
