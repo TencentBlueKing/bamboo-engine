@@ -605,7 +605,6 @@ class Engine:
 
                 # 遇到推进终点后需要尝试唤醒父进程
                 if current_node_id == process_info.destination_id:
-                    # runtime 应该保证 child_process_finish 的事务性
                     wake_up_seccess = self.runtime.child_process_finish(process_info.parent_id, process_id)
 
                     if wake_up_seccess:

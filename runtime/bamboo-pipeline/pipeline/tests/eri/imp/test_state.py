@@ -494,3 +494,15 @@ class StateMixinTestCase(TransactionTestCase):
         self.assertEqual(parent_state.inner_loop, 1)
         self.assertEqual(first_child_state.inner_loop, 0)
         self.assertEqual(second_child_state.inner_loop, 0)
+
+    def test_set_state_ignore_boring_set(self):
+        version = self.state.version
+        self.mixin.set_state(
+            node_id=self.state.node_id,
+            to_state=self.state.name,
+            version=self.state.version,
+            ignore_boring_set=True,
+            refresh_version=True,
+        )
+        self.state.refresh_from_db()
+        self.assertEqual(version, self.state.version)

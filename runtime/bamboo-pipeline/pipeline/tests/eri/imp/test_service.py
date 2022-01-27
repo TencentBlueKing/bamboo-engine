@@ -22,27 +22,6 @@ from pipeline.eri.imp.service import ServiceWrapper
 
 
 class ServiceWrapperTestCase(TestCase):
-    def test_pre_execute(self):
-        service = MagicMock()
-        service.pre_execute = MagicMock()
-        data = ExecutionData(inputs={"1": 1}, outputs={"2": 2})
-        root_pipeline_data = ExecutionData(inputs={"3": 3}, outputs={"4": 4})
-
-        w = ServiceWrapper(service)
-        w.pre_execute(data, root_pipeline_data)
-
-        self.assertEqual(service.pre_execute.call_args[0][0].inputs, data.inputs)
-        self.assertEqual(service.pre_execute.call_args[0][0].outputs, data.outputs)
-
-    def test_pre_execute__no_define(self):
-        service = MagicMock()
-        service.pre_execute = None
-        data = ExecutionData({}, {})
-        root_pipeline_data = ExecutionData({}, {})
-
-        w = ServiceWrapper(service)
-        w.pre_execute(data, root_pipeline_data)
-
     def test_execute(self):
         class S(Service):
             def execute(self, data, parent_data):

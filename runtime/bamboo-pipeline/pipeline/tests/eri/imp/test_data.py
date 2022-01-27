@@ -352,3 +352,12 @@ class DataMixinTestCase(TransactionTestCase):
         self.assertEqual(data.node_id, self.node_id)
         self.assertEqual(data.version, self.version)
         self.assertEqual(data.data, self.raw_callback_data)
+
+    def test_serialize_execution_data(self):
+        data, serializer = self.mixin.serialize_execution_data({})
+        self.assertEqual(data, "{}")
+        self.assertEqual(serializer, "json")
+
+    def test_deserialize_execution_data(self):
+        data = self.mixin.deserialize_execution_data("{}", "json")
+        self.assertEqual(data, {})

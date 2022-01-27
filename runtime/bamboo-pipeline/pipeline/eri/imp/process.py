@@ -217,10 +217,9 @@ class ProcessMixin:
         :rtype: bool
         """
         with transaction.atomic():
-            dead_updated = Process.objects.filter(id=process_id).update(dead=True)
+            Process.objects.filter(id=process_id).update(dead=True)
 
-            if dead_updated:
-                Process.objects.filter(id=parent_id).update(ack_num=F("ack_num") + 1)
+            Process.objects.filter(id=parent_id).update(ack_num=F("ack_num") + 1)
 
             # compare(where) and set(update)
             waked = Process.objects.filter(id=parent_id, ack_num=F("need_ack")).update(ack_num=0, need_ack=-1)

@@ -40,7 +40,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
         pg = ParallelGateway(id="pg")
         act1 = ServiceActivity(id="act1", component_code="debug_node")
         act2 = ServiceActivity(
-            id="act2", component_code="debug_node", error_ignorable=True, timeout=5, skippable=True, retryable=True
+            id="act2", component_code="debug_node", error_ignorable=True, skippable=True, retryable=True
         )
         cg1 = ConvergeGateway(id="cg1")
         eg = ExclusiveGateway(id="eg", conditions={0: "True == True", 1: "True == False"})
@@ -191,7 +191,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -207,7 +206,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": 5,
                 "error_ignorable": True,
             },
         )
@@ -258,7 +256,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -274,7 +271,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -326,7 +322,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -342,7 +337,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -397,7 +391,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "sub_debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -415,7 +408,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "sub_debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
@@ -433,7 +425,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "can_retry": True,
                 "code": "sub_debug_node",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": False,
             },
         )
