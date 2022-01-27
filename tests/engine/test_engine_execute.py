@@ -82,7 +82,7 @@ def state(node_id):
 
 
 @pytest.fixture
-def service_activity(node_id):
+def node(node_id):
     return ServiceActivity(
         id=node_id,
         type=NodeType.ServiceActivity,
@@ -206,14 +206,14 @@ def test_execute__suspended_in_pipeline_stack(node_id, pi, interrupter):
     assert interrupter.check_point.name == ExecuteKeyPoint.START_PUSH_NODE
 
 
-def test_execute__exceed_rerun_limit(node_id, pi, interrupter, service_activity, state):
+def test_execute__exceed_rerun_limit(node_id, pi, interrupter, node, state):
     state.loop = 11
     state.inner_loop = 11
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.node_rerun_limit = MagicMock(return_value=10)
     runtime.get_execution_data_outputs = MagicMock(return_value={})
@@ -237,13 +237,13 @@ def test_execute__exceed_rerun_limit(node_id, pi, interrupter, service_activity,
     assert interrupter.check_point.state_already_exist is True
 
 
-def test_execute__node_has_suspended_appoint(node_id, pi, interrupter, service_activity, state):
+def test_execute__node_has_suspended_appoint(node_id, pi, interrupter, node, state):
     state.name = states.SUSPENDED
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.node_rerun_limit = MagicMock(return_value=10)
 
@@ -263,13 +263,13 @@ def test_execute__node_has_suspended_appoint(node_id, pi, interrupter, service_a
     assert interrupter.check_point.state_already_exist is True
 
 
-def test_execute__node_can_not_transit_to_running(node_id, pi, interrupter, service_activity, state):
+def test_execute__node_can_not_transit_to_running(node_id, pi, interrupter, node, state):
     state.name = states.RUNNING
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.node_rerun_limit = MagicMock(return_value=10)
 
@@ -287,13 +287,13 @@ def test_execute__node_can_not_transit_to_running(node_id, pi, interrupter, serv
     assert interrupter.check_point.state_already_exist is True
 
 
-def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, service_activity, state):
+def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, node, state):
     execution_data = ExecutionData(inputs={"1": "1"}, outputs={"2": "2"})
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.node_rerun_limit = MagicMock(return_value=10)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
@@ -325,9 +325,9 @@ def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, service_acti
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_called_once_with(pi.root_pipeline_id, node_id)
-    runtime.get_execution_data.assert_called_once_with(service_activity.id)
+    runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.add_history.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         started_time=state.started_time,
         archived_time=state.archived_time,
         loop=state.loop,
@@ -338,7 +338,7 @@ def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, service_acti
         outputs=execution_data.outputs,
     )
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=state.loop + 1,
@@ -358,7 +358,7 @@ def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, service_acti
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop + 1,
@@ -373,12 +373,12 @@ def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, service_acti
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__have_to_sleep(node_id, pi, interrupter, service_activity, state):
+def test_execute__have_to_sleep(node_id, pi, interrupter, node, state):
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_state = MagicMock(return_value=state.version)
@@ -410,7 +410,7 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, service_activity, stat
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -430,7 +430,7 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, service_activity, stat
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -445,11 +445,11 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, service_activity, stat
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__poll_schedule_ready(node_id, pi, interrupter, service_activity, state, schedule):
+def test_execute__poll_schedule_ready(node_id, pi, interrupter, node, state, schedule):
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_schedule = MagicMock(return_value=schedule)
@@ -480,7 +480,7 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, service_activity
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -497,15 +497,15 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, service_activity
     runtime.sleep.assert_called_once_with(pi.process_id)
     runtime.set_schedule.assert_called_once_with(
         process_id=pi.process_id,
-        node_id=service_activity.id,
+        node_id=node.id,
         version=state.version,
         schedule_type=execute_result.schedule_type,
     )
-    runtime.schedule.assert_called_once_with(pi.process_id, service_activity.id, schedule.id)
+    runtime.schedule.assert_called_once_with(pi.process_id, node.id, schedule.id)
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -521,11 +521,11 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, service_activity
     assert interrupter.check_point.set_schedule_done is True
 
 
-def test_execute__callback_schedule_ready(node_id, pi, interrupter, service_activity, state, schedule):
+def test_execute__callback_schedule_ready(node_id, pi, interrupter, node, state, schedule):
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_schedule = MagicMock(return_value=schedule)
@@ -557,7 +557,7 @@ def test_execute__callback_schedule_ready(node_id, pi, interrupter, service_acti
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -574,7 +574,7 @@ def test_execute__callback_schedule_ready(node_id, pi, interrupter, service_acti
     runtime.sleep.assert_called_once_with(pi.process_id)
     runtime.set_schedule.assert_called_once_with(
         process_id=pi.process_id,
-        node_id=service_activity.id,
+        node_id=node.id,
         version=state.version,
         schedule_type=execute_result.schedule_type,
     )
@@ -582,7 +582,7 @@ def test_execute__callback_schedule_ready(node_id, pi, interrupter, service_acti
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -598,11 +598,11 @@ def test_execute__callback_schedule_ready(node_id, pi, interrupter, service_acti
     assert interrupter.check_point.set_schedule_done is True
 
 
-def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, service_activity, state, schedule):
+def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, node, state, schedule):
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_schedule = MagicMock(return_value=schedule)
@@ -634,7 +634,7 @@ def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, servic
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -651,7 +651,7 @@ def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, servic
     runtime.sleep.assert_called_once_with(pi.process_id)
     runtime.set_schedule.assert_called_once_with(
         process_id=pi.process_id,
-        node_id=service_activity.id,
+        node_id=node.id,
         version=state.version,
         schedule_type=execute_result.schedule_type,
     )
@@ -659,7 +659,7 @@ def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, servic
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -675,7 +675,7 @@ def test_execute__multi_callback_schedule_ready(node_id, pi, interrupter, servic
     assert interrupter.check_point.set_schedule_done is True
 
 
-def test_execute__has_dispatch_processes(node_id, pi, interrupter, service_activity, state):
+def test_execute__has_dispatch_processes(node_id, pi, interrupter, node, state):
     dispatch_processes = [
         DispatchProcess(process_id=3, node_id="n3"),
         DispatchProcess(process_id=4, node_id="n4"),
@@ -684,7 +684,7 @@ def test_execute__has_dispatch_processes(node_id, pi, interrupter, service_activ
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_state = MagicMock(return_value=state.version)
@@ -716,7 +716,7 @@ def test_execute__has_dispatch_processes(node_id, pi, interrupter, service_activ
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -752,7 +752,7 @@ def test_execute__has_dispatch_processes(node_id, pi, interrupter, service_activ
     )
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -767,12 +767,12 @@ def test_execute__has_dispatch_processes(node_id, pi, interrupter, service_activ
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__have_to_die(node_id, pi, interrupter, service_activity, state):
+def test_execute__have_to_die(node_id, pi, interrupter, node, state):
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_state = MagicMock(return_value=state.version)
@@ -804,7 +804,7 @@ def test_execute__have_to_die(node_id, pi, interrupter, service_activity, state)
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
-        node_id=service_activity.id,
+        node_id=node.id,
         to_state=states.RUNNING,
         version=None,
         loop=1,
@@ -824,7 +824,7 @@ def test_execute__have_to_die(node_id, pi, interrupter, service_activity, state)
     runtime.execute.assert_not_called()
     runtime.die.assert_called_once_with(pi.process_id)
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -839,7 +839,7 @@ def test_execute__have_to_die(node_id, pi, interrupter, service_activity, state)
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__recover_with_state_not_exsit(node_id, pi, interrupter, service_activity, state, recover_point):
+def test_execute__recover_with_state_not_exsit(node_id, pi, interrupter, node, state, recover_point):
     recover_point.state_already_exist = False
     recover_point.running_node_version = "set_running_return_version"
     interrupter.recover_point = recover_point
@@ -847,7 +847,7 @@ def test_execute__recover_with_state_not_exsit(node_id, pi, interrupter, service
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.set_state = MagicMock()
 
@@ -886,7 +886,7 @@ def test_execute__recover_with_state_not_exsit(node_id, pi, interrupter, service
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -902,7 +902,7 @@ def test_execute__recover_with_state_not_exsit(node_id, pi, interrupter, service
 
 
 def test_execute__recover_with_state_not_exsit_and_version_is_none(
-    node_id, pi, interrupter, service_activity, state, recover_point
+    node_id, pi, interrupter, node, state, recover_point
 ):
     recover_point.state_already_exist = False
     interrupter.recover_point = recover_point
@@ -910,7 +910,7 @@ def test_execute__recover_with_state_not_exsit_and_version_is_none(
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.set_state = MagicMock()
 
@@ -949,7 +949,7 @@ def test_execute__recover_with_state_not_exsit_and_version_is_none(
     runtime.execute.assert_not_called()
     runtime.die.assert_not_called()
 
-    get_handler.assert_called_once_with(service_activity, runtime, interrupter)
+    get_handler.assert_called_once_with(node, runtime, interrupter)
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -964,7 +964,7 @@ def test_execute__recover_with_state_not_exsit_and_version_is_none(
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__recover_exceed_rerun_limit(node_id, pi, interrupter, service_activity, state, recover_point):
+def test_execute__recover_exceed_rerun_limit(node_id, pi, interrupter, node, state, recover_point):
     recover_point.state_already_exist = True
     interrupter.recover_point = recover_point
     state.loop = 11
@@ -973,7 +973,7 @@ def test_execute__recover_exceed_rerun_limit(node_id, pi, interrupter, service_a
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.node_rerun_limit = MagicMock(return_value=10)
     runtime.get_execution_data_outputs = MagicMock(return_value={})
@@ -997,7 +997,7 @@ def test_execute__recover_exceed_rerun_limit(node_id, pi, interrupter, service_a
     assert interrupter.check_point.state_already_exist is True
 
 
-def test_execute__recover_with_execute_result(node_id, pi, interrupter, service_activity, state, recover_point):
+def test_execute__recover_with_execute_result(node_id, pi, interrupter, node, state, recover_point):
     recover_point.state_already_exist = False
     recover_point.running_node_version = "set_running_return_version"
     recover_point.execute_result = ExecuteResult(
@@ -1014,7 +1014,7 @@ def test_execute__recover_with_execute_result(node_id, pi, interrupter, service_
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.set_state = MagicMock()
 
@@ -1049,7 +1049,7 @@ def test_execute__recover_with_execute_result(node_id, pi, interrupter, service_
     assert interrupter.check_point.execute_result is not None
 
 
-def test_execute__recover_with_set_schedule_done(node_id, pi, interrupter, service_activity, state, recover_point):
+def test_execute__recover_with_set_schedule_done(node_id, pi, interrupter, node, state, recover_point):
     recover_point.state_already_exist = False
     recover_point.running_node_version = "set_running_return_version"
     recover_point.execute_result = ExecuteResult(
@@ -1067,7 +1067,7 @@ def test_execute__recover_with_set_schedule_done(node_id, pi, interrupter, servi
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
-    runtime.get_node = MagicMock(return_value=service_activity)
+    runtime.get_node = MagicMock(return_value=node)
     runtime.get_state_or_none = MagicMock(return_value=state)
     runtime.set_state = MagicMock()
 

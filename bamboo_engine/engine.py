@@ -1006,7 +1006,6 @@ class Engine:
 
             # fetch node info and start schedule
             node = self.runtime.get_node(node_id)
-            handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
             type_label = self._get_metrics_node_type(node)
 
             logger.info(
@@ -1025,6 +1024,7 @@ class Engine:
                 )
                 schedule_result = interrupter.recover_point.schedule_result
             else:
+                handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
                 schedule_result = handler.schedule(
                     process_info=process_info,
                     loop=state.loop,
