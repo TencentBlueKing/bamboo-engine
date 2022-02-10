@@ -13,7 +13,7 @@ runtime = BambooDjangoRuntime()
 
 
 def _assert_all_state_equal(node_id_list, name):
-    for _ in range(20):
+    for _ in range(100):
         state_names = runtime.batch_get_state_name(node_id_list)
         if len(state_names) == len(node_id_list) and set(state_names.values()) == {name}:
             break
