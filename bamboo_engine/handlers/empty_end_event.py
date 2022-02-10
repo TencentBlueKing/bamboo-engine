@@ -69,6 +69,15 @@ class EmptyEndEventHandler(NodeHandler):
             self.node.id,
             output_value_refs,
         )
+
+        additional_refs = self.runtime.get_context_key_references(pipeline_id=pipeline_id, keys=output_value_refs)
+        output_value_refs = output_value_refs.union(additional_refs)
+        logger.info(
+            "root_pipeline[%s] pipeline(%s) outputs values final refs: %s",
+            root_pipeline_id,
+            pipeline_id,
+            output_value_refs,
+        )
         context_values.extend(self.runtime.get_context_values(pipeline_id=pipeline_id, keys=output_value_refs))
 
         context = Context(self.runtime, context_values, root_pipeline_inputs)
