@@ -7,7 +7,11 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    env:
+      DB_DATABASE: pipeline_test
+      DB_USER: root
+      DB_PASSWORD: root
     strategy:
       matrix:
         python-version: [3.6, 3.7]
@@ -39,3 +43,8 @@ jobs:
         cd runtime/bamboo-pipeline/test
         poetry run coverage run --source="." manage.py test pipeline.tests
         poetry run coverage report -m
+      env:
+        PIPELINE_TEST_DB_TYPE: mysql
+        PIPELINE_TEST_DB_NAME: pipeline_test
+        PIPELINE_TEST_DB_USER: root
+        PIPELINE_TEST_DB_PWD: root
