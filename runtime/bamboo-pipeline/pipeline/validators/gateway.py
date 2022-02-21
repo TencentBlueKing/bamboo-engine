@@ -68,7 +68,8 @@ def can_shared(current_gateway_id, converge_id, converged, gateways) -> bool:
     """
     check whether a converge gateway can be shared by current_gateway
     :param converge_id: converge gateway id
-    :param converged: converge gateway converged gateway map e.g. {"converge_gateway_id": ["parallel_gateway1", "parallel_gateway2]}
+    :param converged: converge gateway converged gateway map
+                      e.g. {"converge_gateway_id": ["parallel_gateway1", "parallel_gateway2]}
     :param gateways: gateway map
     """
     # exclusive gateway can share another block converge gateway
