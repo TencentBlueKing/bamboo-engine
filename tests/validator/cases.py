@@ -895,6 +895,94 @@ def gateway_valid_edge_case_2():
     )
 
 
+def gateway_valid_edge_case_3():
+    converge = {
+        converge_gw_id(1): {
+            "incoming": [1, 2, 3],
+            "outgoing": [],
+            "type": "ConvergeGateway",
+            "target": [converge_gw_id(2)],
+            "id": converge_gw_id(1),
+            "match": None,
+            "match_assert": None,
+            "converge_end": None,
+            "converge_end_assert": None,
+            "distance": 4,
+            "in_len": 3,
+        },
+        converge_gw_id(2): {
+            "incoming": [1, 2],
+            "outgoing": [],
+            "type": "ConvergeGateway",
+            "target": [end_event_id],
+            "id": converge_gw_id(2),
+            "match": None,
+            "match_assert": None,
+            "converge_end": None,
+            "converge_end_assert": None,
+            "distance": 5,
+            "in_len": 2,
+        },
+    }
+    gateway = {
+        parallel_gw_id(1): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ParallelGateway",
+            "target": [parallel_gw_id(2), converge_gw_id(2)],
+            "id": parallel_gw_id(1),
+            "match": None,
+            "match_assert": converge_gw_id(2),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 1,
+        },
+        parallel_gw_id(2): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ParallelGateway",
+            "target": [exclusive_gw_id(1), converge_gw_id(1)],
+            "id": parallel_gw_id(2),
+            "match": None,
+            "match_assert": converge_gw_id(1),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 2,
+        },
+        exclusive_gw_id(1): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ExclusiveGateway",
+            "target": [converge_gw_id(1), converge_gw_id(1)],
+            "id": exclusive_gw_id(1),
+            "match": None,
+            "match_assert": converge_gw_id(1),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 3,
+        },
+    }
+
+    stack = []
+    distances = {}
+    converge_in = {}
+    for gid, g in list(gateway.items()):
+        distances[gid] = g["distance"]
+    for cid, c in list(converge.items()):
+        distances[cid] = c["distance"]
+        converge_in[cid] = c["in_len"]
+
+    return (
+        converge,
+        gateway,
+        stack,
+        end_event_id,
+        parallel_gw_id(1),
+        distances,
+        converge_in,
+    )
+
+
 def gateway_invalid_case_1():
     converge = {
         converge_gw_id(1): {
@@ -1325,6 +1413,7 @@ gateway_valid_cases = [
     {"case": gateway_valid_case},
     {"case": gateway_valid_edge_case_1},
     {"case": gateway_valid_edge_case_2},
+    {"case": gateway_valid_edge_case_3},
 ]
 
 gateway_invalid_cases = [

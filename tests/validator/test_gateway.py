@@ -11,7 +11,9 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import traceback
 
+from bamboo_engine.exceptions import ConvergeMatchError
 from .cases import *  # noqa
 
 
@@ -46,34 +48,37 @@ def test_match_converge():
         converge, gateway, stack, eid, start, distances, in_len = i["case"]()
         block_nodes = {start: set()}
 
-        converge_id, _ = match_converge(
-            converges=converge,
-            gateways=gateway,
-            cur_index=start,
-            end_event_id=end_event_id,
-            converged={},
-            block_start=start,
-            block_nodes=block_nodes,
-            dist_from_start=distances,
-            converge_in_len=in_len,
-        )
-        if converge_id:
-            while converge[converge_id]["target"][0] != eid:
-                start = converge[converge_id]["target"][0]
-                block_nodes[start] = set()
-                converge_id, _ = match_converge(
-                    converges=converge,
-                    gateways=gateway,
-                    cur_index=start,
-                    end_event_id=end_event_id,
-                    converged={},
-                    block_start=start,
-                    block_nodes=block_nodes,
-                    dist_from_start=distances,
-                    converge_in_len=in_len,
-                )
-                if converge_id is None:
-                    break
+        try:
+            converge_id, _ = match_converge(
+                converges=converge,
+                gateways=gateway,
+                cur_index=start,
+                end_event_id=end_event_id,
+                converged={},
+                block_start=start,
+                block_nodes=block_nodes,
+                dist_from_start=distances,
+                converge_in_len=in_len,
+            )
+            if converge_id:
+                while converge[converge_id]["target"][0] != eid:
+                    start = converge[converge_id]["target"][0]
+                    block_nodes[start] = set()
+                    converge_id, _ = match_converge(
+                        converges=converge,
+                        gateways=gateway,
+                        cur_index=start,
+                        end_event_id=end_event_id,
+                        converged={},
+                        block_start=start,
+                        block_nodes=block_nodes,
+                        dist_from_start=distances,
+                        converge_in_len=in_len,
+                    )
+                    if converge_id is None:
+                        break
+        except ConvergeMatchError as e:
+            assert False == True, "fail at {n} case : {trace}".format(n=n, trace=traceback.format_exc())
 
         for _, c in list(converge.items()):
             actual = c["match"]
