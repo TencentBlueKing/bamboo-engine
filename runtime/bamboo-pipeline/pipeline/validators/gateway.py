@@ -225,7 +225,9 @@ def match_converge(
 
         # invalid cases
         else:
-            raise exceptions.ConvergeMatchError(cur_index, _("非法网关, 请检查其分支是否符合规则, cur_index: %s, targets: %s" % (cur_index, target)))
+            raise exceptions.ConvergeMatchError(
+                cur_index, _("非法网关, 请检查其分支是否符合规则, cur_index: %s, targets: %s" % (cur_index, target))
+            )
 
     if is_exg:
         if converge_id in converges:
