@@ -10,8 +10,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 
@@ -133,6 +133,15 @@ class ExecutionHistory(models.Model):
         index_together = ["node_id", "loop"]
 
 
+class LogEntryManager(models.Manager):
+    def delete_expired_log(self, interval):
+        expired_date = timezone.now() + timezone.timedelta(days=(-interval))
+        to_be_deleted = self.filter(logged_at__lt=expired_date)
+        count = to_be_deleted.count()
+        to_be_deleted.delete()
+        return count
+
+
 class LogEntry(models.Model):
     id = models.BigAutoField(_("ID"), primary_key=True)
     node_id = models.CharField(_("节点 ID"), max_length=33)
@@ -142,6 +151,8 @@ class LogEntry(models.Model):
     level_name = models.CharField(_("日志等级"), max_length=32)
     message = models.TextField(_("日志内容"), null=True)
     logged_at = models.DateTimeField(_("输出时间"), auto_now_add=True, db_index=True)
+
+    objects = LogEntryManager()
 
     class Meta:
         index_together = ["node_id", "loop"]
