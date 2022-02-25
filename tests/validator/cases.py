@@ -27,9 +27,7 @@ def flow_valid_case():
     outgoing_assert = {
         start_event_id: out_assert_case(1, {act_id(1)}),
         act_id(1): out_assert_case(1, {parallel_gw_id(1)}),
-        parallel_gw_id(1): out_assert_case(
-            3, {parallel_gw_id(2), act_id(5), act_id(6)}
-        ),
+        parallel_gw_id(1): out_assert_case(3, {parallel_gw_id(2), act_id(5), act_id(6)}),
         parallel_gw_id(2): out_assert_case(3, {act_id(2), act_id(3), act_id(4)}),
         act_id(2): out_assert_case(1, {converge_gw_id(1)}),
         act_id(3): out_assert_case(1, {converge_gw_id(1)}),
@@ -48,14 +46,10 @@ def flow_valid_case():
         act_id(10): out_assert_case(1, {converge_gw_id(2)}),
         converge_gw_id(2): out_assert_case(1, {act_id(12)}),
         act_id(12): out_assert_case(1, {exclusive_gw_id(6)}),
-        exclusive_gw_id(6): out_assert_case(
-            3, {act_id(6), converge_gw_id(3), converge_gw_id(2)}
-        ),
+        exclusive_gw_id(6): out_assert_case(3, {act_id(6), converge_gw_id(3), converge_gw_id(2)}),
         converge_gw_id(3): out_assert_case(1, {act_id(13)}),
         act_id(13): out_assert_case(1, {exclusive_gw_id(3)}),
-        exclusive_gw_id(3): out_assert_case(
-            4, {end_event_id, act_id(14), parallel_gw_id(3), act_id(1)}
-        ),
+        exclusive_gw_id(3): out_assert_case(4, {end_event_id, act_id(14), parallel_gw_id(3), act_id(1)}),
         act_id(14): out_assert_case(1, {exclusive_gw_id(4)}),
         exclusive_gw_id(4): out_assert_case(2, {act_id(13), converge_gw_id(4)}),
         parallel_gw_id(3): out_assert_case(3, {act_id(15), act_id(16), act_id(17)}),
@@ -240,11 +234,7 @@ def flow_valid_case():
     start = EmptyStartEvent(id=start_event_id)
     acts = [ServiceActivity(id=act_id(i)) for i in range(1, 21)]
     pgs = [ParallelGateway(id=parallel_gw_id(i)) for i in range(1, 3)]
-    pgs.append(
-        ConditionalParallelGateway(
-            id=parallel_gw_id(3), conditions={0: "123", 1: "456", 2: "789"}
-        )
-    )
+    pgs.append(ConditionalParallelGateway(id=parallel_gw_id(3), conditions={0: "123", 1: "456", 2: "789"}))
     egs = [
         ExclusiveGateway(
             id=exclusive_gw_id(i),
@@ -261,42 +251,24 @@ def flow_valid_case():
     nodes.extend(egs)
     nodes.extend(cgs)
 
-    start.extend(acts[_(1)]).extend(pgs[_(1)]).connect(
-        pgs[_(2)], acts[_(5)], acts[_(6)]
-    )
+    start.extend(acts[_(1)]).extend(pgs[_(1)]).connect(pgs[_(2)], acts[_(5)], acts[_(6)])
 
-    pgs[_(2)].connect(acts[_(2)], acts[_(3)], acts[_(4)]).converge(cgs[_(1)]).extend(
-        acts[_(7)]
-    ).extend(egs[_(1)]).connect(pgs[_(2)], cgs[_(3)])
-    acts[_(5)].extend(egs[_(7)]).connect(cgs[_(3)], acts[_(8)]).to(acts[_(8)]).extend(
-        egs[_(8)]
-    ).connect(acts[_(8)], acts[_(11)]).to(acts[_(11)]).extend(cgs[_(3)])
-    acts[_(6)].extend(egs[_(2)]).connect(acts[_(9)], acts[_(10)],).converge(
-        cgs[_(2)]
-    ).extend(acts[_(12)]).extend(egs[_(6)]).connect(
-        acts[_(6)], cgs[_(3)], cgs[_(2)]
-    ).to(
-        egs[_(2)]
-    ).connect(
-        acts[_(6)]
-    )
+    pgs[_(2)].connect(acts[_(2)], acts[_(3)], acts[_(4)]).converge(cgs[_(1)]).extend(acts[_(7)]).extend(
+        egs[_(1)]
+    ).connect(pgs[_(2)], cgs[_(3)])
+    acts[_(5)].extend(egs[_(7)]).connect(cgs[_(3)], acts[_(8)]).to(acts[_(8)]).extend(egs[_(8)]).connect(
+        acts[_(8)], acts[_(11)]
+    ).to(acts[_(11)]).extend(cgs[_(3)])
+    acts[_(6)].extend(egs[_(2)]).connect(acts[_(9)], acts[_(10)],).converge(cgs[_(2)]).extend(acts[_(12)]).extend(
+        egs[_(6)]
+    ).connect(acts[_(6)], cgs[_(3)], cgs[_(2)]).to(egs[_(2)]).connect(acts[_(6)])
 
-    cgs[_(3)].extend(acts[_(13)]).extend(egs[_(3)]).connect(
-        end, acts[_(14)], pgs[_(3)], acts[_(1)]
-    )
+    cgs[_(3)].extend(acts[_(13)]).extend(egs[_(3)]).connect(end, acts[_(14)], pgs[_(3)], acts[_(1)])
 
     acts[_(14)].extend(egs[_(4)]).connect(acts[_(13)], cgs[_(4)])
-    pgs[_(3)].connect(acts[_(15)], acts[_(16)], acts[_(17)]).to(acts[_(15)]).extend(
-        acts[_(18)]
-    ).extend(cgs[_(4)]).to(acts[_(17)]).extend(egs[_(5)]).connect(
-        acts[_(19)], acts[_(20)]
-    ).to(
-        acts[_(19)]
-    ).extend(
-        cgs[_(4)]
-    ).to(
-        acts[_(20)]
-    ).extend(
+    pgs[_(3)].connect(acts[_(15)], acts[_(16)], acts[_(17)]).to(acts[_(15)]).extend(acts[_(18)]).extend(cgs[_(4)]).to(
+        acts[_(17)]
+    ).extend(egs[_(5)]).connect(acts[_(19)], acts[_(20)]).to(acts[_(19)]).extend(cgs[_(4)]).to(acts[_(20)]).extend(
         cgs[_(4)]
     ).to(
         acts[_(16)]
@@ -312,9 +284,7 @@ def flow_valid_case():
         assert a["len"] == len(node.outgoing), "{id} actual: {a}, expect: {e}".format(
             id=node.id, a=len(node.outgoing), e=a["len"]
         )
-        assert a["outgoing"] == out, "{id} actual: {a}, expect: {e}".format(
-            id=node.id, a=out, e=a["outgoing"]
-        )
+        assert a["outgoing"] == out, "{id} actual: {a}, expect: {e}".format(id=node.id, a=out, e=a["outgoing"])
 
     return build_tree(start), gateway_validation_assert, stream_assert
 
@@ -323,15 +293,11 @@ def flow_valid_edge_case_1():
     start = EmptyStartEvent(id=start_event_id)
     act_1 = ServiceActivity(id=act_id(1))
     act_2 = ServiceActivity(id=act_id(2))
-    eg = ExclusiveGateway(
-        id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"}
-    )
+    eg = ExclusiveGateway(id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"})
     act_3 = ServiceActivity(id=act_id(3))
     end = EmptyEndEvent(id=end_event_id)
 
-    start.extend(act_1).extend(act_2).extend(eg).connect(act_1, act_2, act_3).to(
-        act_3
-    ).extend(end)
+    start.extend(act_1).extend(act_2).extend(eg).connect(act_1, act_2, act_3).to(act_3).extend(end)
 
     return build_tree(start)
 
@@ -473,9 +439,7 @@ def flow_valid_edge_case_3():
 def flow_valid_edge_case_4():
     start = EmptyStartEvent(id=start_event_id)
     pg = ParallelGateway(id=parallel_gw_id(1))
-    eg = ExclusiveGateway(
-        id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"}
-    )
+    eg = ExclusiveGateway(id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"})
     cg = ConvergeGateway(id=converge_gw_id(1))
     end = EmptyEndEvent(id=end_event_id)
 
@@ -488,9 +452,7 @@ def flow_valid_edge_case_4():
 
 def flow_valid_edge_case_5():
     start = EmptyStartEvent(id=start_event_id)
-    eg = ExclusiveGateway(
-        id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"}
-    )
+    eg = ExclusiveGateway(id=exclusive_gw_id(1), conditions={0: "123", 1: "456", 2: "789"})
     cg = ConvergeGateway(id=converge_gw_id(1))
     end = EmptyEndEvent(id=end_event_id)
 
@@ -511,9 +473,7 @@ def flow_invalid_case_1():
     cg = ConvergeGateway(id=converge_gw_id(1))
     end = EmptyEndEvent(id=end_event_id)
 
-    start.extend(act_1).extend(pg).connect(act_2, act_3, eg).to(eg).connect(
-        act_3, act_4
-    )
+    start.extend(act_1).extend(pg).connect(act_2, act_3, eg).to(eg).connect(act_3, act_4)
 
     act_2.connect(cg)
     act_3.connect(cg)
@@ -534,9 +494,9 @@ def flow_invalid_case_2():
     cg = ConvergeGateway(id=converge_gw_id(1))
     end = EmptyEndEvent(id=end_event_id)
 
-    start.extend(act_1).extend(eg).connect(act_3, act_2).to(act_2).extend(pg).connect(
-        act_3, act_4
-    ).converge(cg).extend(end)
+    start.extend(act_1).extend(eg).connect(act_3, act_2).to(act_2).extend(pg).connect(act_3, act_4).converge(cg).extend(
+        end
+    )
 
     return build_tree(start)
 
@@ -872,6 +832,94 @@ def gateway_valid_edge_case_2():
             "converge_end": None,
             "converge_end_assert": False,
             "distance": 1,
+        },
+    }
+
+    stack = []
+    distances = {}
+    converge_in = {}
+    for gid, g in list(gateway.items()):
+        distances[gid] = g["distance"]
+    for cid, c in list(converge.items()):
+        distances[cid] = c["distance"]
+        converge_in[cid] = c["in_len"]
+
+    return (
+        converge,
+        gateway,
+        stack,
+        end_event_id,
+        parallel_gw_id(1),
+        distances,
+        converge_in,
+    )
+
+
+def gateway_valid_edge_case_3():
+    converge = {
+        converge_gw_id(1): {
+            "incoming": [1, 2, 3],
+            "outgoing": [],
+            "type": "ConvergeGateway",
+            "target": [converge_gw_id(2)],
+            "id": converge_gw_id(1),
+            "match": None,
+            "match_assert": None,
+            "converge_end": None,
+            "converge_end_assert": None,
+            "distance": 4,
+            "in_len": 3,
+        },
+        converge_gw_id(2): {
+            "incoming": [1, 2],
+            "outgoing": [],
+            "type": "ConvergeGateway",
+            "target": [end_event_id],
+            "id": converge_gw_id(2),
+            "match": None,
+            "match_assert": None,
+            "converge_end": None,
+            "converge_end_assert": None,
+            "distance": 5,
+            "in_len": 2,
+        },
+    }
+    gateway = {
+        parallel_gw_id(1): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ParallelGateway",
+            "target": [parallel_gw_id(2), converge_gw_id(2)],
+            "id": parallel_gw_id(1),
+            "match": None,
+            "match_assert": converge_gw_id(2),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 1,
+        },
+        parallel_gw_id(2): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ParallelGateway",
+            "target": [exclusive_gw_id(1), converge_gw_id(1)],
+            "id": parallel_gw_id(2),
+            "match": None,
+            "match_assert": converge_gw_id(1),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 2,
+        },
+        exclusive_gw_id(1): {
+            "incoming": [],
+            "outgoing": [],
+            "type": "ExclusiveGateway",
+            "target": [converge_gw_id(1), converge_gw_id(1)],
+            "id": exclusive_gw_id(1),
+            "match": None,
+            "match_assert": converge_gw_id(1),
+            "converge_end": None,
+            "converge_end_assert": False,
+            "distance": 3,
         },
     }
 
@@ -1325,6 +1373,7 @@ gateway_valid_cases = [
     {"case": gateway_valid_case},
     {"case": gateway_valid_edge_case_1},
     {"case": gateway_valid_edge_case_2},
+    {"case": gateway_valid_edge_case_3},
 ]
 
 gateway_invalid_cases = [

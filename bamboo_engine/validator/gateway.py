@@ -60,6 +60,27 @@ def matched_in_prev_blocks(gid, current_start, block_nodes):
     return gid in prev_nodes
 
 
+def can_shared(current_gateway_id, converge_id, converged, gateways) -> bool:
+    """
+    check whether a converge gateway can be shared by current_gateway
+    :param converge_id: converge gateway id
+    :param converged: converge gateway converged gateway map
+                      e.g. {"converge_gateway_id": ["parallel_gateway1", "parallel_gateway2]}
+    :param gateways: gateway map
+    """
+    # exclusive gateway can share another block converge gateway
+    if gateways[current_gateway_id]["type"] not in PARALLEL_GATEWAYS:
+        return True
+
+    # check whether another parallel gateway in converged
+    for gateway_id in converged.get(converge_id, []):
+        if gateway_id == current_gateway_id:
+            continue
+        if gateways[gateway_id]["type"] in PARALLEL_GATEWAYS:
+            return False
+    return True
+
+
 def match_converge(
     converges,
     gateways,
@@ -140,7 +161,12 @@ def match_converge(
             if converge_id:
                 target[i] = converge_id
 
-                if not shared:
+                if not shared or (
+                    shared
+                    and not can_shared(
+                        current_gateway_id=cur_index, converge_id=converge_id, converged=converged, gateways=gateways
+                    )
+                ):
                     # try to get next node fo converge which is not shared
                     target[i] = converges[converge_id]["target"][0]
 
@@ -196,7 +222,9 @@ def match_converge(
 
         # invalid cases
         else:
-            raise exceptions.ConvergeMatchError(cur_index, "非法网关，请检查其分支是否符合规则")
+            raise exceptions.ConvergeMatchError(
+                cur_index, "非法网关, 请检查其分支是否符合规则, cur_index: %s, targets: %s" % (cur_index, target)
+            )
 
     if is_exg:
         if converge_id in converges:

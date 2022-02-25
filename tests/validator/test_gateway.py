@@ -11,7 +11,9 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import traceback
 
+from bamboo_engine.exceptions import ConvergeMatchError
 from .cases import *  # noqa
 
 
@@ -24,9 +26,7 @@ def test_distance_from_start():
     for gid, ga in list(gateway_validation_assert.items()):
         actual = distances[gid]
         expect = ga["distance"]
-        assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-            id=gid, a=actual, e=expect
-        )
+        assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=gid, a=actual, e=expect)
 
     for gid, ga in list(gateway_validation_assert.items()):
         actual = distance_from(
@@ -36,9 +36,7 @@ def test_distance_from_start():
             marked={},
         )
         expect = ga["distance"]
-        assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-            id=gid, a=actual, e=expect
-        )
+        assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=gid, a=actual, e=expect)
 
 
 def test_match_converge():
@@ -46,60 +44,55 @@ def test_match_converge():
         converge, gateway, stack, eid, start, distances, in_len = i["case"]()
         block_nodes = {start: set()}
 
-        converge_id, _ = match_converge(
-            converges=converge,
-            gateways=gateway,
-            cur_index=start,
-            end_event_id=end_event_id,
-            converged={},
-            block_start=start,
-            block_nodes=block_nodes,
-            dist_from_start=distances,
-            converge_in_len=in_len,
-        )
-        if converge_id:
-            while converge[converge_id]["target"][0] != eid:
-                start = converge[converge_id]["target"][0]
-                block_nodes[start] = set()
-                converge_id, _ = match_converge(
-                    converges=converge,
-                    gateways=gateway,
-                    cur_index=start,
-                    end_event_id=end_event_id,
-                    converged={},
-                    block_start=start,
-                    block_nodes=block_nodes,
-                    dist_from_start=distances,
-                    converge_in_len=in_len,
-                )
-                if converge_id is None:
-                    break
+        try:
+            converge_id, _ = match_converge(
+                converges=converge,
+                gateways=gateway,
+                cur_index=start,
+                end_event_id=end_event_id,
+                converged={},
+                block_start=start,
+                block_nodes=block_nodes,
+                dist_from_start=distances,
+                converge_in_len=in_len,
+            )
+            if converge_id:
+                while converge[converge_id]["target"][0] != eid:
+                    start = converge[converge_id]["target"][0]
+                    block_nodes[start] = set()
+                    converge_id, _ = match_converge(
+                        converges=converge,
+                        gateways=gateway,
+                        cur_index=start,
+                        end_event_id=end_event_id,
+                        converged={},
+                        block_start=start,
+                        block_nodes=block_nodes,
+                        dist_from_start=distances,
+                        converge_in_len=in_len,
+                    )
+                    if converge_id is None:
+                        break
+        except ConvergeMatchError as e:
+            assert False == True, "fail at {n} case : {trace}".format(n=n, trace=traceback.format_exc())
 
         for _, c in list(converge.items()):
             actual = c["match"]
             expect = c["match_assert"]
-            assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-                id=c["id"], a=actual, e=expect
-            )
+            assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=c["id"], a=actual, e=expect)
 
             actual = c["converge_end"]
             expect = c["converge_end_assert"]
-            assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-                id=c["id"], a=actual, e=expect
-            )
+            assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=c["id"], a=actual, e=expect)
 
         for _, g in list(gateway.items()):
             actual = g["match"]
             expect = g["match_assert"]
-            assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-                id=g["id"], a=actual, e=expect
-            )
+            assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=g["id"], a=actual, e=expect)
 
             actual = g["converge_end"]
             expect = g["converge_end_assert"]
-            assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-                id=g["id"], a=actual, e=expect
-            )
+            assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=g["id"], a=actual, e=expect)
 
     for n, i in enumerate(gateway_invalid_cases, start=1):
         converge, gateway, stack, eid, start, distances, in_len = i["case"]()
@@ -135,11 +128,7 @@ def test_match_converge():
             invalid = True
             actual = e.gateway_id
             expect = i["invalid_assert"]
-            assert (
-                actual == expect
-            ), "invalid assert{id} actual: {a}, expect: {e}".format(
-                id=n, a=actual, e=expect
-            )
+            assert actual == expect, "invalid assert{id} actual: {a}, expect: {e}".format(id=n, a=actual, e=expect)
 
         assert invalid == True, "invalid case %s expect raise exception" % n
 
@@ -151,24 +140,18 @@ def test_validate_gateway():
     for cid, converge_items in list(converged.items()):
         actual = len(converge_items)
         expect = gateway_validation_assert[cid]["converged_len"]
-        assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-            id=cid, a=actual, e=expect
-        )
+        assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=cid, a=actual, e=expect)
 
         actual = set(converge_items)
         expect = gateway_validation_assert[cid]["converged"]
 
-        assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-            id=cid, a=actual, e=expect
-        )
+        assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=cid, a=actual, e=expect)
 
     for gid, gateway in list(tree["gateways"].items()):
         if gateway["type"] != "ConvergeGateway":
             actual = gateway["converge_gateway_id"]
             expect = gateway_validation_assert[gid]["match_assert"]
-            assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-                id=gid, a=actual, e=expect
-            )
+            assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=gid, a=actual, e=expect)
 
     # edge cases
     for i, c in enumerate(flow_valid_edge_cases):
@@ -185,9 +168,7 @@ def test_validate_stream():
 
     for nid, expect in list(stream_assert.items()):
         actual = data[nid][STREAM]
-        assert actual == expect, "{id} actual: {a}, expect: {e}".format(
-            id=nid, a=actual, e=expect
-        )
+        assert actual == expect, "{id} actual: {a}, expect: {e}".format(id=nid, a=actual, e=expect)
 
     for n, c in enumerate(flow_valid_edge_cases):
         tree = c["case"]()
@@ -206,11 +187,7 @@ def test_validate_stream():
         except exceptions.StreamValidateError as e:
             actual = e.node_id
             expect = item["assert_invalid"]
-            assert (
-                actual == expect
-            ), "invalid assert{id} actual: {a}, expect: {e}".format(
-                id=n, a=actual, e=expect
-            )
+            assert actual == expect, "invalid assert{id} actual: {a}, expect: {e}".format(id=n, a=actual, e=expect)
             invalid = True
 
         assert invalid == True, "invalid case %s expect raise exception" % n
