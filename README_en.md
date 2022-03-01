@@ -26,6 +26,7 @@ bamboo-engine is a event-driven workflow engine. It can
   - [Basic Concept](./docs/user_guide/basic_concept.md)
   - [Flow Orchestration](./docs/user_guide/flow_orchestration.md)
   - [Flow Builder](./docs/user_guide/flow_builder.md)
+  - [Flow Builder Tree Schema](./docs/user_guide/builded_pipeline_tree_schema.md)
   - [SPLICE Var](./docs/user_guide/splice_var.md)
   - [Engine API](./docs/user_guide/engine_api.md)
   - [Monitor](./docs/user_guide/monitor.md)

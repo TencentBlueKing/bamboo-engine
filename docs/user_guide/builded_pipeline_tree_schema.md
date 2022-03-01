@@ -151,17 +151,17 @@ pipeline_tree:
                 "code": "example_component",
                 "inputs": {}
             },
-            "error_ignorable": False,
+            "error_ignorable": false,
             "id": "eb456a70affdf47ae9d96c5d196d36b09",
             "incoming": [
                 "f216d744eae614b71b3ca88002fe81439"
             ],
             "name": "",
-            "optional": False,
+            "optional": false,
             "outgoing": "f42b0a808b63f4315bb9b51159617797c",
-            "retryable": True,
-            "skippable": True,
-            "timeout": None,
+            "retryable": true,
+            "skippable": true,
+            "timeout": null,
             "type": "ServiceActivity"
         }
     },
@@ -181,13 +181,13 @@ pipeline_tree:
     "flows": {
         "f216d744eae614b71b3ca88002fe81439": {
             "id": "f216d744eae614b71b3ca88002fe81439",
-            "is_default": False,
+            "is_default": false,
             "source": "e817acc99284348cf9caa45fe0dd0cff4",
             "target": "eb456a70affdf47ae9d96c5d196d36b09"
         },
         "f42b0a808b63f4315bb9b51159617797c": {
             "id": "f42b0a808b63f4315bb9b51159617797c",
-            "is_default": False,
+            "is_default": false,
             "source": "eb456a70affdf47ae9d96c5d196d36b09",
             "target": "e1f45d04d298a4a1e8510fb6d7dd496d2"
         }

@@ -24,6 +24,7 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
   - [核心概念](./docs/user_guide/basic_concept.md)
   - [流程编排](./docs/user_guide/flow_orchestration.md)
   - [流程构造器](./docs/user_guide/flow_builder.md)
+  - [流程构造生成树字段摘要](./docs/user_guide/builded_pipeline_tree_schema.md)
   - [SPLICE 变量](./docs/user_guide/splice_var.md)
   - [Engine API](./docs/user_guide/engine_api.md)
   - [监控](./docs/user_guide/monitor.md)
