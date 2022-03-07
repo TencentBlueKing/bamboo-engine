@@ -10,9 +10,13 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import logging
 from typing import Optional
 
 from celery import task
+from celery.decorators import periodic_task
+from celery.schedules import crontab
+from django.conf import settings
 
 from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
 from bamboo_engine.engine import Engine
@@ -23,7 +27,11 @@ from bamboo_engine.interrupt import (
     ScheduleKeyPoint,
 )
 
+from pipeline.eri.models import LogEntry
 from pipeline.eri.runtime import BambooDjangoRuntime
+
+
+logger = logging.getLogger(__name__)
 
 
 @task(ignore_result=True)
@@ -78,3 +86,15 @@ def schedule(
         interrupter=interrupter,
         callback_data_id=callback_data_id,
     )
+
+
+@periodic_task(run_every=(crontab(minute=0, hour=0)), ignore_result=True)
+def clean_expired_log():
+    expired_interval = getattr(settings, "LOG_PERSISTENT_DAYS", None)
+
+    if expired_interval is None:
+        expired_interval = 30
+        logger.warning("LOG_PERSISTENT_DAYS are not found in settings, use default value: 30")
+
+    del_num = LogEntry.objects.delete_expired_log(expired_interval)
+    logger.info("%s log entry are deleted" % del_num)
