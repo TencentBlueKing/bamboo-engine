@@ -79,10 +79,10 @@ def test_multi_callback_node_fail_and_callback_again():
 
     assert_all_running([act_1.id])
     state = runtime.get_state(act_1.id)
-    for schedule_time in range(2):
+    for _ in range(2):
         engine.callback(act_1.id, state.version, {"bit": 0})
 
-    sleep(7)
+    sleep(15)
 
     assert_all_failed([act_1.id])
     assert_schedule_not_finish(act_1.id, times=1, scheduling=False, expired=True)

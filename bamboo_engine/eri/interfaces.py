@@ -13,9 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from datetime import datetime
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional, Dict, Set, Any
+from typing import List, Optional, Dict, Set, Any, Tuple
 
 from .models import (
+    ScheduleInterruptPoint,
     State,
     Node,
     Schedule,
@@ -30,11 +31,12 @@ from .models import (
     SuspendedProcessInfo,
     DispatchProcess,
     ContextValue,
+    ExecuteInterruptPoint,
 )
 
 # plugin interface
 
-__version__ = "5.0.0"
+__version__ = "6.0.0"
 
 
 def version():
@@ -45,16 +47,6 @@ class Service(metaclass=ABCMeta):
     """
     服务对象接口
     """
-
-    def pre_execute(self, data: ExecutionData, root_pipeline_data: ExecutionData):
-        """
-        execute 执行前执行的逻辑
-
-        :param data: 节点执行数据
-        :type data: ExecutionData
-        :param root_pipeline_data: 根流程执行数据
-        :type root_pipeline_data: ExecutionData
-        """
 
     @abstractmethod
     def execute(self, data: ExecutionData, root_pipeline_data: ExecutionData) -> bool:
@@ -505,7 +497,14 @@ class TaskMixin:
     """
 
     @abstractmethod
-    def execute(self, process_id: int, node_id: str, root_pipeline_id: str, parent_pipeline_id: str):
+    def execute(
+        self,
+        process_id: int,
+        node_id: str,
+        root_pipeline_id: str,
+        parent_pipeline_id: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
 
@@ -517,6 +516,8 @@ class TaskMixin:
         :type root_pipeline_id: str
         :param parent_pipeline_id: 父流程 ID
         :type parent_pipeline_id: str
+        :param recover_point: 执行中断点
+        :type recover_point: Optional[ExecuteInterruptPoint]
         """
 
     @abstractmethod
@@ -526,6 +527,7 @@ class TaskMixin:
         node_id: str,
         schedule_id: str,
         callback_data_id: Optional[int] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -538,6 +540,8 @@ class TaskMixin:
         :type schedule_id: str
         :param callback_data_id: 回调数据, defaults to None
         :type callback_data_id: Optional[int], optional
+        :param recover_point: 调度中断点
+        :type recover_point: Optional[ExecuteInterruptPoint]
         """
 
     @abstractmethod
@@ -564,39 +568,6 @@ class TaskMixin:
         :type callback_data_id: Optional[int], optional
         """
 
-    @abstractmethod
-    def start_timeout_monitor(self, process_id: int, node_id: str, version: str, timeout: int):
-        """
-        开始对某个节点执行的超时监控，若超时时间归零后节点未进入归档状态，则强制失败该节点
-
-        :param process_id: 进程 ID
-        :type process_id: int
-        :param node_id: 节点 ID
-        :type node_id: str
-        :param version: 执行版本
-        :type version: str
-        :param timeout: 超时时间，单位为秒
-        :type timeout: int
-        """
-
-    @abstractmethod
-    def stop_timeout_monitor(
-        self,
-        process_id: int,
-        node_id: str,
-        version: str,
-    ):
-        """
-        停止对某个节点的超时监控
-
-        :param process_id: 进程 ID
-        :type process_id: int
-        :param node_id: 节点 ID
-        :type node_id: str
-        :param version: 执行版本
-        :type version: str
-        """
-
 
 class ProcessMixin:
     """
@@ -615,6 +586,7 @@ class ProcessMixin:
     @abstractmethod
     def wake_up(self, process_id: int):
         """
+        该接口应为幂等接口
         将当前进程标记为唤醒状态
 
         :param process_id: 进程 ID
@@ -624,6 +596,7 @@ class ProcessMixin:
     @abstractmethod
     def sleep(self, process_id: int):
         """
+        该接口应为幂等接口
         将当前进程标记为睡眠状态
 
         :param process_id: 进程 ID
@@ -633,6 +606,7 @@ class ProcessMixin:
     @abstractmethod
     def suspend(self, process_id: int, by: str):
         """
+        该接口应为幂等接口
         将当前进程标记为阻塞状态
 
         :param process_id: 进程 ID
@@ -644,6 +618,7 @@ class ProcessMixin:
     @abstractmethod
     def resume(self, process_id: int):
         """
+        该接口应为幂等接口
         将进程标记为非阻塞状态
 
         :param process_id: 进程 ID
@@ -653,6 +628,7 @@ class ProcessMixin:
     @abstractmethod
     def batch_resume(self, process_id_list: List[int]):
         """
+        该接口应为幂等接口
         批量将进程标记为非阻塞状态
 
         :param process_id_list: 进程 ID 列表
@@ -662,6 +638,7 @@ class ProcessMixin:
     @abstractmethod
     def die(self, process_id: int):
         """
+        该接口应为幂等接口
         将当前进程标记为非存活状态
 
         :param process_id: 进程 ID
@@ -693,6 +670,7 @@ class ProcessMixin:
     @abstractmethod
     def kill(self, process_id: int):
         """
+        该接口应为幂等接口
         强制结束某个进程正在进行的活动，并将其标志为睡眠状态
 
         :param process_id: 进程 ID
@@ -735,6 +713,7 @@ class ProcessMixin:
     @abstractmethod
     def set_current_node(self, process_id: int, node_id: str):
         """
+        该接口应为幂等接口
         将进程当前处理节点标记为 node
 
         :param process_id: 进程 ID
@@ -746,6 +725,7 @@ class ProcessMixin:
     @abstractmethod
     def child_process_finish(self, parent_id: int, process_id: int) -> bool:
         """
+        该接口应为幂等接口
         标记某个进程的子进程执行完成，并返回是否能够唤醒父进程继续执行的标志位
 
         :param parent_id: 父进程 ID
@@ -770,6 +750,7 @@ class ProcessMixin:
     @abstractmethod
     def freeze(self, process_id: int):
         """
+        该接口应为幂等接口
         冻结当前进程
 
         :param process_id: 进程 ID
@@ -802,6 +783,7 @@ class ProcessMixin:
     @abstractmethod
     def join(self, process_id: int, children_id: List[str]):
         """
+        该接口应为幂等接口
         让父进程等待子进程
 
         :param process_id: 父进程 ID
@@ -813,6 +795,7 @@ class ProcessMixin:
     @abstractmethod
     def set_pipeline_stack(self, process_id: int, stack: List[str]):
         """
+        该接口应为幂等接口
         设置进程的流程栈
 
         :param process_id: 进程 ID
@@ -896,6 +879,7 @@ class StateMixin:
     @abstractmethod
     def reset_state_inner_loop(self, node_id: str) -> str:
         """
+        该接口应为幂等接口
         设置节点的当前流程重入次数
 
         :param node_id: 节点 ID
@@ -905,6 +889,7 @@ class StateMixin:
     @abstractmethod
     def reset_children_state_inner_loop(self, node_id: str):
         """
+        该接口应为幂等接口
         批量设置子流程节点的所有子节点inner_loop次数
 
         :param node_id: 子流程节点 ID
@@ -918,7 +903,7 @@ class StateMixin:
         to_state: str,
         loop: int = -1,
         inner_loop: int = -1,
-        version: str = None,
+        version: Optional[str] = None,
         root_id: Optional[str] = None,
         parent_id: Optional[str] = None,
         is_retry: bool = False,
@@ -932,6 +917,7 @@ class StateMixin:
         set_started_time: bool = False,
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
+        ignore_boring_set: bool = False,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -972,6 +958,7 @@ class StateMixin:
         :type clear_archived_time: bool, optional
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
+        :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
         :return: 该节点最新版本
         :rtype: str
         """
@@ -979,6 +966,7 @@ class StateMixin:
     @abstractmethod
     def set_state_root_and_parent(self, node_id: str, root_id: str, parent_id: str):
         """
+        该接口应为幂等接口
         设置节点的根流程和父流程 ID
 
         :param node_id: 节点 ID
@@ -1021,6 +1009,7 @@ class ScheduleMixin:
         schedule_type: ScheduleType,
     ) -> Schedule:
         """
+        该接口应为幂等接口
         设置 schedule 对象
 
         :param process_id: 进程 ID
@@ -1082,6 +1071,7 @@ class ScheduleMixin:
     @abstractmethod
     def expire_schedule(self, schedule_id: int):
         """
+        该接口应为幂等接口
         将某个 Schedule 对象标记为已过期
 
         :param schedule_id: 调度实例 ID
@@ -1091,6 +1081,7 @@ class ScheduleMixin:
     @abstractmethod
     def finish_schedule(self, schedule_id: int):
         """
+        该接口应为幂等接口
         将某个 Schedule 对象标记为已完成
 
         :param schedule_id: 调度实例 ID
@@ -1141,6 +1132,7 @@ class ContextMixin:
     @abstractmethod
     def upsert_plain_context_values(self, pipeline_id: str, update: Dict[str, ContextValue]):
         """
+        该接口应为幂等接口
         更新或创建新的普通上下文数据
 
         :param pipeline_id: 流程 ID
@@ -1211,6 +1203,7 @@ class DataMixin:
     @abstractmethod
     def set_data_inputs(self, node_id: str, data: Dict[str, DataInput]):
         """
+        该接口应为幂等接口
         将节点数据对象的 inputs 设置为 data
 
         : param node_id: 节点 ID
@@ -1256,6 +1249,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data(self, node_id: str, data: ExecutionData):
         """
+        该接口应为幂等接口
         设置某个节点的执行数据
 
         :param node_id: 节点 ID
@@ -1267,6 +1261,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data_inputs(self, node_id: str, inputs: dict):
         """
+        该接口应为幂等接口
         设置某个节点的执行数据输入
 
         :param node_id: 节点 ID
@@ -1278,6 +1273,7 @@ class DataMixin:
     @abstractmethod
     def set_execution_data_outputs(self, node_id: str, outputs: dict):
         """
+        该接口应为幂等接口
         设置某个节点的执行数据输出
 
         :param node_id: 节点 ID
@@ -1290,6 +1286,7 @@ class DataMixin:
     @abstractmethod
     def set_callback_data(self, node_id: str, version: str, data: dict) -> int:
         """
+        该接口应为幂等接口
         设置某个节点执行数据的回调数据
 
         :param node_id: 节点 ID
@@ -1311,6 +1308,27 @@ class DataMixin:
         :type data_id: int
         :return: 回调数据实例
         :rtype: CallbackData
+        """
+
+    @abstractmethod
+    def serialize_execution_data(self, data: dict) -> (str, str):
+        """
+        幂等接口
+        序列化执行数据输入或输出
+
+        :param data: 执行数据实例
+        :return: 序列化数据，序列化器标记
+        """
+
+    @abstractmethod
+    def deserialize_execution_data(self, data: str, serializer: str) -> dict:
+        """
+        幂等接口
+        反序列化执行数据
+
+        :param data: 序列化数据
+        :param data: 序列化器标记
+        :return: 执行数据输入或输出
         """
 
 
@@ -1382,6 +1400,20 @@ class ExecutionHistoryMixin:
         """
 
 
+class InterruptMixin:
+    """
+    中断相关 API
+    """
+
+    @abstractmethod
+    def interrupt_errors(self) -> Tuple[Exception]:
+        """
+        返回需要中断的异常列表
+
+        :return: 需要中断的异常列表
+        """
+
+
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
@@ -1393,6 +1425,7 @@ class EngineRuntimeInterface(
     ContextMixin,
     DataMixin,
     ExecutionHistoryMixin,
+    InterruptMixin,
     metaclass=ABCMeta,
 ):
     @abstractmethod

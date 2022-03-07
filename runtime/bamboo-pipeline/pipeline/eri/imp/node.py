@@ -53,7 +53,6 @@ class NodeMixin:
                 type=NodeType.ServiceActivity,
                 code=node_detail["code"],
                 version=node_detail["version"],
-                timeout=node_detail["timeout"],
                 error_ignorable=node_detail["error_ignorable"],
                 **common_args
             )

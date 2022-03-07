@@ -13,7 +13,12 @@ runtime = BambooDjangoRuntime()
 
 
 def _assert_all_state_equal(node_id_list, name):
-    state_names = runtime.batch_get_state_name(node_id_list)
+    for _ in range(100):
+        state_names = runtime.batch_get_state_name(node_id_list)
+        if len(state_names) == len(node_id_list) and set(state_names.values()) == {name}:
+            break
+        sleep(0.5)
+
     assert len(state_names) == len(node_id_list), "actual: %s" % len(state_names)
     assert set(state_names.values()) == {name}, "actual: %s" % state_names
 
@@ -28,6 +33,14 @@ def assert_all_failed(node_id_list):
 
 def assert_all_running(node_id_list):
     _assert_all_state_equal(node_id_list, states.RUNNING)
+
+
+def assert_all_revoked(node_id_list):
+    _assert_all_state_equal(node_id_list, states.REVOKED)
+
+
+def assert_all_suspended(node_id_list):
+    _assert_all_state_equal(node_id_list, states.SUSPENDED)
 
 
 def assert_not_executed(node_id_list):

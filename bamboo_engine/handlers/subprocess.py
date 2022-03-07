@@ -12,11 +12,13 @@ specific language governing permissions and limitations under the License.
 """
 
 import logging
+from typing import Optional
 
 from bamboo_engine.context import Context
 from bamboo_engine.config import Settings
+from bamboo_engine.interrupt import ExecuteKeyPoint
 from bamboo_engine.template import Template
-from bamboo_engine.eri import ProcessInfo, ContextValue, ContextValueType, NodeType
+from bamboo_engine.eri import ProcessInfo, ContextValue, ContextValueType, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 
 logger = logging.getLogger("bamboo_engine")
@@ -24,7 +26,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.SubProcess)
 class SubProcessHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -92,7 +101,20 @@ class SubProcessHandler(NodeHandler):
         )
 
         context = Context(self.runtime, context_values, root_pipeline_inputs)
-        hydrated_context = context.hydrate(deformat=True)
+        try:
+            hydrated_context = context.hydrate(deformat=True)
+        except Exception as e:
+            logger.exception(
+                "root_pipeline[%s] node(%s) context hydrate error",
+                root_pipeline_id,
+                self.node.id,
+            )
+            return self._execute_fail(
+                ex_data="context hydrate failed(%s), check node log for details." % e,
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
+
         logger.info(
             "root_pipeline[%s] node(%s) subprocess parent hydrated context: %s",
             root_pipeline_id,
@@ -116,8 +138,12 @@ class SubProcessHandler(NodeHandler):
 
         # update subprocess context, inject subprocess data
         self.runtime.upsert_plain_context_values(self.node.id, sub_context_values)
-        process_info.pipeline_stack.append(self.node.id)
-        self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
+        if not recover_point or not recover_point.handler_data.pipeline_stack_setted:
+            process_info.pipeline_stack.append(self.node.id)
+            self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
+        self.interrupter.check_and_set(
+            ExecuteKeyPoint.SP_SET_PIPELINE_STACK_DONE, pipeline_stack_setted=True, from_handler=True
+        )
 
         return ExecuteResult(
             should_sleep=False,

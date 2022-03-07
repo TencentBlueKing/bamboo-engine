@@ -12,12 +12,14 @@ specific language governing permissions and limitations under the License.
 """
 import json
 import logging
+from typing import Optional
+from bamboo_engine.interrupt import ExecuteKeyPoint
 
 from bamboo_engine.utils.boolrule import BoolRule
 from bamboo_engine.template.template import Template
 
 from bamboo_engine import states
-from bamboo_engine.eri import NodeType, ProcessInfo
+from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
 from bamboo_engine.context import Context
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.utils.string import transform_escape_char
@@ -27,7 +29,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.ConditionalParallelGateway)
 class ConditionalParallelGatewayHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -75,7 +84,11 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                 root_pipeline_id,
                 self.node.id,
             )
-            return self._execute_fail("evaluation context hydrate failed(%s), check node log for details." % e)
+            return self._execute_fail(
+                ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # check conditions
         fork_targets = []
@@ -89,6 +102,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                 resolved_evaluate,
                 hydrated_context,
             )
+
             try:
                 result = BoolRule(resolved_evaluate).test()
                 logger.info(
@@ -101,31 +115,52 @@ class ConditionalParallelGatewayHandler(NodeHandler):
             except Exception as e:
                 # test failed
                 return self._execute_fail(
-                    "evaluate[{}] fail with data[{}] message: {}".format(
-                        c.resolved_evaluate, json.dumps(hydrated_context), e
-                    )
+                    ex_data="evaluate[{}] fail with data[{}] message: {}".format(
+                        c.evaluation, json.dumps(hydrated_context), e
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
+
             else:
                 if result:
                     fork_targets.append(c.target_id)
 
         # all miss
         if not fork_targets:
-            return self._execute_fail("all conditions of branches are not meet")
+            return self._execute_fail(
+                ex_data="all conditions of branches are not meet",
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # fork
         from_to = {}
         for target in fork_targets:
             from_to[target] = self.node.converge_gateway_id
 
-        dispatch_processes = self.runtime.fork(
-            parent_id=process_info.process_id,
-            root_pipeline_id=process_info.root_pipeline_id,
-            pipeline_stack=process_info.pipeline_stack,
-            from_to=from_to,
+        # try to recover forked processes
+        if recover_point and recover_point.handler_data.dispatch_processes:
+            dispatch_processes = recover_point.handler_data.dispatch_processes
+        else:
+            dispatch_processes = self.runtime.fork(
+                parent_id=process_info.process_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                pipeline_stack=process_info.pipeline_stack,
+                from_to=from_to,
+            )
+        self.interrupter.check_and_set(
+            ExecuteKeyPoint.CPG_PROCESS_FORK_DONE, dispatch_processes=dispatch_processes, from_handler=True
         )
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        # if this statement fail, just retry it, check is not necessary
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            ignore_boring_set=recover_point is not None,
+        )
 
         return ExecuteResult(
             should_sleep=True,

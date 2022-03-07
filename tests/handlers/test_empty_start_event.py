@@ -11,6 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from mailbox import Mailbox
+import pytest
 from mock import MagicMock
 
 from bamboo_engine import states
@@ -26,7 +28,14 @@ from bamboo_engine.eri import (
 from bamboo_engine.handlers.empty_start_event import EmptyStartEventHandler
 
 
-def test_empty_start_event_handler__execute_success():
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock, id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_empty_start_event_handler__execute_success(recover_point):
     # ContextValue 各个属性值相等即判断为相等，用于assert生成的函数入参
     def mock_eq_func(self, other):
         return (
@@ -91,8 +100,8 @@ def test_empty_start_event_handler__execute_success():
     runtime.get_context_values = MagicMock(return_value=context_values)
     runtime.get_data = MagicMock(return_value=data)
 
-    handler = EmptyStartEventHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = EmptyStartEventHandler(node, runtime, MagicMock())
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -104,8 +113,10 @@ def test_empty_start_event_handler__execute_success():
 
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
+        version="v1",
         to_state=states.FINISHED,
         set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys={"${a}", "${b}", "${c}"})
     runtime.upsert_plain_context_values.assert_called_once_with(pi.top_pipeline_id, upsert_context_dict)

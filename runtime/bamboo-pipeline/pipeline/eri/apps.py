@@ -21,6 +21,6 @@ class ERIConfig(AppConfig):
     verbose_name = "PipelineEngineRuntimeInterface"
 
     def ready(self):
-        from .celery.tasks import execute, schedule, timeout_check  # noqa
+        from .celery.tasks import execute, schedule  # noqa
 
         register()

@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 
 # 节点处理器逻辑封装模块
 
-from typing import Optional, List
+from typing import Optional
 from abc import ABCMeta, abstractmethod
 
 from bamboo_engine import states
@@ -23,11 +23,14 @@ from .eri import (
     Node,
     Schedule,
     CallbackData,
-    ScheduleType,
-    DispatchProcess,
     ProcessInfo,
     NodeType,
+    ExecuteResult,
+    ScheduleResult,
+    ExecuteInterruptPoint,
+    ScheduleInterruptPoint,
 )
+from .interrupt import Interrupter
 from .exceptions import NotFoundError, InvalidOperationError
 
 
@@ -46,76 +49,6 @@ def register_handler(type: NodeType):
     return register
 
 
-class ExecuteResult:
-    """
-    Handler execute 方法返回的结果
-    """
-
-    def __init__(
-        self,
-        should_sleep: bool,
-        schedule_ready: bool,
-        schedule_type: Optional[ScheduleType],
-        schedule_after: int,
-        dispatch_processes: List[DispatchProcess],
-        next_node_id: Optional[str],
-        should_die: bool = False,
-    ):
-        """
-
-        :param should_sleep: 当前进程是否应该进入休眠
-        :type should_sleep: bool
-        :param schedule_ready: 被处理的节点是否准备好进入调度
-        :type schedule_ready: bool
-        :param schedule_type: 被处理的节点的调度类型
-        :type schedule_type: Optional[ScheduleType]
-        :param schedule_after: 在 schedule_after 秒后开始执行调度
-        :type schedule_after: int
-        :param dispatch_processes: 需要派发的子进程信息列表
-        :type dispatch_processes: List[DispatchProcess]
-        :param next_node_id: 推进循环中下一个要处理的节点的 ID
-        :type next_node_id: Optional[str]
-        :param should_die: 当前进程是否需要进入死亡状态, defaults to False
-        :type should_die: bool, optional
-        """
-        self.should_sleep = should_sleep
-        self.schedule_ready = schedule_ready
-        self.schedule_type = schedule_type
-        self.schedule_after = schedule_after
-        self.dispatch_processes = dispatch_processes
-        self.next_node_id = next_node_id
-        self.should_die = should_die
-
-
-class ScheduleResult:
-    """
-    Handler schedule 方法返回的结果
-    """
-
-    def __init__(
-        self,
-        has_next_schedule: bool,
-        schedule_after: int,
-        schedule_done: bool,
-        next_node_id: Optional[str],
-    ):
-        """
-
-        :param has_next_schedule: 是否还有下次调度
-        :type has_next_schedule: bool
-        :param schedule_after: 在 schedule_after 秒后开始下次调度
-        :type schedule_after: int
-        :param schedule_done: 调度是否完成
-        :type schedule_done: bool
-        :param next_node_id: 调度完成后下一个需要执行的节点的 ID
-        :type next_node_id: Optional[str]
-        """
-        self.has_next_schedule = has_next_schedule
-        self.schedule_after = schedule_after
-        self.schedule_done = schedule_done
-        self.next_node_id = next_node_id
-
-
 class NodeHandler(metaclass=ABCMeta):
     """
     节点处理器，负责封装不同类型节点的 execute 和 schedule 逻辑
@@ -124,7 +57,7 @@ class NodeHandler(metaclass=ABCMeta):
     LOOP_KEY = "_loop"
     INNER_LOOP_KEY = "_inner_loop"
 
-    def __init__(self, node: Node, runtime: EngineRuntimeInterface):
+    def __init__(self, node: Node, runtime: EngineRuntimeInterface, interrupter: Interrupter):
         """
 
         :param node: 节点实例
@@ -134,9 +67,17 @@ class NodeHandler(metaclass=ABCMeta):
         """
         self.node = node
         self.runtime = runtime
+        self.interrupter = interrupter
 
     @abstractmethod
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -159,6 +100,7 @@ class NodeHandler(metaclass=ABCMeta):
         inner_loop: int,
         schedule: Schedule,
         callback_data: Optional[CallbackData] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         """
         节点的 schedule 处理逻辑，不支持 schedule 的节点可以不实现该方法
@@ -178,14 +120,19 @@ class NodeHandler(metaclass=ABCMeta):
         """
         raise NotImplementedError()
 
-    def _execute_fail(self, ex_data: str) -> ExecuteResult:
+    def _execute_fail(self, ex_data: str, version: str, ignore_boring_set: bool) -> ExecuteResult:
         exec_outputs = self.runtime.get_execution_data_outputs(self.node.id)
-
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FAILED, set_archive_time=True)
-
         exec_outputs["ex_data"] = ex_data
 
         self.runtime.set_execution_data_outputs(self.node.id, exec_outputs)
+
+        self.runtime.set_state(
+            node_id=self.node.id,
+            to_state=states.FAILED,
+            set_archive_time=True,
+            version=version,
+            ignore_boring_set=ignore_boring_set,
+        )
 
         return ExecuteResult(
             should_sleep=True,
@@ -225,7 +172,7 @@ class HandlerFactory:
         cls._handlers[type.value] = handler_cls
 
     @classmethod
-    def get_handler(cls, node: Node, runtime: EngineRuntimeInterface) -> NodeHandler:
+    def get_handler(cls, node: Node, runtime: EngineRuntimeInterface, interrupter: Interrupter) -> NodeHandler:
         """
         获取某个节点的处理器实例
 
@@ -240,4 +187,4 @@ class HandlerFactory:
         if node.type.value not in cls._handlers:
             raise NotFoundError("can not find handler for {} type node".format(node.type.value))
 
-        return cls._handlers[node.type.value](node, runtime)
+        return cls._handlers[node.type.value](node, runtime, interrupter)

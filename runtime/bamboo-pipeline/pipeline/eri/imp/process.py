@@ -16,6 +16,7 @@ from typing import List, Optional, Dict
 
 from django.utils import timezone
 from django.db.models import F
+from django.db import transaction
 
 from bamboo_engine import metrics
 from bamboo_engine.eri import ProcessInfo, SuspendedProcessInfo, DispatchProcess
@@ -215,14 +216,15 @@ class ProcessMixin:
         :return: 是否能够唤醒父进程继续执行
         :rtype: bool
         """
-        Process.objects.filter(id=process_id).update(dead=True)
+        with transaction.atomic():
+            Process.objects.filter(id=process_id).update(dead=True)
 
-        Process.objects.filter(id=parent_id).update(ack_num=F("ack_num") + 1)
+            Process.objects.filter(id=parent_id).update(ack_num=F("ack_num") + 1)
 
-        # compare(where) and set(update)
-        row = Process.objects.filter(id=parent_id, ack_num=F("need_ack")).update(ack_num=0, need_ack=-1)
+            # compare(where) and set(update)
+            waked = Process.objects.filter(id=parent_id, ack_num=F("need_ack")).update(ack_num=0, need_ack=-1)
 
-        return row != 0
+        return waked != 0
 
     def is_frozen(self, process_id: int) -> bool:
         """

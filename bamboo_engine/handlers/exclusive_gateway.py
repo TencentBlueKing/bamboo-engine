@@ -12,13 +12,14 @@ specific language governing permissions and limitations under the License.
 """
 import json
 import logging
+from typing import Optional
 
 from bamboo_engine import states
 from bamboo_engine.context import Context
 from bamboo_engine.template import Template
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.utils.boolrule import BoolRule
-from bamboo_engine.eri import NodeType, ProcessInfo
+from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
 
 from bamboo_engine.utils.string import transform_escape_char
 
@@ -27,7 +28,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.ExclusiveGateway)
 class ExclusiveGatewayHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -82,7 +90,11 @@ class ExclusiveGatewayHandler(NodeHandler):
                 root_pipeline_id,
                 self.node.id,
             )
-            return self._execute_fail("evaluation context hydrate failed(%s), check node log for details." % e)
+            return self._execute_fail(
+                ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # check conditions
         meet_targets = []
@@ -109,9 +121,11 @@ class ExclusiveGatewayHandler(NodeHandler):
             except Exception as e:
                 # test failed
                 return self._execute_fail(
-                    "evaluate[{}] fail with data[{}] message: {}".format(
+                    ex_data="evaluate[{}] fail with data[{}] message: {}".format(
                         resolved_evaluate, json.dumps(hydrated_context), e
-                    )
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
             else:
                 if result:
@@ -120,13 +134,27 @@ class ExclusiveGatewayHandler(NodeHandler):
 
         # all miss
         if not meet_targets:
-            return self._execute_fail("all conditions of branches are not meet")
+            return self._execute_fail(
+                ex_data="all conditions of branches are not meet",
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
         # multiple branch hit
         if len(meet_targets) != 1:
-            return self._execute_fail("multiple conditions meet: {}".format(meet_conditions))
+            return self._execute_fail(
+                ex_data="multiple conditions meet: {}".format(meet_conditions),
+                version=version,
+                ignore_boring_set=recover_point is not None,
+            )
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            ignore_boring_set=recover_point is not None,
+        )
 
         return ExecuteResult(
             should_sleep=False,

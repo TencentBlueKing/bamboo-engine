@@ -35,7 +35,7 @@ def test_rewrite_output():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(3)
+    
 
     assert_all_finish([pipeline["id"]])
 

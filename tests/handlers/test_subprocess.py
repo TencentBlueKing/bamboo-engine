@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations underExecutableEndEvent the License.
 """
 
+import pytest
 from mock import MagicMock, call
 
 from bamboo_engine import states
@@ -22,11 +23,25 @@ from bamboo_engine.eri import (
     ContextValueType,
     Data,
     DataInput,
+    ExecuteInterruptPoint,
 )
+from bamboo_engine.eri.models.interrupt import HandlerExecuteData
 from bamboo_engine.handlers.subprocess import SubProcessHandler
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
 
 
-def test_subprocess_handler__execute_success():
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(
+            ExecuteInterruptPoint("n", handler_data=HandlerExecuteData(pipeline_stack_setted=True)),
+            id="recover_is_not_none",
+        ),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_subprocess_handler__execute_success(recover_point):
     pi = ProcessInfo(
         process_id="pid",
         destination_id="",
@@ -57,13 +72,23 @@ def test_subprocess_handler__execute_success():
 
     context_values = [ContextValue(key="${v1}", value="var", type=ContextValueType.PLAIN)]
 
+    interrupter = ExecuteInterrupter(
+        runtime=MagicMock(),
+        current_node_id="nid",
+        process_id=1,
+        parent_pipeline_id="parent",
+        root_pipeline_id="root",
+        check_point=ExecuteInterruptPoint(name="s1"),
+        recover_point=None,
+    )
+
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
     runtime.get_context_key_references = MagicMock(return_value=set())
     runtime.get_context_values = MagicMock(return_value=context_values)
 
-    handler = SubProcessHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = SubProcessHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -86,5 +111,10 @@ def test_subprocess_handler__execute_success():
     assert upsert_call_args[1]["${k2}"].key == "${k2}"
     assert upsert_call_args[1]["${k2}"].type == ContextValueType.PLAIN
     assert upsert_call_args[1]["${k2}"].value == 1
-    runtime.set_pipeline_stack.assert_called_once_with(pi.process_id, ["root", "nid"])
-    assert pi.pipeline_stack == ["root", "nid"]
+    if recover_point and recover_point.handler_data.pipeline_stack_setted:
+        runtime.set_pipeline_stack.assert_not_called()
+    else:
+        runtime.set_pipeline_stack.assert_called_once_with(pi.process_id, ["root", "nid"])
+        assert pi.pipeline_stack == ["root", "nid"]
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.SP_SET_PIPELINE_STACK_DONE

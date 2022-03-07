@@ -41,9 +41,7 @@ def test_hydrate():
             value="compute_value",
             code="compute_var",
         ),
-        ContextValue(
-            "${f}", type=ContextValueType.SPLICE, value="${a}-${b}-${c}-${d}-${e}"
-        ),
+        ContextValue("${f}", type=ContextValueType.SPLICE, value="${a}-${b}-${c}-${d}-${e}"),
     ]
 
     context = Context(runtime, values, {"id": 1})

@@ -25,19 +25,6 @@ class ServiceWrapper(ServiceInterface):
     def __init__(self, service: Service):
         self.service = service
 
-    def pre_execute(self, data: ExecutionData, root_pipeline_data: ExecutionData):
-        """
-        execute 执行前执行的逻辑
-
-        :param data: 节点执行数据
-        :type data: ExecutionData
-        :param root_pipeline_data: 根流程执行数据
-        :type root_pipeline_data: ExecutionData
-        """
-        pre_execute = getattr(self.service, "pre_execute", None)
-        if callable(pre_execute):
-            return pre_execute(DataObject(inputs=data.inputs, outputs=data.outputs))
-
     def execute(self, data: ExecutionData, root_pipeline_data: ExecutionData) -> bool:
         """
         execute 逻辑

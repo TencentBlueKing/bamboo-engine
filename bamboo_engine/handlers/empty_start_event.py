@@ -11,10 +11,11 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import logging
+from typing import Optional
 
 from bamboo_engine import states
 from bamboo_engine.context import Context
-from bamboo_engine.eri import ProcessInfo, NodeType, ContextValue, ContextValueType
+from bamboo_engine.eri import ProcessInfo, NodeType, ContextValue, ContextValueType, ExecuteInterruptPoint
 from bamboo_engine.exceptions import NotFoundError
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 
@@ -23,7 +24,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.EmptyStartEvent)
 class EmptyStartEventHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -56,7 +64,20 @@ class EmptyStartEventHandler(NodeHandler):
                 pipeline_id=top_pipeline_id, keys=set(pre_render_keys).union(refs)
             )
             context = Context(self.runtime, context_values, root_pipeline_inputs)
-            hydrated_context = context.hydrate(deformat=False)
+            try:
+                hydrated_context = context.hydrate(deformat=False)
+            except Exception as e:
+                logger.exception(
+                    "root_pipeline[%s] node(%s) context hydrate error",
+                    process_info.root_pipeline_id,
+                    self.node.id,
+                )
+                return self._execute_fail(
+                    ex_data="context hydrate failed(%s), check node log for details." % e,
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
+                )
+
             for context_value in context_values:
                 context_key = context_value.key
                 if context_key in pre_render_keys:
@@ -69,7 +90,13 @@ class EmptyStartEventHandler(NodeHandler):
             logger.info(f"top_pipeline({top_pipeline_id}) pre_render_keys results are: {upsert_context_dict}")
             self.runtime.upsert_plain_context_values(top_pipeline_id, upsert_context_dict)
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            ignore_boring_set=recover_point is not None,
+        )
 
         return ExecuteResult(
             should_sleep=False,

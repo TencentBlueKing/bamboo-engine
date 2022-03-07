@@ -11,14 +11,24 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from typing import Optional
+
 from bamboo_engine import states
-from bamboo_engine.eri import ProcessInfo, NodeType
+from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
+from bamboo_engine.interrupt import ExecuteKeyPoint
 
 
 @register_handler(NodeType.ParallelGateway)
 class ParallelGatewayHandler(NodeHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -34,14 +44,27 @@ class ParallelGatewayHandler(NodeHandler):
         for target in self.node.target_nodes:
             from_to[target] = self.node.converge_gateway_id
 
-        dispatch_processes = self.runtime.fork(
-            parent_id=process_info.process_id,
-            root_pipeline_id=process_info.root_pipeline_id,
-            pipeline_stack=process_info.pipeline_stack,
-            from_to=from_to,
+        # try to recover forked processes
+        if recover_point and recover_point.handler_data.dispatch_processes:
+            dispatch_processes = recover_point.handler_data.dispatch_processes
+        else:
+            dispatch_processes = self.runtime.fork(
+                parent_id=process_info.process_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                pipeline_stack=process_info.pipeline_stack,
+                from_to=from_to,
+            )
+        self.interrupter.check_and_set(
+            ExecuteKeyPoint.PG_PROCESS_FORK_DONE, dispatch_processes=dispatch_processes, from_handler=True
         )
 
-        self.runtime.set_state(node_id=self.node.id, to_state=states.FINISHED, set_archive_time=True)
+        self.runtime.set_state(
+            node_id=self.node.id,
+            version=version,
+            to_state=states.FINISHED,
+            set_archive_time=True,
+            ignore_boring_set=recover_point is not None,
+        )
 
         return ExecuteResult(
             should_sleep=True,

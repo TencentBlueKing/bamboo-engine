@@ -190,7 +190,7 @@ class StateMixin:
         self,
         node_id: str,
         to_state: str,
-        version: str = None,
+        version: Optional[str] = None,
         loop: int = -1,
         inner_loop: int = -1,
         root_id: Optional[str] = None,
@@ -206,6 +206,7 @@ class StateMixin:
         set_started_time: bool = False,
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
+        ignore_boring_set: bool = False,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -246,6 +247,7 @@ class StateMixin:
         :type clear_archived_time: bool, optional
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
+        :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
         :return: 该节点最新版本
         :rtype: str
         """
@@ -254,6 +256,10 @@ class StateMixin:
 
         if state and version and state.version != version:
             raise StateVersionNotMatchError("state version({}) not match {}".format(state.version, version))
+
+        # 只有在当前状态和版本一致的情况下允许实现幂等
+        if ignore_boring_set and state and version and state.version == version and state.name == to_state:
+            return state.version
 
         fields = {}
 

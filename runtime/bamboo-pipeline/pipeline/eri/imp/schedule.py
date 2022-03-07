@@ -36,9 +36,13 @@ class ScheduleMixin:
         :return: 调度对象实例
         :rtype: Schedule
         """
-        schedule_model = DBSchedule.objects.create(
-            process_id=process_id, node_id=node_id, type=schedule_type.value, version=version
-        )
+        try:
+            schedule_model = DBSchedule.objects.get(node_id=node_id, version=version)
+        except DBSchedule.DoesNotExist:
+            schedule_model = DBSchedule.objects.create(
+                process_id=process_id, node_id=node_id, type=schedule_type.value, version=version
+            )
+
         return Schedule(
             id=schedule_model.id,
             type=schedule_type,

@@ -64,6 +64,7 @@ INSTALLED_APPS = (
     "pipeline_test_use",
     "variable_app",
     "pipeline.eri",
+    "eri_chaos",
 )
 
 MIDDLEWARE = (

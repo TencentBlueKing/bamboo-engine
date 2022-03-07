@@ -47,7 +47,6 @@ class ProcessMixinTestCase(TestCase):
                 "can_retry": True,
                 "code": "test_code",
                 "version": "legacy",
-                "timeout": None,
                 "error_ignorable": True,
             },
             "n2": {
@@ -151,7 +150,6 @@ class ProcessMixinTestCase(TestCase):
         self.assertEqual(node.can_retry, True)
         self.assertEqual(node.code, "test_code")
         self.assertEqual(node.version, "legacy")
-        self.assertEqual(node.timeout, None)
         self.assertEqual(node.error_ignorable, True)
 
         node = self.mixin.get_node("n2")

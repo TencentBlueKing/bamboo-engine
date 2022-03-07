@@ -39,10 +39,6 @@ class QueueResolver:
                 "queue": "er_schedule%s" % suffix,
                 "routing_key": "er_schedule%s" % suffix,
             },
-            "pipeline.eri.celery.tasks.timeout_check": {
-                "queue": "er_timeout%s" % suffix,
-                "routing_key": "er_timeout%s" % suffix,
-            },
         }
 
     def queues(self) -> List[Queue]:

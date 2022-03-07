@@ -58,6 +58,11 @@ class ScheduleMixinTestCase(TransactionTestCase):
         self.assertEqual(schedule_model.version, self.version)
         self.assertEqual(schedule_model.schedule_times, 0)
 
+        another_schedule = self.mixin.set_schedule(
+            process_id=self.process_id, node_id=self.node_id, version=self.version, schedule_type=self.schedule_type
+        )
+        self.assertEqual(schedule.id, another_schedule.id)
+
     def test_get_schedule(self):
         schedule = self.mixin.get_schedule(self.schedule.id)
 
@@ -86,7 +91,10 @@ class ScheduleMixinTestCase(TransactionTestCase):
 
     def test_get_schedule_with_node_and_version_not_exist(self):
         self.assertRaises(
-            DBSchedule.DoesNotExist, self.mixin.get_schedule_with_node_and_version, self.schedule.node_id, "not_exist",
+            DBSchedule.DoesNotExist,
+            self.mixin.get_schedule_with_node_and_version,
+            self.schedule.node_id,
+            "not_exist",
         )
 
     def test_apply_schedule_lock(self):

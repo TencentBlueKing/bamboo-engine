@@ -11,7 +11,10 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import sched
 import mock
+from py import process
+import pytest
 from mock import MagicMock
 
 from bamboo_engine.eri import (
@@ -25,26 +28,59 @@ from bamboo_engine.eri import (
 )
 from bamboo_engine import states
 from bamboo_engine.engine import Engine
-from bamboo_engine.exceptions import StateVersionNotMatchError
+from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
 from bamboo_engine.handler import ScheduleResult
+from bamboo_engine.interrupt import ScheduleInterrupter, ScheduleKeyPoint
 
 
-def test_schedule__lock_get_failed():
-    node_id = "nid"
-    schedule_id = 1
-    version = "v"
+@pytest.fixture
+def node_id():
+    return "nid"
 
-    pi = ProcessInfo(
+
+@pytest.fixture
+def schedule_id():
+    return 1
+
+
+@pytest.fixture
+def version():
+    return "v"
+
+
+@pytest.fixture
+def state(version):
+    return State(
+        node_id=node_id,
+        root_id="root",
+        parent_id="root",
+        name=states.RUNNING,
+        version=version,
+        loop=1,
+        inner_loop=1,
+        retry=0,
+        skip=False,
+        error_ignored=False,
+        created_time=None,
+        started_time=None,
+        archived_time=None,
+    )
+
+
+@pytest.fixture
+def pi():
+    return ProcessInfo(
         process_id="pid",
         destination_id="",
         root_pipeline_id="root",
         pipeline_stack=["root"],
         parent_id="parent",
     )
-    state = MagicMock()
-    state.name = states.RUNNING
-    state.version = version
-    schedule = Schedule(
+
+
+@pytest.fixture
+def schedule(schedule_id, version):
+    return Schedule(
         id=schedule_id,
         type=ScheduleType.MULTIPLE_CALLBACK,
         process_id=1,
@@ -55,6 +91,43 @@ def test_schedule__lock_get_failed():
         times=0,
     )
 
+
+@pytest.fixture
+def interrupter(pi, node_id, schedule_id):
+    return ScheduleInterrupter(
+        runtime=MagicMock(),
+        process_id=pi.process_id,
+        current_node_id=node_id,
+        schedule_id=schedule_id,
+        callback_data_id=None,
+        check_point=ScheduleInterruptPoint(name="name"),
+        recover_point=None,
+    )
+
+
+@pytest.fixture
+def node():
+    return ServiceActivity(
+        id=node_id,
+        type=NodeType.ServiceActivity,
+        target_flows=["f1"],
+        target_nodes=["t1"],
+        targets={"f1": "t1"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        code="",
+        version="",
+        error_ignorable=False,
+    )
+
+
+@pytest.fixture
+def recover_point():
+    return ScheduleInterruptPoint(name="name")
+
+
+def test_schedule__lock_get_failed(node_id, schedule_id, state, pi, schedule, interrupter):
+
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.apply_schedule_lock = MagicMock(return_value=False)
@@ -62,7 +135,7 @@ def test_schedule__lock_get_failed():
     runtime.get_schedule = MagicMock(return_value=schedule)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id)
+    engine.schedule(pi.process_id, node_id, schedule_id, interrupter)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -75,32 +148,14 @@ def test_schedule__lock_get_failed():
     assert runtime.set_next_schedule.call_args.kwargs["schedule_after"] <= 5
     runtime.beat.assert_not_called()
 
+    assert interrupter.check_point.name == ScheduleKeyPoint.APPLY_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is False
 
-def test_schedule__lock_get_failed_but_not_retry():
-    node_id = "nid"
-    schedule_id = 1
-    version = "v"
 
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-    state = MagicMock()
-    state.name = states.RUNNING
-    state.version = version
-    schedule = Schedule(
-        id=schedule_id,
-        type=ScheduleType.CALLBACK,
-        process_id=1,
-        node_id="nid",
-        finished=False,
-        expired=False,
-        version=version,
-        times=0,
-    )
+def test_schedule__lock_get_failed_but_not_retry(node_id, schedule_id, state, pi, schedule, interrupter):
+    schedule.type = ScheduleType.CALLBACK
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -109,7 +164,7 @@ def test_schedule__lock_get_failed_but_not_retry():
     runtime.get_schedule = MagicMock(return_value=schedule)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id)
+    engine.schedule(pi.process_id, node_id, schedule_id, interrupter)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -117,28 +172,14 @@ def test_schedule__lock_get_failed_but_not_retry():
     runtime.set_next_schedule.assert_not_called()
     runtime.beat.assert_not_called()
 
+    assert interrupter.check_point.name == ScheduleKeyPoint.APPLY_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is False
 
-def test_schedule__schedule_is_finished():
-    node_id = "nid"
 
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=True,
-        expired=False,
-        version="v1",
-        times=0,
-    )
+def test_schedule__schedule_is_finished(node_id, pi, schedule, interrupter):
+    schedule.finished = True
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -147,7 +188,7 @@ def test_schedule__schedule_is_finished():
     runtime.get_state = MagicMock()
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -156,43 +197,8 @@ def test_schedule__schedule_is_finished():
     runtime.beat.assert_not_called()
 
 
-def test_schedule__schedule_version_not_match():
-    node_id = "nid"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
-
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.RUNNING,
-        version="v2",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
+def test_schedule__schedule_version_not_match(node_id, pi, state, schedule, interrupter):
+    state.version = "v2"
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -201,7 +207,7 @@ def test_schedule__schedule_version_not_match():
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -211,44 +217,12 @@ def test_schedule__schedule_version_not_match():
     runtime.beat.assert_not_called()
     runtime.apply_schedule_lock.assert_not_called()
 
+    assert interrupter.check_point.name == ScheduleKeyPoint.VERSION_MISMATCH_CHECKED
+    assert interrupter.check_point.version_mismatch is True
 
-def test_schedule__schedule_node_state_is_not_running():
-    node_id = "nid"
 
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
-
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.FAILED,
-        version="v1",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
+def test_schedule__schedule_node_state_is_not_running(node_id, pi, state, schedule, interrupter):
+    state.name = states.FAILED
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -257,7 +231,7 @@ def test_schedule__schedule_node_state_is_not_running():
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -268,170 +242,15 @@ def test_schedule__schedule_node_state_is_not_running():
     runtime.beat.assert_not_called()
     runtime.apply_schedule_lock.assert_not_called()
 
-
-def test_schedule__unexpected_raise():
-    node_id = "nid"
-    schedule_id = 1
-    version = "v"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-    state = MagicMock()
-    state.name = states.RUNNING
-    state.version = version
-    schedule = Schedule(
-        id=schedule_id,
-        type=ScheduleType.MULTIPLE_CALLBACK,
-        process_id=1,
-        node_id="nid",
-        finished=False,
-        expired=False,
-        version=version,
-        times=0,
-    )
-
-    runtime = MagicMock()
-    runtime.get_process_info = MagicMock(return_value=pi)
-    runtime.apply_schedule_lock = MagicMock(side_effect=Exception)
-    runtime.get_state = MagicMock(return_value=state)
-    runtime.get_schedule = MagicMock(return_value=schedule)
-
-    engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id)
-
-    runtime.get_process_info.assert_called_once_with(pi.process_id)
-    runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_schedule.assert_called_once_with(schedule_id)
-    runtime.apply_schedule_lock.assert_called_once_with(schedule_id)
-    runtime.set_state.assert_called_once_with(node_id=node_id, to_state=states.FAILED, set_archive_time=True)
-    runtime.get_execution_data_outputs.assert_called_once_with(node_id)
-    runtime.set_execution_data_outputs.assert_called_once()
-    runtime.release_schedule_lock.assert_called_once_with(schedule_id)
-    runtime.beat.assert_not_called()
+    assert interrupter.check_point.name == ScheduleKeyPoint.NODE_NOT_RUNNING_CHECKED
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is True
 
 
-def test_schedule__process_info_exception():
-    node_id = "nid"
-    schedule_id = 1
+def test_schedule__has_callback_data(node_id, state, pi, version, schedule, node, interrupter):
+    schedule.type = ScheduleType.POLL
 
-    runtime = MagicMock()
-    runtime.get_process_info = MagicMock(side_effect=Exception)
-    runtime.get_execution_data_outputs = MagicMock(return_value={})
-
-    engine = Engine(runtime=runtime)
-    engine.schedule("pid", node_id, schedule_id)
-
-    runtime.apply_schedule_lock.assert_not_called()
-    runtime.set_state.assert_called_once_with(node_id=node_id, to_state=states.FAILED, set_archive_time=True)
-    runtime.get_execution_data_outputs.assert_called_once_with(node_id)
-    runtime.set_execution_data_outputs.assert_called_once()
-    runtime.release_schedule_lock.assert_called_once_with(schedule_id)
-    runtime.get_schedule.assert_not_called()
-
-
-def test_schedule__raise_state_not_match():
-    node_id = "nid"
-    schedule_id = 1
-    version = "v"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-    state = MagicMock()
-    state.name = states.RUNNING
-    state.version = version
-    schedule = Schedule(
-        id=schedule_id,
-        type=ScheduleType.MULTIPLE_CALLBACK,
-        process_id=1,
-        node_id="nid",
-        finished=False,
-        expired=False,
-        version=version,
-        times=0,
-    )
-
-    runtime = MagicMock()
-    runtime.get_process_info = MagicMock(return_value=pi)
-    runtime.apply_schedule_lock = MagicMock(side_effect=StateVersionNotMatchError)
-    runtime.get_state = MagicMock(return_value=state)
-    runtime.get_schedule = MagicMock(return_value=schedule)
-    engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id)
-
-    runtime.get_process_info.assert_called_once_with(pi.process_id)
-    runtime.get_state.assert_called_once_with(node_id)
-    runtime.get_schedule.assert_called_once_with(schedule_id)
-    runtime.apply_schedule_lock.assert_called_once_with(schedule_id)
-    runtime.set_state.assert_not_called()
-    runtime.get_execution_data_outputs.assert_not_called()
-    runtime.set_execution_data_outputs.assert_not_called()
-    runtime.release_schedule_lock.assert_not_called()
-    runtime.beat.assert_not_called()
-
-
-def test_schedule__has_callback_data():
-    node_id = "nid"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
-
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.RUNNING,
-        version="v1",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
-
-    callback_data = CallbackData(id=1, node_id=node_id, version="v1", data={})
-
-    node = ServiceActivity(
-        id=node_id,
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        code="",
-        version="",
-        timeout=None,
-        error_ignorable=False,
-    )
+    callback_data = CallbackData(id=1, node_id=node_id, version=version, data={})
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -458,7 +277,7 @@ def test_schedule__has_callback_data():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, callback_data.id)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, callback_data.id)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -468,60 +287,25 @@ def test_schedule__has_callback_data():
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_called_once_with(callback_data.id)
-    handler.schedule.assert_called_once_with(pi, state.loop, state.inner_loop, schedule, callback_data)
-
-
-def test_schedule__without_callback_data():
-    node_id = "nid"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
+    handler.schedule.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.inner_loop,
+        schedule=schedule,
+        callback_data=callback_data,
+        recover_point=interrupter.recover_point,
     )
 
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True
 
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.RUNNING,
-        version="v1",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
 
-    node = ServiceActivity(
-        id=node_id,
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        code="",
-        version="",
-        timeout=None,
-        error_ignorable=False,
-    )
+def test_schedule__without_callback_data(node_id, state, pi, schedule, node, interrupter):
+    schedule.type = ScheduleType.POLL
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -547,7 +331,7 @@ def test_schedule__without_callback_data():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -557,60 +341,25 @@ def test_schedule__without_callback_data():
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_not_called()
-    handler.schedule.assert_called_once_with(pi, state.loop, state.inner_loop, schedule, None)
-
-
-def test_schedule__has_next_schedule():
-    node_id = "nid"
-
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
+    handler.schedule.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.inner_loop,
+        schedule=schedule,
+        callback_data=None,
+        recover_point=interrupter.recover_point,
     )
 
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True
 
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.RUNNING,
-        version="v1",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
 
-    node = ServiceActivity(
-        id=node_id,
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        code="",
-        version="",
-        timeout=None,
-        error_ignorable=False,
-    )
+def test_schedule__has_next_schedule(node_id, state, pi, schedule, node, interrupter):
+    schedule.type = ScheduleType.POLL
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -636,7 +385,7 @@ def test_schedule__has_next_schedule():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -646,63 +395,28 @@ def test_schedule__has_next_schedule():
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_not_called()
-    handler.schedule.assert_called_once_with(pi, state.loop, state.inner_loop, schedule, None)
+    handler.schedule.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.inner_loop,
+        schedule=schedule,
+        callback_data=None,
+        recover_point=interrupter.recover_point,
+    )
     runtime.set_next_schedule.assert_called_once_with(pi.process_id, node_id, schedule.id, 60)
     runtime.finish_schedule.assert_not_called()
     runtime.execute.assert_not_called()
 
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True
 
-def test_schedule__schedule_done():
-    node_id = "nid"
 
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
-    )
-
-    schedule = Schedule(
-        id=1,
-        type=ScheduleType.POLL,
-        process_id=pi.process_id,
-        node_id=node_id,
-        finished=False,
-        expired=False,
-        version="v1",
-        times=0,
-    )
-
-    state = State(
-        node_id=node_id,
-        root_id="root",
-        parent_id="root",
-        name=states.RUNNING,
-        version="v1",
-        loop=11,
-        inner_loop=11,
-        retry=0,
-        skip=False,
-        error_ignored=False,
-        created_time=None,
-        started_time=None,
-        archived_time=None,
-    )
-
-    node = ServiceActivity(
-        id=node_id,
-        type=NodeType.ServiceActivity,
-        target_flows=["f1"],
-        target_nodes=["t1"],
-        targets={"f1": "t1"},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        code="",
-        version="",
-        timeout=None,
-        error_ignorable=False,
-    )
+def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter):
+    schedule.type = ScheduleType.POLL
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -728,7 +442,7 @@ def test_schedule__schedule_done():
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -738,9 +452,122 @@ def test_schedule__schedule_done():
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_not_called()
-    handler.schedule.assert_called_once_with(pi, state.loop, state.inner_loop, schedule, None)
+    handler.schedule.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.inner_loop,
+        schedule=schedule,
+        callback_data=None,
+        recover_point=interrupter.recover_point,
+    )
     runtime.set_next_schedule.assert_not_called()
     runtime.finish_schedule.assert_called_once_with(schedule.id)
     runtime.execute.assert_called_once_with(
         process_id=pi.process_id, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root"
     )
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True
+
+
+def test_schedule__recover_version_mismatch(node_id, pi, state, schedule, interrupter, recover_point):
+    recover_point.version_mismatch = True
+    interrupter.recover_point = recover_point
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_state = MagicMock(return_value=state)
+
+    engine = Engine(runtime=runtime)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+
+    runtime.get_process_info.assert_called_once_with(pi.process_id)
+    runtime.schedule.assert_not_called()
+    runtime.get_schedule.assert_called_once_with(schedule.id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.expire_schedule.assert_called_once_with(schedule.id)
+    runtime.beat.assert_not_called()
+    runtime.apply_schedule_lock.assert_not_called()
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.VERSION_MISMATCH_CHECKED
+    assert interrupter.check_point.version_mismatch is True
+
+
+def test_schedule__recover_not_not_running(node_id, pi, state, schedule, interrupter, recover_point):
+    recover_point.node_not_running = True
+    interrupter.recover_point = recover_point
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_state = MagicMock(return_value=state)
+
+    engine = Engine(runtime=runtime)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+
+    runtime.get_process_info.assert_called_once_with(pi.process_id)
+    runtime.schedule.assert_not_called()
+    runtime.get_schedule.assert_called_once_with(schedule.id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.expire_schedule.assert_called_once_with(schedule.id)
+    runtime.get_node.assert_not_called()
+    runtime.beat.assert_not_called()
+    runtime.apply_schedule_lock.assert_not_called()
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.NODE_NOT_RUNNING_CHECKED
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is True
+
+
+def test_schedule__recover_has_schedule_result(node_id, pi, node, state, schedule, interrupter, recover_point):
+    recover_point.schedule_result = ScheduleResult(
+        has_next_schedule=True,
+        schedule_after=60,
+        schedule_done=False,
+        next_node_id=None,
+    )
+    interrupter.recover_point = recover_point
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_node = MagicMock(return_value=node)
+
+    get_handler = MagicMock()
+
+    engine = Engine(runtime=runtime)
+
+    with mock.patch(
+        "bamboo_engine.engine.HandlerFactory.get_handler",
+        get_handler,
+    ):
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+
+    runtime.beat.assert_called_once_with(pi.process_id)
+    runtime.get_process_info.assert_called_once_with(pi.process_id)
+    runtime.apply_schedule_lock.assert_called_once_with(schedule.id)
+    runtime.schedule.assert_not_called()
+    runtime.get_schedule.assert_called_once_with(schedule.id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_callback_data.assert_not_called()
+    runtime.set_next_schedule.assert_called_once_with(pi.process_id, node_id, schedule.id, 60)
+    runtime.finish_schedule.assert_not_called()
+    runtime.execute.assert_not_called()
+    get_handler.assert_not_called()
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True

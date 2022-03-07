@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations underExecutableEndEvent the License.
 """
 
+import pytest
 from mock import MagicMock, call
 
 from bamboo_engine import states
@@ -21,11 +22,13 @@ from bamboo_engine.eri import (
     ContextValue,
     ContextValueType,
 )
+from bamboo_engine.eri.models.interrupt import ExecuteInterruptPoint
 from bamboo_engine.handlers.executable_end_event import ExecutableEndEventHandler
 
 
-def test_executable_end_event_handler__event_execute_error():
-    pi = ProcessInfo(
+@pytest.fixture
+def pi():
+    return ProcessInfo(
         process_id="pid",
         destination_id="",
         root_pipeline_id="root",
@@ -33,7 +36,10 @@ def test_executable_end_event_handler__event_execute_error():
         parent_id="parent",
     )
 
-    node = ExecutableEndEvent(
+
+@pytest.fixture
+def node():
+    return ExecutableEndEvent(
         id="nid",
         type=NodeType.ExecutableEndEvent,
         target_flows=[],
@@ -45,14 +51,24 @@ def test_executable_end_event_handler__event_execute_error():
         code="eee",
     )
 
+
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_executable_end_event_handler__event_execute_error(pi, node, recover_point):
+
     event = MagicMock()
     event.execute = MagicMock(side_effect=Exception)
 
     runtime = MagicMock()
     runtime.get_executable_end_event = MagicMock(return_value=event)
 
-    handler = ExecutableEndEventHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ExecutableEndEventHandler(node, runtime, MagicMock())
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
     assert result.schedule_ready == False
@@ -63,31 +79,28 @@ def test_executable_end_event_handler__event_execute_error():
     assert result.should_die == False
 
     runtime.get_executable_end_event.assert_called_once_with(code=node.code)
-    event.execute.assert_called_once_with(pipeline_stack=["root"], root_pipeline_id="root")
+    if not recover_point:
+        event.execute.assert_called_once_with(pipeline_stack=["root"], root_pipeline_id="root")
+    else:
+        event.exeucte.assert_not_called()
     runtime.set_execution_data_outputs.assert_called_once()
-    runtime.set_state.assert_called_once_with(node_id=node.id, to_state=states.FAILED, set_archive_time=True)
-
-
-def test_executable_end_event_handler__event_execute_success():
-    pi = ProcessInfo(
-        process_id="pid",
-        destination_id="",
-        root_pipeline_id="root",
-        pipeline_stack=["root"],
-        parent_id="parent",
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FAILED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
 
-    node = ExecutableEndEvent(
-        id="nid",
-        type=NodeType.ExecutableEndEvent,
-        target_flows=[],
-        target_nodes=[],
-        targets={},
-        root_pipeline_id="root",
-        parent_pipeline_id="root",
-        can_skip=True,
-        code="eee",
-    )
+
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint("n"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_executable_end_event_handler__event_execute_success(pi, node, recover_point):
 
     event = MagicMock()
     event.execute = MagicMock()
@@ -99,14 +112,18 @@ def test_executable_end_event_handler__event_execute_success():
         ContextValue(key="${c}", value="3", type=ContextValueType.PLAIN),
     ]
 
+    pipeline_state = MagicMock()
+    pipeline_state.version = "v2"
+
     runtime = MagicMock()
     runtime.get_executable_end_event = MagicMock(return_value=event)
     runtime.get_data_inputs = MagicMock(return_value={})
     runtime.get_context_outputs = MagicMock(return_value=context_outputs)
     runtime.get_context_values = MagicMock(return_value=context_values)
+    runtime.get_state_or_none = MagicMock(return_value=pipeline_state)
 
-    handler = ExecutableEndEventHandler(node, runtime)
-    result = handler.execute(pi, 1, 1, "v1")
+    handler = ExecutableEndEventHandler(node, runtime, MagicMock())
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == False
     assert result.schedule_ready == False
@@ -136,13 +153,17 @@ def test_executable_end_event_handler__event_execute_success():
         [
             call(
                 node_id=node.id,
+                version="v1",
                 to_state=states.FINISHED,
                 set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
             call(
                 node_id="root",
+                version="v2",
                 to_state=states.FINISHED,
                 set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
             ),
         ]
     )

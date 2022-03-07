@@ -252,3 +252,24 @@ class DataMixin(SerializerMixin):
         return CallbackData(
             id=data_model.id, node_id=data_model.node_id, version=data_model.version, data=json.loads(data_model.data)
         )
+
+    def serialize_execution_data(self, data: dict) -> (str, str):
+        """
+        幂等接口
+        序列化执行数据输入或输出
+
+        :param data: 执行数据实例
+        :return: 序列化数据，序列化器标记
+        """
+        return self._serialize(data)
+
+    def deserialize_execution_data(self, data: str, serializer: str) -> dict:
+        """
+        幂等接口
+        反序列化执行数据
+
+        :param data: 序列化数据
+        :param data: 序列化器标记
+        :return: 执行数据输入或输出
+        """
+        return self._deserialize(data, serializer)

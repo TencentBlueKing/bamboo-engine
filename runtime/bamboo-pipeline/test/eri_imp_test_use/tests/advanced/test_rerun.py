@@ -29,8 +29,6 @@ def test_single_node_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(2)
-
     assert_all_finish([pipeline["id"]])
 
     state = runtime.get_state(act_1.id)
@@ -121,7 +119,7 @@ def test_subprocess_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(2)
+    assert_all_finish([pipeline["id"]])
 
     state = runtime.get_state(start_sub.id)
     assert state.name == states.FINISHED
@@ -230,8 +228,6 @@ def test_parallel_gateway_rerun():
     runtime = BambooDjangoRuntime()
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
-
-    sleep(20)
 
     assert_all_finish([pipeline["id"]])
 
@@ -376,8 +372,6 @@ def test_rerun_in_branch():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(2)
-
     assert_all_finish([pipeline["id"]])
 
     state = runtime.get_state(act_2.id)
@@ -426,19 +420,13 @@ def test_retry_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(2)
-
     assert_all_failed([act_1.id])
 
     engine.retry_node(act_1.id, {})
 
-    sleep(2)
-
     assert_all_failed([act_1.id])
 
     engine.retry_node(act_1.id, {"can_go": True})
-
-    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 
@@ -506,13 +494,9 @@ def test_skip_rerun():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={}, cycle_tolerate=True)
 
-    sleep(2)
-
     assert_all_failed([act_1.id])
 
     engine.skip_node(act_1.id)
-
-    sleep(2)
 
     assert_all_finish([pipeline["id"]])
 

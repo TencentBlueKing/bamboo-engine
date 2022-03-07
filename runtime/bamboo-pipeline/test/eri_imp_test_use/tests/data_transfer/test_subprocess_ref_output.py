@@ -37,7 +37,7 @@ def test_ref_constant():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    
 
     assert_all_finish([pipeline["id"]])
 

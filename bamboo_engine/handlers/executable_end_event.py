@@ -13,10 +13,12 @@ specific language governing permissions and limitations under the License.
 import copy
 import logging
 import traceback
+from typing import Optional
 
 from bamboo_engine import states
-from bamboo_engine.eri import ProcessInfo, NodeType
+from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, ExecuteResult
+from bamboo_engine.interrupt import ExecuteKeyPoint
 
 from .empty_end_event import EmptyEndEventHandler
 
@@ -25,7 +27,14 @@ logger = logging.getLogger("bamboo_engine")
 
 @register_handler(NodeType.ExecutableEndEvent)
 class ExecutableEndEventHandler(EmptyEndEventHandler):
-    def execute(self, process_info: ProcessInfo, loop: int, inner_loop: int, version: str) -> ExecuteResult:
+    def execute(
+        self,
+        process_info: ProcessInfo,
+        loop: int,
+        inner_loop: int,
+        version: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+    ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
 
@@ -45,23 +54,44 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         )
         event = self.runtime.get_executable_end_event(code=self.node.code)
 
-        try:
-            event.execute(
-                pipeline_stack=copy.copy(process_info.pipeline_stack),
-                root_pipeline_id=process_info.root_pipeline_id,
-            )
-        except Exception:
-            ex_data = traceback.format_exc()
-            logger.warning(
-                "root_pipeline[%s] node(%s) executable end event execute raise: %s",
-                process_info.root_pipeline_id,
-                self.node.id,
-                ex_data,
-            )
+        execute_fail = False
+        ex_data = ""
+        if recover_point and recover_point.handler_data.end_event_executed:
+            execute_fail = recover_point.handler_data.end_event_execute_fail
+            ex_data = recover_point.handler_data.end_event_execute_ex_data
+        else:
+            try:
+                event.execute(
+                    pipeline_stack=copy.copy(process_info.pipeline_stack),
+                    root_pipeline_id=process_info.root_pipeline_id,
+                )
+            except Exception:
+                execute_fail = True
+                ex_data = traceback.format_exc()
+                logger.warning(
+                    "root_pipeline[%s] node(%s) executable end event execute raise: %s",
+                    process_info.root_pipeline_id,
+                    self.node.id,
+                    ex_data,
+                )
+        self.interrupter.check_and_set(
+            ExecuteKeyPoint.EXEC_EE_EVENT_EXECUTE_DONE,
+            end_event_executed=True,
+            end_event_execute_fail=execute_fail,
+            end_event_execute_ex_data=ex_data,
+            from_handler=True,
+        )
 
+        if execute_fail:
             self.runtime.set_execution_data_outputs(node_id=self.node.id, outputs={"ex_data": ex_data})
 
-            self.runtime.set_state(node_id=self.node.id, to_state=states.FAILED, set_archive_time=True)
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.FAILED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
+            )
 
             return ExecuteResult(
                 should_sleep=True,
@@ -72,4 +102,6 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
                 next_node_id=None,
             )
 
-        return super().execute(process_info=process_info, loop=loop, inner_loop=inner_loop, version=version)
+        return super().execute(
+            process_info=process_info, loop=loop, inner_loop=inner_loop, version=version, recover_point=recover_point
+        )
