@@ -28,6 +28,8 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
   - [SPLICE 变量](./docs/user_guide/splice_var.md)
   - [Engine API](./docs/user_guide/engine_api.md)
   - [监控](./docs/user_guide/monitor.md)
+  - 升级指引
+    - [如何升级到 2.x 版本](./docs/upgrade/bamboo_engine_2.md)
 - 运行时文档
   - bamboo-pipeline
     - [自定义组件](./docs/user_guide/custom_component.md)
@@ -35,6 +37,7 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
     - [组件单元测试](./docs/user_guide/component_unit_test.md)
     - [Worker 配置](./docs/user_guide/workers.md)
     - [设置](./docs/user_guide/settings.md)
+
 
 ## 整体设计
 
