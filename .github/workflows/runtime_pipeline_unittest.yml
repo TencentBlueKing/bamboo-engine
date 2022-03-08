@@ -1,8 +1,7 @@
 name: Runtime Pipeline Unittest
 
 on:
-  pull_request:
-    branches: [ master ]
+  workflow_call:
 
 jobs:
   build:
