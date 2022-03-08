@@ -12,7 +12,7 @@ jobs:
     uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_flake8_and_black.yml@main
 
   engine_test:
-    uses: github.com/TencentBlueKing/.github/workflows/myengine_unittest.yml@main
+    uses: github.com/TencentBlueKing/.github/workflows/engine_unittest.yml@main
 
    
   pipeline_test:
