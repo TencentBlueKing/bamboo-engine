@@ -15,3 +15,4 @@ from .handler import *  # noqa
 from .interrupt import *  # noqa
 from .node import *  # noqa
 from .runtime import *  # noqa
+from .event import *  # noqa

@@ -53,5 +53,6 @@ def test_call(interrupter):
             callback_data_id=interrupter.callback_data_id,
             recover_point=interrupter.latest_recover_point,
         )
+        interrupter.runtime.handle_schedule_interrupt_event.assert_called_once()
     else:
         assert False

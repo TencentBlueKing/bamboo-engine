@@ -36,6 +36,7 @@ from pipeline.eri.imp.context import ContextMixin
 from pipeline.eri.imp.execution_history import ExecutionHistoryMixin
 from pipeline.eri.imp.task import TaskMixin
 from pipeline.eri.imp.interrupt import InterruptMixin
+from pipeline.eri.imp.event import EventMixin
 from pipeline.eri.celery.queues import QueueResolver
 
 from pipeline.eri.models import Node, Data, ContextValue, Process, ContextOutputs, LogEntry, ExecutionHistory, State
@@ -53,6 +54,7 @@ class BambooDjangoRuntime(
     PipelinePluginManagerMixin,
     HooksMixin,
     InterruptMixin,
+    EventMixin,
     EngineRuntimeInterface,
 ):
     CONTEXT_VALUE_TYPE_MAP = {

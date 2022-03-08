@@ -32,11 +32,13 @@ from .models import (
     DispatchProcess,
     ContextValue,
     ExecuteInterruptPoint,
+    ExecuteInterruptEvent,
+    ScheduleInterruptEvent,
 )
 
 # plugin interface
 
-__version__ = "6.0.0"
+__version__ = "6.1.0"
 
 
 def version():
@@ -1411,6 +1413,24 @@ class InterruptMixin:
         返回需要中断的异常列表
 
         :return: 需要中断的异常列表
+        """
+
+
+class EventMixin:
+    """
+    事件相关 API
+    """
+
+    @abstractmethod
+    def handle_execute_interrupt_event(self, event: ExecuteInterruptEvent):
+        """
+        execute 中断事件出现后的处理钩子
+        """
+
+    @abstractmethod
+    def handle_schedule_interrupt_event(self, event: ScheduleInterruptEvent):
+        """
+        schedule 中断事件出现后的处理钩子
         """
 
 

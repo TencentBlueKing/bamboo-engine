@@ -11,4 +11,20 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-__version__ = "2.1.0"
+from bamboo_engine.eri.models import ExecuteInterruptEvent, ScheduleInterruptEvent
+
+from pipeline.eri import signals
+
+
+class EventMixin:
+    def handle_execute_interrupt_event(self, event: ExecuteInterruptEvent):
+        """
+        execute 中断事件出现后的处理钩子
+        """
+        signals.execute_interrupt.send(sender=event, event=event)
+
+    def handle_schedule_interrupt_event(self, event: ScheduleInterruptEvent):
+        """
+        schedule 中断事件出现后的处理钩子
+        """
+        signals.schedule_interrupt.send(sender=event, event=event)
