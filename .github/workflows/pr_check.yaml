@@ -6,18 +6,14 @@ on:
 
 jobs:
   engine_lint:
-    name: code-lint
-    uses: github.com/TencentBlueKing/.github/workflows/engine_flake8_and_black.yml
+    uses: github.com/TencentBlueKing/.github/workflows/engine_flake8_and_black.yml@main
 
   pipeline_lint:
-    name: code-lint
-    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_flake8_and_black.yml
+    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_flake8_and_black.yml@main
 
   engine_test:
-    name: unittest
-    uses: github.com/TencentBlueKing/.github/workflows/myengine_unittest.yml
+    uses: github.com/TencentBlueKing/.github/workflows/myengine_unittest.yml@main
 
    
   pipeline_test:
-    name: Pipeline relate test
-    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_unittest.yml
+    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_unittest.yml@main
