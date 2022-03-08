@@ -6,14 +6,14 @@ on:
 
 jobs:
   engine_lint:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_flake8_and_black.yml@main
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_flake8_and_black.yml@master
 
   pipeline_lint:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@main
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@master
 
   engine_test:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_unittest.yml@main
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_unittest.yml@master
 
    
   pipeline_test:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@main
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@master
