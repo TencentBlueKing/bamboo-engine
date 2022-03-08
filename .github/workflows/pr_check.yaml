@@ -12,14 +12,17 @@ jobs:
     uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@master
 
   Engine test:
+    needs: "Engine lint"
     uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_unittest.yml@master
 
-  Runtime pipeline test:
-    steps:
-      - uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@master
-      - uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_end_to_end_test.yml@master
-
-  Pipeline test:
-    steps:
-      - uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@master
-      - uses: TencentBlueKing/bamboo-engine/.github/workflows/pipeline_end_to_end_test.yml@master
+  Pipeline unittest:
+    needs: "Pipeline lint"
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@master
+  
+  Runtime pipeline end to end test:
+    needs: "Pipeline unittest"
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_end_to_end_test.yml@master
+  
+  Pipeline end to end test:
+    needs: "Pipeline unittest"
+    uses: TencentBlueKing/bamboo-engine/.github/workflows/pipeline_end_to_end_test.yml@master
