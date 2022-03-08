@@ -7,21 +7,18 @@ on:
 jobs:
   engine_lint:
     name: Engine code lint
-    runs-on: ubuntu-latest
     steps:
       - name: code-lint
         uses: ./.github/workflows/engine_flake8_and_black.yml
 
   pipeline_lint:
     name: Pipeline code lint
-    runs-on: ubuntu-latest
     steps:
       - name: code-lint
         uses: ./.github/workflows/runtime_pipeline_flake8_and_black.yml
 
   engine_test:
     name: Engine relate test
-    runs-on: ubuntu-latest
     steps:
       - name: unittest
         uses: ./.github/workflows/myengine_unittest.yml
@@ -29,7 +26,6 @@ jobs:
    
   pipeline_test:
     name: Pipeline relate test
-    runs-on: ubuntu-latest
     steps:
       - name: unittest
         uses: ./.github/workflows/runtime_pipeline_unittest.yml
