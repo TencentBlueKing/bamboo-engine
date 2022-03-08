@@ -6,30 +6,18 @@ on:
 
 jobs:
   engine_lint:
-    name: Engine code lint
-    steps:
-      - name: code-lint
-        uses: ./.github/workflows/engine_flake8_and_black.yml
+    name: code-lint
+    uses: github.com/TencentBlueKing/.github/workflows/engine_flake8_and_black.yml
 
   pipeline_lint:
-    name: Pipeline code lint
-    steps:
-      - name: code-lint
-        uses: ./.github/workflows/runtime_pipeline_flake8_and_black.yml
+    name: code-lint
+    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_flake8_and_black.yml
 
   engine_test:
-    name: Engine relate test
-    steps:
-      - name: unittest
-        uses: ./.github/workflows/myengine_unittest.yml
+    name: unittest
+    uses: github.com/TencentBlueKing/.github/workflows/myengine_unittest.yml
 
    
   pipeline_test:
     name: Pipeline relate test
-    steps:
-      - name: unittest
-        uses: ./.github/workflows/runtime_pipeline_unittest.yml
-      - name: runtime pipeline end to end test
-        uses: ./.github/workflows/runtime_pipeline_end_to_end_test.yml
-      - name: pipeline end to end test
-        uses: ./.github/workflows/pipeline_end_to_end_test.yml
+    uses: github.com/TencentBlueKing/.github/workflows/runtime_pipeline_unittest.yml
