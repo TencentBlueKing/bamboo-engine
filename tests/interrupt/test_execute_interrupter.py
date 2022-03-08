@@ -84,5 +84,6 @@ def test_call(call_interrupter):
             parent_pipeline_id=call_interrupter.parent_pipeline_id,
             recover_point=call_interrupter.latest_recover_point,
         )
+        call_interrupter.runtime.handle_execute_interrupt_event.assert_called_once()
     else:
         assert False

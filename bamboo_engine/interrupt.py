@@ -15,7 +15,7 @@ import traceback
 from typing import Optional
 from contextlib import contextmanager
 
-from bamboo_engine.eri.models import ScheduleInterruptPoint
+from bamboo_engine.eri.models import ScheduleInterruptPoint, ExecuteInterruptEvent, ScheduleInterruptEvent
 
 from .eri import EngineRuntimeInterface, InterruptPoint, ExecuteInterruptPoint, HandlerExecuteData
 
@@ -148,11 +148,26 @@ class ExecuteInterrupter(Interrupter):
                 parent_pipeline_id=self.parent_pipeline_id,
                 recover_point=recover_point,
             )
+
+            exec_trace = traceback.format_exc()
             logger.error(
                 "[interrupt({})] execute interrupt with point({}), trying to recover, {}".format(
-                    self.current_node_id, recover_point.to_json(), traceback.format_exc()
+                    self.current_node_id, recover_point.to_json(), exec_trace
                 )
             )
+
+            try:
+                self.runtime.handle_execute_interrupt_event(
+                    event=ExecuteInterruptEvent(
+                        name=recover_point.name,
+                        process_id=self.process_id,
+                        node_id=self.current_node_id,
+                        exception=e,
+                        exception_traceback=exec_trace,
+                    )
+                )
+            except Exception:
+                logger.exception("[interrupt({})] execute interrupt event handle error.".format(self.current_node_id))
 
             raise InterruptException()
 
@@ -211,10 +226,25 @@ class ScheduleInterrupter(Interrupter):
                 callback_data_id=self.callback_data_id,
                 recover_point=recover_point,
             )
+
+            exec_trace = traceback.format_exc()
             logger.error(
                 "[interrupt({})] schedule interrupt with point({}), trying to recover, {}".format(
-                    self.current_node_id, recover_point.to_json(), traceback.format_exc()
+                    self.current_node_id, recover_point.to_json(), exec_trace
                 )
             )
+
+            try:
+                self.runtime.handle_schedule_interrupt_event(
+                    event=ScheduleInterruptEvent(
+                        name=recover_point.name,
+                        process_id=self.process_id,
+                        node_id=self.current_node_id,
+                        exception=e,
+                        exception_traceback=exec_trace,
+                    )
+                )
+            except Exception:
+                logger.exception("[interrupt({})] schedule interrupt event handle error.".format(self.current_node_id))
 
             raise InterruptException()
