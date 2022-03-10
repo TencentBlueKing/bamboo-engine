@@ -77,8 +77,6 @@ app.config_from_object("django.conf:settings")
 
 INSTALLED_APPS = [
     ...
-    "pipeline",
-    "pipeline.engine",
     "pipeline.component_framework",
     "pipeline.eri",
     ...
@@ -96,7 +94,7 @@ $ python manage.py migrate
 首先在 `bamboo_engine_playground` 目录下启动 celery worker：
 
 ```
-$ python manage.py celery worker -Q er_execute,er_schedule -l info
+$ DJANGO_SETTINGS_MODULE=bamboo_engine_playground.settings celery worker -A bamboo_engine_playground.settings -Q er_execute,er_schedule -l info
 ```
 
 创建并执行一个简单的流程：
