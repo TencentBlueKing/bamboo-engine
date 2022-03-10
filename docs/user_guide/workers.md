@@ -13,13 +13,13 @@
 处理流程推进的 worker：
 
 ```shell
-python manage.py celery worker -Q er_execute
+DJANGO_SETTINGS_MODULE=your_django_settings_path celery worker -A your_django_settings_path -Q er_execute
 ```
 
 处理轮询调度及回调请求的 worker：
 
 ```shell
-python manage.py celery worker -Q er_schedule
+DJANGO_SETTINGS_MODULE=your_django_settings_path celery worker -A your_django_settings_path -Q er_schedule
 ```
 
 ### Worker Pool 的选择
@@ -28,7 +28,7 @@ Celery worker 默认使用 prefork 模式来启动，如果要提高系统的流
 
 ```python
 $ pip install gevent
-$ python manage.py celery worker -Q er_execute,er_schedule -P gevent -c 500
+$ DJANGO_SETTINGS_MODULE=your_django_settings_path celery worker -A your_django_settings_path -Q er_execute,er_schedule -P gevent -c 500
 ```
 
 更多 celery worker pool 的介绍请参考 [celery workers](https://docs.celeryproject.org/en/stable/userguide/workers.html#concurrency)
@@ -58,7 +58,7 @@ api.run_pipeline(runtime, pipeline, queue='api')
 当然，为了实现队列隔离的效果，我们要为我们自定义的队列启动专用的 worker：
 
 ```shell
-python manage.py celery worker -Q er_execute_api,er_schedule_api
+DJANGO_SETTINGS_MODULE=your_django_settings_path celery worker -A your_django_settings_path -Q er_execute_api,er_schedule_api
 ```
 
 如果你添加了多个自定义队列，就要为每个队列都启动一批 worker。
