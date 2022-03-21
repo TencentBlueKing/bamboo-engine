@@ -26,7 +26,6 @@ from pipeline.core.data import mako_safety
 from pipeline.utils.mako_utils.checker import check_mako_template_safety
 from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
-
 logger = logging.getLogger("root")
 # find mako template(format is ${xxx}，and ${}# not in xxx, # may raise memory error)
 TEMPLATE_PATTERN = re.compile(r"\${[^$#]+}")
@@ -101,6 +100,8 @@ class ConstantTemplate(object):
 
     @staticmethod
     def get_template_reference(template):
+        template = template.replace(".", "点")
+
         lex = lexer.Lexer(template)
 
         try:
@@ -117,7 +118,11 @@ class ConstantTemplate(object):
         compiler.reserved_names = set()
         identifiers = codegen._Identifiers(compiler, node)
 
-        return list(identifiers.undeclared)
+        undeclared_list = list(identifiers.undeclared)
+        for index, item in enumerate(undeclared_list):
+            undeclared_list[index] = item.replace("点", ".")
+
+        return undeclared_list
 
     @staticmethod
     def resolve_string(string, value_maps):
