@@ -36,14 +36,8 @@ class ExecuteInterruptEvent(InterruptEvent):
     执行中断事件
     """
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-
 
 class ScheduleInterruptEvent(InterruptEvent):
     """
     调度中断事件
     """
-
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
