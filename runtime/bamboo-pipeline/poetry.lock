@@ -41,7 +41,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "bamboo-engine"
-version = "2.0.0"
+version = "2.1.0"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
@@ -737,7 +737,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 3.8"
-content-hash = "88eff7ae8c78fbc3dba3aa1179b35c0e58b34057452ea9fd754a76aa004bde19"
+content-hash = "e4a4d04035165c9299d3a7b80d7dc01f39d4f64eb9e83208e263568fe885188e"
 
 [metadata.files]
 amqp = [
@@ -757,8 +757,8 @@ attrs = [
     {file = "attrs-21.2.0.tar.gz", hash = "sha256:ef6aaac3ca6cd92904cdd0d83f629a15f18053ec84e6432106f7a4d04ae4f5fb"},
 ]
 bamboo-engine = [
-    {file = "bamboo-engine-2.0.0.tar.gz", hash = "sha256:3ca8c51916902dc018429a5540680ed24427b7fdb7b693e2bd03f3ebd9625d76"},
-    {file = "bamboo_engine-2.0.0-py3-none-any.whl", hash = "sha256:2712dc15f37a7949f92b64beb36a8896f9c1fd3824117984e4ddd4a9e2decdad"},
+    {file = "bamboo-engine-2.1.0.tar.gz", hash = "sha256:9fd649b79c25335f8861b1a882659d5bc551a7f3cfc11b4d2c006bfbbb80ed2c"},
+    {file = "bamboo_engine-2.1.0-py3-none-any.whl", hash = "sha256:bc9f17fd23ec89aaa13a369dc8f21eae2d4b913fec966442b59b30038446c2a1"},
 ]
 billiard = [
     {file = "billiard-3.6.4.0-py3-none-any.whl", hash = "sha256:87103ea78fa6ab4d5c751c4909bcff74617d985de7fa8b672cf8618afd5a875b"},
