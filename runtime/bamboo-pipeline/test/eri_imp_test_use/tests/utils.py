@@ -2,7 +2,7 @@
 
 from time import sleep  # noqa
 
-from bamboo_engine import states
+from bamboo_engine import states, exceptions
 from bamboo_engine.eri import ContextValueType  # noqa
 
 from pipeline.eri.runtime import BambooDjangoRuntime
@@ -50,7 +50,14 @@ def assert_not_executed(node_id_list):
 
 def assert_exec_data_equal(node_data_dict):
     for node_id in node_data_dict.keys():
-        data = runtime.get_execution_data(node_id)
+        for _ in range(100):
+            try:
+                data = runtime.get_execution_data(node_id)
+            except exceptions.NotFoundError:
+                sleep(0.5)
+                continue
+            else:
+                break
         inputs = node_data_dict[node_id]["inputs"]
         outputs = node_data_dict[node_id]["outputs"]
         assert data.inputs == inputs, "actual: %s, expect: %s" % (data.inputs, inputs)
