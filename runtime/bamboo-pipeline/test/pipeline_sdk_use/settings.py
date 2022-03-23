@@ -60,7 +60,6 @@ INSTALLED_APPS = (
     "pipeline.django_signal_valve",
     "pipeline.contrib.periodic_task",
     "django_celery_beat",
-    "django_celery_results",
     "pipeline_test_use",
     "variable_app",
     "pipeline.eri",

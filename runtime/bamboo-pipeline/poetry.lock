@@ -256,17 +256,6 @@ django-timezone-field = ">=4.1.0,<5.0"
 python-crontab = ">=2.3.4"
 
 [[package]]
-name = "django-celery-results"
-version = "1.2.1"
-description = "Celery result backends for Django."
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-celery = ">=4.4,<5.0"
-
-[[package]]
 name = "django-timezone-field"
 version = "4.2.1"
 description = "A Django app providing database and form fields for pytz timezone objects."
@@ -536,7 +525,7 @@ testing = ["django", "django-configurations (>=2.0)"]
 
 [[package]]
 name = "python-crontab"
-version = "2.5.1"
+version = "2.6.0"
 description = "Python Crontab API"
 category = "main"
 optional = false
@@ -737,7 +726,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 3.8"
-content-hash = "e4a4d04035165c9299d3a7b80d7dc01f39d4f64eb9e83208e263568fe885188e"
+content-hash = "95e04d55eecd42fa3c537fedc5771c4889f52af3c283c845f86b30ade7638cc8"
 
 [metadata.files]
 amqp = [
@@ -860,10 +849,6 @@ django = [
 django-celery-beat = [
     {file = "django-celery-beat-2.2.0.tar.gz", hash = "sha256:b8a13afb15e7c53fc04f4f847ac71a6d32088959aba701eb7c4a59f0c28ba543"},
     {file = "django_celery_beat-2.2.0-py2.py3-none-any.whl", hash = "sha256:c4c72a9579f20eff4c4ccf1b58ebdca5ef940f4210065057db1754ea5f8dffdc"},
-]
-django-celery-results = [
-    {file = "django_celery_results-1.2.1-py2.py3-none-any.whl", hash = "sha256:a29ab580f0e38c66c39f51cc426bbdbb2a391b8cc0867df9dea748db2c961db2"},
-    {file = "django_celery_results-1.2.1.tar.gz", hash = "sha256:e390f70cc43bbc2cd7c8e4607dc29ab6211a2ab968f93677583f0160921f670c"},
 ]
 django-timezone-field = [
     {file = "django-timezone-field-4.2.1.tar.gz", hash = "sha256:97780cde658daa5094ae515bb55ca97c1352928ab554041207ad515dee3fe971"},
@@ -1024,7 +1009,7 @@ pytest-django = [
     {file = "pytest_django-4.1.0-py3-none-any.whl", hash = "sha256:10e384e6b8912ded92db64c58be8139d9ae23fb8361e5fc139d8e4f8fc601bc2"},
 ]
 python-crontab = [
-    {file = "python-crontab-2.5.1.tar.gz", hash = "sha256:4bbe7e720753a132ca4ca9d4094915f40e9d9dc8a807a4564007651018ce8c31"},
+    {file = "python-crontab-2.6.0.tar.gz", hash = "sha256:1e35ed7a3cdc3100545b43e196d34754e6551e7f95e4caebbe0e1c0ca41c2f1b"},
 ]
 python-dateutil = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
