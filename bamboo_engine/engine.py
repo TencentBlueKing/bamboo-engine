@@ -13,40 +13,44 @@ specific language governing permissions and limitations under the License.
 
 # 引擎核心模块
 
-import time
-import random
 import logging
+import random
+import time
 from functools import wraps
 from typing import Optional
 
-
-from . import states
-from . import validator
-from .local import set_node_info, clear_node_info, CurrentNodeInfo
+from . import states, validator
+from .eri import (
+    DataInput,
+    EngineRuntimeInterface,
+    ExecutionData,
+    Node,
+    NodeType,
+    ScheduleType,
+    State,
+)
 from .exceptions import InvalidOperationError, NotFoundError
 from .handler import HandlerFactory
+from .interrupt import (
+    ExecuteInterrupter,
+    ExecuteKeyPoint,
+    InterruptException,
+    ScheduleInterrupter,
+    ScheduleKeyPoint,
+)
+from .local import CurrentNodeInfo, clear_node_info, set_node_info
 from .metrics import (
-    ENGINE_RUNNING_PROCESSES,
-    ENGINE_RUNNING_SCHEDULES,
-    ENGINE_PROCESS_RUNNING_TIME,
-    ENGINE_SCHEDULE_RUNNING_TIME,
     ENGINE_NODE_EXECUTE_TIME,
     ENGINE_NODE_SCHEDULE_TIME,
+    ENGINE_PROCESS_RUNNING_TIME,
+    ENGINE_RUNNING_PROCESSES,
+    ENGINE_RUNNING_SCHEDULES,
+    ENGINE_SCHEDULE_RUNNING_TIME,
     setup_gauge,
     setup_histogram,
 )
-from .eri import (
-    EngineRuntimeInterface,
-    ScheduleType,
-    NodeType,
-    State,
-    ExecutionData,
-    DataInput,
-    Node,
-)
-from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint, InterruptException
-from .utils.string import get_lower_case_name
 from .utils.host import get_hostname
+from .utils.string import get_lower_case_name
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -466,7 +470,7 @@ class Engine:
 
         self.runtime.post_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
 
-    def forced_fail_activity(self, node_id: str, ex_data: str):
+    def forced_fail_activity(self, node_id: str, ex_data: str, post_set_state_signal: bool = True):
         """
         强制失败某个 Activity
 
@@ -474,6 +478,8 @@ class Engine:
         :type node_id: str
         :param ex_data: 强制失败时写入节点有慈航数据的信息
         :type ex_data: str
+        :param post_set_state_signal: 强制失败时，是否发送post_set_state信号
+        :type post_set_state_signal: bool, optional
         :raises InvalidOperationError: [description]
         :raises InvalidOperationError: [description]
         """
@@ -505,6 +511,7 @@ class Engine:
             to_state=states.FAILED,
             refresh_version=True,
             set_archive_time=True,
+            post_set_state_signal=post_set_state_signal,
         )
 
         self.runtime.set_execution_data_outputs(node_id, outputs)
@@ -1079,7 +1086,7 @@ class Engine:
                 exec_data = self.runtime.get_execution_data(node_id)
             except NotFoundError:
                 # execution data may be lack with some node
-                logger.warning("can't not find execution data for %s at loop %s" % (node_id, state.loop))
+                logger.warning("can't not find execution data for {} at loop {}".format(node_id, state.loop))
                 history_inputs = {}
                 history_outputs = {}
             else:

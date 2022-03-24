@@ -11,27 +11,27 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from datetime import datetime
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional, Dict, Set, Any, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import (
-    ScheduleInterruptPoint,
-    State,
-    Node,
-    Schedule,
-    ScheduleType,
+    CallbackData,
+    ContextValue,
     Data,
     DataInput,
+    DispatchProcess,
+    ExecuteInterruptPoint,
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
-    CallbackData,
+    Node,
     ProcessInfo,
+    Schedule,
+    ScheduleInterruptPoint,
+    ScheduleType,
+    State,
     SuspendedProcessInfo,
-    DispatchProcess,
-    ContextValue,
-    ExecuteInterruptPoint,
 )
 
 # plugin interface
@@ -918,6 +918,7 @@ class StateMixin:
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
         ignore_boring_set: bool = False,
+        post_set_state_signal: bool = True,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -959,6 +960,8 @@ class StateMixin:
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
         :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
+        :param post_set_state_signal: 节点状态改变时，是否发送post_set_state信号
+        :type post_set_state_signal: bool, optional
         :return: 该节点最新版本
         :rtype: str
         """
