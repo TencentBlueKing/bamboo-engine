@@ -11,16 +11,16 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 from django.utils import timezone
-from bamboo_engine.eri import State
-from bamboo_engine import states, metrics
-from bamboo_engine.utils.string import unique_id
-from bamboo_engine.exceptions import StateVersionNotMatchError
-
-from pipeline.eri.signals import post_set_state
 from pipeline.eri.models import State as DBState
+from pipeline.eri.signals import post_set_state
+
+from bamboo_engine import metrics, states
+from bamboo_engine.eri import State
+from bamboo_engine.exceptions import StateVersionNotMatchError
+from bamboo_engine.utils.string import unique_id
 
 
 class StateMixin:
@@ -207,6 +207,7 @@ class StateMixin:
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
         ignore_boring_set: bool = False,
+        post_set_state_signal: bool = True,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -248,6 +249,8 @@ class StateMixin:
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
         :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
+        :param post_set_state_signal: 节点状态改变时，是否发送post_set_state信号
+        :type post_set_state_signal: bool, optional
         :return: 该节点最新版本
         :rtype: str
         """
@@ -326,14 +329,14 @@ class StateMixin:
         else:
             state = DBState.objects.create(node_id=node_id, name=to_state, **fields)
             ret_version = fields["version"]
-
-        post_set_state.send(
-            sender=DBState,
-            node_id=node_id,
-            to_state=to_state,
-            version=ret_version,
-            root_id=state.root_id,
-            parent_id=state.parent_id,
-            loop=loop,
-        )
+        if post_set_state_signal:
+            post_set_state.send(
+                sender=DBState,
+                node_id=node_id,
+                to_state=to_state,
+                version=ret_version,
+                root_id=state.root_id,
+                parent_id=state.parent_id,
+                loop=loop,
+            )
         return ret_version
