@@ -11,32 +11,34 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from abc import ABCMeta, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from abc import ABCMeta, abstractmethod
+from typing import List, Optional, Dict, Set, Any, Tuple
 
 from .models import (
-    CallbackData,
-    ContextValue,
+    ScheduleInterruptPoint,
+    State,
+    Node,
+    Schedule,
+    ScheduleType,
     Data,
     DataInput,
-    DispatchProcess,
-    ExecuteInterruptPoint,
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
-    Node,
+    CallbackData,
     ProcessInfo,
-    Schedule,
-    ScheduleInterruptPoint,
-    ScheduleType,
-    State,
     SuspendedProcessInfo,
+    DispatchProcess,
+    ContextValue,
+    ExecuteInterruptPoint,
+    ExecuteInterruptEvent,
+    ScheduleInterruptEvent,
 )
 
 # plugin interface
 
-__version__ = "6.0.0"
+__version__ = "6.1.0"
 
 
 def version():
@@ -1414,6 +1416,24 @@ class InterruptMixin:
         返回需要中断的异常列表
 
         :return: 需要中断的异常列表
+        """
+
+
+class EventMixin:
+    """
+    事件相关 API
+    """
+
+    @abstractmethod
+    def handle_execute_interrupt_event(self, event: ExecuteInterruptEvent):
+        """
+        execute 中断事件出现后的处理钩子
+        """
+
+    @abstractmethod
+    def handle_schedule_interrupt_event(self, event: ScheduleInterruptEvent):
+        """
+        schedule 中断事件出现后的处理钩子
         """
 
 
