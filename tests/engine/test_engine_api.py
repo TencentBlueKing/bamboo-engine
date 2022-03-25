@@ -961,6 +961,46 @@ def test_forced_fail_activity():
         to_state=states.FAILED,
         refresh_version=True,
         set_archive_time=True,
+        send_post_set_state_signal=True,
+    )
+    runtime.set_execution_data_outputs.assert_called_once_with(node_id, {"ex_data": ex_data, "_forced_failed": True})
+    runtime.kill.assert_called_once_with(process_id)
+    runtime.post_forced_fail_activity.assert_called_once_with(node_id, ex_data, "old_version", "new_version")
+
+
+def test_forced_fail_activity_not_send_post_set_state_signal():
+    node_id = "nid"
+    ex_data = "ex_msg"
+    process_id = "pid"
+
+    node = MagicMock()
+    node.type = NodeType.ServiceActivity
+
+    state = MagicMock()
+    state.name = states.RUNNING
+    state.version = "old_version"
+
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_process_id_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_execution_data_outputs = MagicMock(return_value={})
+    runtime.set_state = MagicMock(return_value="new_version")
+
+    engine = Engine(runtime=runtime)
+    engine.forced_fail_activity(node_id, ex_data, send_post_set_state_signal=False)
+
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_process_id_with_current_node_id.assert_called_once_with(node_id)
+    runtime.pre_forced_fail_activity.assert_called_once_with(node_id, ex_data)
+    runtime.get_execution_data_outputs.assert_called_once_with(node_id)
+    runtime.set_state.assert_called_once_with(
+        node_id=node_id,
+        to_state=states.FAILED,
+        refresh_version=True,
+        set_archive_time=True,
+        send_post_set_state_signal=False,
     )
     runtime.set_execution_data_outputs.assert_called_once_with(node_id, {"ex_data": ex_data, "_forced_failed": True})
     runtime.kill.assert_called_once_with(process_id)

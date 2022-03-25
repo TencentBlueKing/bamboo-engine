@@ -506,3 +506,47 @@ class StateMixinTestCase(TransactionTestCase):
         )
         self.state.refresh_from_db()
         self.assertEqual(version, self.state.version)
+
+    def test_set_state_send_post_set_state_signal(self):
+        post_set_state = MagicMock()
+        with patch("pipeline.eri.imp.state.post_set_state", post_set_state):
+            self.mixin.set_state(
+                node_id=self.state.node_id,
+                to_state=states.FINISHED,
+                loop=2,
+                is_retry=True,
+                is_skip=True,
+                reset_retry=False,
+                reset_skip=False,
+                error_ignored=True,
+                reset_error_ignored=False,
+                refresh_version=True,
+                clear_started_time=True,
+                set_started_time=True,
+                clear_archived_time=True,
+                set_archive_time=True,
+                send_post_set_state_signal=True,
+            )
+        post_set_state.send.assert_called()
+
+    def test_set_state_not_send_post_set_state_signal(self):
+        post_set_state = MagicMock()
+        with patch("pipeline.eri.imp.state.post_set_state", post_set_state):
+            self.mixin.set_state(
+                node_id=self.state.node_id,
+                to_state=states.FINISHED,
+                loop=2,
+                is_retry=True,
+                is_skip=True,
+                reset_retry=False,
+                reset_skip=False,
+                error_ignored=True,
+                reset_error_ignored=False,
+                refresh_version=True,
+                clear_started_time=True,
+                set_started_time=True,
+                clear_archived_time=True,
+                set_archive_time=True,
+                send_post_set_state_signal=False,
+            )
+        post_set_state.send.assert_not_called()
