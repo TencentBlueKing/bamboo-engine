@@ -470,7 +470,7 @@ class Engine:
 
         self.runtime.post_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
 
-    def forced_fail_activity(self, node_id: str, ex_data: str, post_set_state_signal: bool = True):
+    def forced_fail_activity(self, node_id: str, ex_data: str, send_post_set_state_signal: bool = True):
         """
         强制失败某个 Activity
 
@@ -478,8 +478,8 @@ class Engine:
         :type node_id: str
         :param ex_data: 强制失败时写入节点有慈航数据的信息
         :type ex_data: str
-        :param post_set_state_signal: 强制失败时，是否发送post_set_state信号
-        :type post_set_state_signal: bool, optional
+        :param send_post_set_state_signal: 强制失败时，是否发送post_set_state信号
+        :type send_post_set_state_signal: bool, optional
         :raises InvalidOperationError: [description]
         :raises InvalidOperationError: [description]
         """
@@ -511,7 +511,7 @@ class Engine:
             to_state=states.FAILED,
             refresh_version=True,
             set_archive_time=True,
-            post_set_state_signal=post_set_state_signal,
+            send_post_set_state_signal=send_post_set_state_signal,
         )
 
         self.runtime.set_execution_data_outputs(node_id, outputs)

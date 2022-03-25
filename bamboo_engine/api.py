@@ -258,7 +258,7 @@ def skip_conditional_parallel_gateway(
 
 @_ensure_return_api_result
 def forced_fail_activity(
-    runtime: EngineRuntimeInterface, node_id: str, ex_data: str, post_set_state_signal: bool = True
+    runtime: EngineRuntimeInterface, node_id: str, ex_data: str, send_post_set_state_signal: bool = True
 ) -> EngineAPIResult:
     """
     强制失败某个 activity 节点
@@ -269,12 +269,12 @@ def forced_fail_activity(
     :type node_id: str
     :param ex_data: 异常信息
     :type ex_data: str
-    :param post_set_state_signal: 强制失败时，是否发送post_set_state信号
-    :type post_set_state_signal: bool, optional
+    :param send_post_set_state_signal: 强制失败时，是否发送post_set_state信号
+    :type send_post_set_state_signal: bool, optional
     :return: 执行结果
     :rtype: EngineAPIResult
     """
-    Engine(runtime).forced_fail_activity(node_id, ex_data, post_set_state_signal)
+    Engine(runtime).forced_fail_activity(node_id, ex_data, send_post_set_state_signal)
 
 
 @_ensure_return_api_result
