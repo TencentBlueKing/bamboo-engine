@@ -38,7 +38,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "6.1.0"
+__version__ = "6.2.0"
 
 
 def version():
@@ -920,6 +920,7 @@ class StateMixin:
         clear_archived_time: bool = False,
         set_archive_time: bool = False,
         ignore_boring_set: bool = False,
+        send_post_set_state_signal: bool = True,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -961,6 +962,8 @@ class StateMixin:
         :param set_archive_time: 是否设置归档时间
         :type set_archive_time: bool, optional
         :param ignore_boring_set: 当 version 与 to_state 与当前实际状态一致时，是否忽略本次设置
+        :param send_post_set_state_signal: 节点状态改变时，是否发送post_set_state信号
+        :type send_post_set_state_signal: bool, optional
         :return: 该节点最新版本
         :rtype: str
         """

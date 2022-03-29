@@ -11,21 +11,20 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-
 # API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
 
 
-import logging
 import functools
+import logging
 import traceback
-from typing import Optional, Any, List
+from typing import Any, List, Optional
 
-from .utils.object import Representable
-from .eri import EngineRuntimeInterface, ContextValue
-from .engine import Engine
-from .template import Template
 from .context import Context
+from .engine import Engine
+from .eri import ContextValue, EngineRuntimeInterface
+from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
+from .utils.object import Representable
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -258,7 +257,9 @@ def skip_conditional_parallel_gateway(
 
 
 @_ensure_return_api_result
-def forced_fail_activity(runtime: EngineRuntimeInterface, node_id: str, ex_data: str) -> EngineAPIResult:
+def forced_fail_activity(
+    runtime: EngineRuntimeInterface, node_id: str, ex_data: str, send_post_set_state_signal: bool = True
+) -> EngineAPIResult:
     """
     强制失败某个 activity 节点
 
@@ -266,12 +267,14 @@ def forced_fail_activity(runtime: EngineRuntimeInterface, node_id: str, ex_data:
     :type runtime: EngineRuntimeInterface
     :param node_id: 节点 ID
     :type node_id: str
-    :param message: 异常信息
-    :type message: str
+    :param ex_data: 异常信息
+    :type ex_data: str
+    :param send_post_set_state_signal: 强制失败时，是否发送post_set_state信号
+    :type send_post_set_state_signal: bool, optional
     :return: 执行结果
     :rtype: EngineAPIResult
     """
-    Engine(runtime).forced_fail_activity(node_id, ex_data)
+    Engine(runtime).forced_fail_activity(node_id, ex_data, send_post_set_state_signal)
 
 
 @_ensure_return_api_result
