@@ -23,6 +23,7 @@ from pipeline.eri.models import Process
 
 logger = logging.getLogger("bamboo_engine")
 
+
 def _retry_once(action: callable):
     try:
         action()
@@ -74,7 +75,12 @@ class TaskMixin:
                 },
                 **route_params,
             )
-            logger.info("[pipeline-trace](root_pipeline: %s) node(%s) execute task %s sended", root_pipeline_id, node_id, result.id)
+            logger.info(
+                "[pipeline-trace](root_pipeline: %s) node(%s) execute task %s sended",
+                root_pipeline_id,
+                node_id,
+                result.id,
+            )
 
         _retry_once(action=action)
 
