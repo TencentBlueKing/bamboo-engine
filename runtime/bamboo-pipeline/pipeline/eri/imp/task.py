@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import logging
 from typing import Optional
 
 from celery import current_app
@@ -20,6 +21,7 @@ from pipeline.eri.celery.queues import QueueResolver
 
 from pipeline.eri.models import Process
 
+logger = logging.getLogger("bamboo_engine")
 
 def _retry_once(action: callable):
     try:
@@ -62,7 +64,7 @@ class TaskMixin:
         route_params = self._get_task_route_params(task_name, process_id)
 
         def action():
-            current_app.tasks[task_name].apply_async(
+            result = current_app.tasks[task_name].apply_async(
                 kwargs={
                     "process_id": process_id,
                     "node_id": node_id,
@@ -72,6 +74,7 @@ class TaskMixin:
                 },
                 **route_params,
             )
+            logger.info("[pipeline-trace](root_pipeline: %s) node(%s) execute task %s sended", root_pipeline_id, node_id, result.id)
 
         _retry_once(action=action)
 
@@ -97,7 +100,7 @@ class TaskMixin:
         route_params = self._get_task_route_params(task_name, process_id)
 
         def action():
-            current_app.tasks[task_name].apply_async(
+            result = current_app.tasks[task_name].apply_async(
                 kwargs={
                     "process_id": process_id,
                     "node_id": node_id,
@@ -107,6 +110,7 @@ class TaskMixin:
                 },
                 **route_params,
             )
+            logger.info("[pipeline-trace] node(%s) schedule task %s sended", node_id, result.id)
 
         _retry_once(action=action)
 
@@ -134,7 +138,7 @@ class TaskMixin:
         route_params = self._get_task_route_params(task_name, process_id)
 
         def action():
-            current_app.tasks[task_name].apply_async(
+            result = current_app.tasks[task_name].apply_async(
                 kwargs={
                     "process_id": process_id,
                     "node_id": node_id,
@@ -145,5 +149,6 @@ class TaskMixin:
                 countdown=schedule_after,
                 **route_params,
             )
+            logger.info("[pipeline-trace] node(%s) schedule task %s sended", node_id, result.id)
 
         _retry_once(action=action)
