@@ -17,7 +17,9 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
-from pipeline.contrib.external_plugins.utils.importer.base import AutoInstallRequirementsImporter
+from pipeline.contrib.external_plugins.utils.importer.base import (
+    AutoInstallRequirementsImporter,
+)
 
 logger = logging.getLogger("root")
 CONFIG = Config(connect_timeout=10, read_timeout=10, retries={"max_attempts": 2})
@@ -43,16 +45,38 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
         elif not secure_only:
             logger.warning("Using not secure protocol is extremely dangerous!!")
 
-        self.service_address = service_address if service_address.endswith("/") else "%s/" % service_address
-        self.bucket = bucket
-        self.source_dir = source_dir if source_dir == "" or source_dir.endswith("/") else "%s/" % source_dir
+        self.service_address = (
+            service_address
+            if service_address.endswith("/")
+            else "%s/" % service_address
+        )
+        # 支持virtual_path模式，bucket形如xxx$virtual_path即判定为该模式
+        bucket_partitions = bucket.split("$")
+        if len(bucket_partitions) > 1 and bucket_partitions[-1] == "virtual_path":
+            self.bucket = "$".join(bucket_partitions[:-1])
+            s3_config = Config(
+                s3={"addressing_style": "virtual"},
+                connect_timeout=10,
+                read_timeout=10,
+                retries={"max_attempts": 2},
+            )
+            self.virtual_path = True
+        else:
+            self.bucket = bucket
+            s3_config = CONFIG
+            self.virtual_path = False
+        self.source_dir = (
+            source_dir
+            if source_dir == "" or source_dir.endswith("/")
+            else "%s/" % source_dir
+        )
         self.use_cache = use_cache
         self.s3 = boto3.resource(
             "s3",
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             endpoint_url=self.service_address,
-            config=CONFIG,
+            config=s3_config,
         )
         self.obj_cache = {}
 
@@ -63,14 +87,15 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
         return compile(self.get_source(fullname), self.get_file(fullname), "exec")
 
     def get_source(self, fullname):
-        source_code = self._fetch_obj_content(self._obj_key(fullname, is_pkg=self.is_package(fullname)))
+        source_code = self._fetch_obj_content(
+            self._obj_key(fullname, is_pkg=self.is_package(fullname))
+        )
 
         if source_code is None:
             raise ImportError(
-                "Can not find {module} in {service_address}{bucket}/{source_dir}".format(
+                "Can not find {module} in {request_path}/{source_dir}".format(
                     module=fullname,
-                    service_address=self.service_address,
-                    bucket=self.bucket,
+                    request_path=self.resolve_request_path(),
                     source_dir=self.source_dir,
                 )
             )
@@ -80,10 +105,15 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
     def get_path(self, fullname):
         return [self.get_file(fullname).rpartition("/")[0]]
 
+    def resolve_request_path(self):
+        if self.virtual_path:
+            scheme, host = self.service_address.split("://")
+            return f"{scheme}://{self.bucket}.{host}"
+        return f"{self.service_address}{self.bucket}"
+
     def get_file(self, fullname):
-        return "{service_address}{bucket}/{key}".format(
-            service_address=self.service_address,
-            bucket=self.bucket,
+        return "{request_path}/{key}".format(
+            request_path=self.resolve_request_path(),
             key=self._obj_key(fullname, is_pkg=self.is_package(fullname)),
         )
 
