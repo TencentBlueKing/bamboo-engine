@@ -539,7 +539,7 @@ class Engine:
         process_info = self.runtime.get_sleep_process_info_with_current_node_id(node_id)
 
         if not process_info:
-            raise InvalidOperationError("can not find process with current node id: {}".format(node_id))
+            raise InvalidOperationError("can not find sleep process with current node id: {}".format(node_id))
 
         state = self.runtime.get_state(node_id)
 
@@ -550,10 +550,10 @@ class Engine:
             raise InvalidOperationError("node version {} not exist".format(version))
 
         if schedule.finished:
-            raise InvalidOperationError("scheudle is already finished")
+            raise InvalidOperationError("schedule is already finished")
 
         if schedule.expired:
-            raise InvalidOperationError("scheudle is already expired")
+            raise InvalidOperationError("schedule is already expired")
 
         self.runtime.pre_callback(node_id, version, data)
 
