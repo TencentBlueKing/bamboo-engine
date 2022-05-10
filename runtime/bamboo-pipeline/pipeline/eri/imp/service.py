@@ -40,7 +40,9 @@ class ServiceWrapper(ServiceInterface):
         data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
         parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
 
-        pre_service_execute.send(sender=ServiceWrapper, service=self.service, data=data_obj, parent_data=parent_data_obj)
+        pre_service_execute.send(
+            sender=ServiceWrapper, service=self.service, data=data_obj, parent_data=parent_data_obj
+        )
 
         try:
             execute_res = self.service.execute(data_obj, parent_data_obj)
@@ -78,7 +80,13 @@ class ServiceWrapper(ServiceInterface):
         data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
         parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
 
-        pre_service_schedule.send(sender=ServiceWrapper, service=self.service, data=data_obj, parent_data=parent_data_obj, callback_data=callback_data)
+        pre_service_schedule.send(
+            sender=ServiceWrapper,
+            service=self.service,
+            data=data_obj,
+            parent_data=parent_data_obj,
+            callback_data=callback_data,
+        )
 
         try:
             schedule_res = self.service.schedule(
