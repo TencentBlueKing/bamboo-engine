@@ -45,7 +45,7 @@ class ServiceWrapperTestCase(TestCase):
         with patch("pipeline.eri.imp.service.pre_service_execute", pre_service_execute):
             execute_res = w.execute(data, root_pipeline_data)
 
-        pre_service_execute.assert_called_once()
+        pre_service_execute.send.assert_called_once()
         self.assertFalse(execute_res)
         self.assertEqual(data.inputs, {"1": 1, "a": 1, "b": 2})
         self.assertEqual(data.outputs, {"2": 2, "c": 3, "d": 4})
@@ -81,7 +81,7 @@ class ServiceWrapperTestCase(TestCase):
         with patch("pipeline.eri.imp.service.pre_service_schedule", pre_service_schedule):
             schedule_res = w.schedule(schedule, data, root_pipeline_data, callback_data)
 
-        pre_service_schedule.assert_called_once()
+        pre_service_schedule.send.assert_called_once()
         self.assertFalse(schedule_res)
         self.assertEqual(data.inputs, {"1": 1, "a": 1, "b": 2})
         self.assertEqual(data.outputs, {"2": 2, "c": 3, "d": 4})
