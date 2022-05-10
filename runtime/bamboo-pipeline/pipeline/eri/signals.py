@@ -16,3 +16,5 @@ from django.dispatch import Signal
 post_set_state = Signal(providing_args=["node_id", "to_state", "version", "root_id", "parent_id", "loop"])
 execute_interrupt = Signal(providing_args=["event"])
 schedule_interrupt = Signal(providing_args=["event"])
+pre_service_execute = Signal(providing_args=["service", "data", "parent_data"])
+pre_service_schedule = Signal(providing_args=["service", "data", "parent_data", "callback_data"])
