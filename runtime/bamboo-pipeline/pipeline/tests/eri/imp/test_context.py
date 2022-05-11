@@ -163,3 +163,58 @@ class ContextMixinTestCase(TransactionTestCase):
         self.assertEqual(context_values["${var_6}"].type, ContextValueType.PLAIN)
         self.assertEqual(context_values["${var_6}"].value, "6_val")
         self.assertIsNone(context_values["${var_6}"].code)
+
+    def test_update_context_values(self):
+        DBContextValue.objects.create(
+            pipeline_id=self.pipeline_id,
+            key="${var_5}",
+            type=ContextValueType.COMPUTE.value,
+            serializer=ContextMixin.JSON_SERIALIZER,
+            value=json.dumps({"attr1": "a", "attr2": "${var_3}"}),
+            references='["${var_1}", "${var_2}", "${var_3}"]',
+            code="cv",
+        )
+        context_values = [
+            ContextValue("${var_1}", ContextValueType.PLAIN, value="456"),
+            ContextValue("${var_2}", ContextValueType.SPLICE, value="456_${var_1}"),
+            ContextValue("${var_3}", ContextValueType.SPLICE, value="${var_1}"),
+            ContextValue("${var_4}", ContextValueType.COMPUTE, value="${var_1}_${var_2}", code="cv")
+        ]
+        self.mixin.update_context_values(pipeline_id=self.pipeline_id, context_values=context_values)
+
+        cv_dict = {cv.key : cv for cv in DBContextValue.objects.all()}
+
+        # update value
+        self.assertEqual(cv_dict["${var_1}"].type, ContextValueType.PLAIN.value)
+        self.assertEqual(cv_dict["${var_1}"].serializer, ContextMixin.JSON_SERIALIZER)
+        self.assertEqual(cv_dict["${var_1}"].value, '"456"')
+        self.assertEqual(set(json.loads(cv_dict["${var_1}"].references)), set())
+        self.assertEqual(cv_dict["${var_1}"].code, "")
+
+        # add references
+        self.assertEqual(cv_dict["${var_2}"].type, ContextValueType.SPLICE.value)
+        self.assertEqual(cv_dict["${var_2}"].serializer, ContextMixin.JSON_SERIALIZER)
+        self.assertEqual(cv_dict["${var_2}"].value, '"456_${var_1}"')
+        self.assertEqual(set(json.loads(cv_dict["${var_2}"].references)), {"${var_1}"})
+        self.assertEqual(cv_dict["${var_2}"].code, "")
+
+        # remove references
+        self.assertEqual(cv_dict["${var_3}"].type, ContextValueType.SPLICE.value)
+        self.assertEqual(cv_dict["${var_3}"].serializer, ContextMixin.JSON_SERIALIZER)
+        self.assertEqual(cv_dict["${var_3}"].value, '"${var_1}"')
+        self.assertEqual(set(json.loads(cv_dict["${var_3}"].references)), {"${var_1}"})
+        self.assertEqual(cv_dict["${var_3}"].code, "")
+
+        # update reference
+        self.assertEqual(cv_dict["${var_4}"].type, ContextValueType.COMPUTE.value)
+        self.assertEqual(cv_dict["${var_4}"].serializer, ContextMixin.JSON_SERIALIZER)
+        self.assertEqual(cv_dict["${var_4}"].value, '"${var_1}_${var_2}"')
+        self.assertEqual(set(json.loads(cv_dict["${var_4}"].references)), {"${var_1}", "${var_2}"})
+        self.assertEqual(cv_dict["${var_4}"].code, "cv")
+
+        # update reference passively
+        self.assertEqual(cv_dict["${var_5}"].type, ContextValueType.COMPUTE.value)
+        self.assertEqual(cv_dict["${var_5}"].serializer, ContextMixin.JSON_SERIALIZER)
+        self.assertEqual(cv_dict["${var_5}"].value, json.dumps({"attr1": "a", "attr2": "${var_3}"}))
+        self.assertEqual(set(json.loads(cv_dict["${var_5}"].references)), {"${var_1}", "${var_3}"})
+        self.assertEqual(cv_dict["${var_5}"].code, "cv")
