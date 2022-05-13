@@ -174,7 +174,7 @@ class BambooDjangoRuntime(
             default_condition = gateway.get("default_condition", {})
             detail["default_condition"] = {
                 "name": default_condition["name"],
-                "target_id":  pipeline["flows"][default_condition["flow_id"]]["target"],
+                "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
                 "flow_id": default_condition["flow_id"],
             } if default_condition else None
         elif gateway["type"] == NodeType.ParallelGateway.value:
@@ -193,7 +193,7 @@ class BambooDjangoRuntime(
             default_condition = gateway.get("default_condition", {})
             detail["default_condition"] = {
                 "name": default_condition["name"],
-                "target_id":  pipeline["flows"][default_condition["flow_id"]]["target"],
+                "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
                 "flow_id": default_condition["flow_id"],
             } if default_condition else None
             detail["converge_gateway_id"] = gateway["converge_gateway_id"]
