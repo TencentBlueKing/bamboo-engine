@@ -133,12 +133,14 @@ class ExclusiveGatewayHandler(NodeHandler):
                     meet_targets.append(c.target_id)
 
         # all miss
-        if not meet_targets:
+        if not meet_targets and not self.node.default_condition:
             return self._execute_fail(
                 ex_data="all conditions of branches are not meet",
                 version=version,
                 ignore_boring_set=recover_point is not None,
             )
+        elif not meet_targets:
+            meet_targets.append(self.node.default_condition.target_id)
 
         # multiple branch hit
         if len(meet_targets) != 1:

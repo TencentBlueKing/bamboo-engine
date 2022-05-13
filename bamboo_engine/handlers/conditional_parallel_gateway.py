@@ -127,12 +127,14 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                     fork_targets.append(c.target_id)
 
         # all miss
-        if not fork_targets:
+        if not fork_targets and not self.node.default_condition:
             return self._execute_fail(
                 ex_data="all conditions of branches are not meet",
                 version=version,
                 ignore_boring_set=recover_point is not None,
             )
+        elif not fork_targets:
+            fork_targets.append(self.node.default_condition.target_id)
 
         # fork
         from_to = {}

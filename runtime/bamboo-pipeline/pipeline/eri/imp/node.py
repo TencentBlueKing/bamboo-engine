@@ -26,7 +26,7 @@ from bamboo_engine.eri import (
     EmptyStartEvent,
     EmptyEndEvent,
     ExecutableEndEvent,
-    Condition,
+    Condition, DefaultCondition,
 )
 
 from pipeline.eri.models import Node as DBNode
@@ -61,9 +61,11 @@ class NodeMixin:
             return SubProcess(type=NodeType.SubProcess, start_event_id=node_detail["start_event_id"], **common_args)
 
         elif node_type == NodeType.ExclusiveGateway.value:
+            default_condition = node_detail.get("default_condition")
             return ExclusiveGateway(
                 type=NodeType.ExclusiveGateway,
                 conditions=[Condition(**c) for c in node_detail["conditions"]],
+                default_condition=DefaultCondition(**default_condition) if default_condition else None,
                 **common_args
             )
 
@@ -73,10 +75,12 @@ class NodeMixin:
             )
 
         elif node_type == NodeType.ConditionalParallelGateway.value:
+            default_condition = node_detail.get("default_condition")
             return ConditionalParallelGateway(
                 type=NodeType.ConditionalParallelGateway,
                 converge_gateway_id=node_detail["converge_gateway_id"],
                 conditions=[Condition(**c) for c in node_detail["conditions"]],
+                default_condition=DefaultCondition(**default_condition) if default_condition else None,
                 **common_args
             )
 
