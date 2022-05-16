@@ -14,6 +14,12 @@ specific language governing permissions and limitations under the License.
 from typing import Dict
 from bamboo_engine.eri import ContextValueType
 
+CONTEXT_TYPE_MAP = {
+    "plain": ContextValueType.PLAIN,
+    "splice": ContextValueType.SPLICE,
+    "lazy": ContextValueType.COMPUTE,
+}
+
 CONTEXT_VALUE_TYPE_MAP = {
     "plain": ContextValueType.PLAIN.value,
     "splice": ContextValueType.SPLICE.value,
