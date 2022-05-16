@@ -178,11 +178,11 @@ class ContextMixinTestCase(TransactionTestCase):
             ContextValue("${var_1}", ContextValueType.PLAIN, value="456"),
             ContextValue("${var_2}", ContextValueType.SPLICE, value="456_${var_1}"),
             ContextValue("${var_3}", ContextValueType.SPLICE, value="${var_1}"),
-            ContextValue("${var_4}", ContextValueType.COMPUTE, value="${var_1}_${var_2}", code="cv")
+            ContextValue("${var_4}", ContextValueType.COMPUTE, value="${var_1}_${var_2}", code="cv"),
         ]
         self.mixin.update_context_values(pipeline_id=self.pipeline_id, context_values=context_values)
 
-        cv_dict = {cv.key : cv for cv in DBContextValue.objects.all()}
+        cv_dict = {cv.key: cv for cv in DBContextValue.objects.all()}
 
         # update value
         self.assertEqual(cv_dict["${var_1}"].type, ContextValueType.PLAIN.value)

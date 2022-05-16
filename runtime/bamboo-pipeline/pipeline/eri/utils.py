@@ -26,12 +26,13 @@ CONTEXT_VALUE_TYPE_MAP = {
     "lazy": ContextValueType.COMPUTE.value,
 }
 
+
 def caculate_final_references(original_references: Dict[str, set]) -> Dict[str, set]:
     """
     将变量的引用树展开，将树高减少为两层
     convert a:b, b:c,d -> a:b,c,d b:c,d
     """
-    final_references = {k : set() for k in original_references.keys()}
+    final_references = {k: set() for k in original_references.keys()}
     # resolve final references (BFS)
     for key, references in original_references.items():
         queue = []
@@ -47,5 +48,5 @@ def caculate_final_references(original_references: Dict[str, set]) -> Dict[str, 
             final_references[key].add(r)
             if r in original_references:
                 queue.extend(original_references[r])
-    
+
     return final_references

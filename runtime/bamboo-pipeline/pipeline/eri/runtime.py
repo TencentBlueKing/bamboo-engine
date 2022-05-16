@@ -76,7 +76,9 @@ class BambooDjangoRuntime(
                 % (eri_version, self.ERI_SUPPORT_VERSION)
             )
 
-    def _data_inputs_assemble(self, pipeline_id: str, node_id: str, node_inputs: dict) -> Tuple[dict, List[ContextValue]]:
+    def _data_inputs_assemble(
+        self, pipeline_id: str, node_id: str, node_inputs: dict
+    ) -> Tuple[dict, List[ContextValue]]:
         inputs = {}
         context_values = []
         for k, v in node_inputs.items():

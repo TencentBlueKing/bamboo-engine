@@ -15,6 +15,7 @@ from django.test import TestCase
 
 from pipeline.eri.utils import caculate_final_references
 
+
 class CaculateFinalReferencesTestCase(TestCase):
     def test_normal(self):
         original_references = {
@@ -25,7 +26,7 @@ class CaculateFinalReferencesTestCase(TestCase):
             "e": {},
             "f": {"g", "h", "i"},
             "h": {},
-            "i": {}
+            "i": {},
         }
         final_references = caculate_final_references(original_references)
         self.assertEqual(
@@ -39,13 +40,10 @@ class CaculateFinalReferencesTestCase(TestCase):
                 "f": {"g", "h", "i"},
                 "h": set(),
                 "i": set(),
-            }
+            },
         )
 
     def test_circle(self):
         original_references = {"a": {"b"}, "b": {"c"}, "c": {"a"}}
         final_references = caculate_final_references(original_references)
-        self.assertEqual(
-            final_references,
-            {"a": {"a", "b", "c"}, "b": {"a", "b", "c"}, "c": {"a", "b", "c"}}
-        )
+        self.assertEqual(final_references, {"a": {"a", "b", "c"}, "b": {"a", "b", "c"}, "c": {"a", "b", "c"}})

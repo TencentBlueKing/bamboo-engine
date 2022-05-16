@@ -86,7 +86,7 @@ class ContextMixin(SerializerMixin):
         context_value_references = {}
         for cv in context_values:
             context_value_references[cv.key] = Template(cv.value).get_reference()
-        
+
         # 重新计算并更新整个流程的变量引用图
         exist_context_values = DBContextValue.objects.filter(
             ~Q(key__in=context_value_references.keys()) & Q(pipeline_id=pipeline_id)
@@ -94,9 +94,7 @@ class ContextMixin(SerializerMixin):
         exist_context_value_references = {}
         for ecv in exist_context_values:
             exist_context_value_references[ecv.key] = set(json.loads(ecv.references))
-            context_value_references[ecv.key] = Template(
-                self._deserialize(ecv.value, ecv.serializer)
-            ).get_reference()
+            context_value_references[ecv.key] = Template(self._deserialize(ecv.value, ecv.serializer)).get_reference()
 
         # convert a:b, b:c,d -> a:b,c,d b:c,d
         final_references = caculate_final_references(context_value_references)
@@ -117,7 +115,7 @@ class ContextMixin(SerializerMixin):
                     value=value,
                     serializer=serializer,
                     code=cv.code or "",
-                    references=json.dumps(list(final_references[cv.key]))
+                    references=json.dumps(list(final_references[cv.key])),
                 )
 
             # update references
@@ -125,8 +123,6 @@ class ContextMixin(SerializerMixin):
                 DBContextValue.objects.filter(pipeline_id=pipeline_id, key=key).update(
                     references=json.dumps(list(final_references[key]))
                 )
-
-
 
     @metrics.setup_histogram(metrics.ENGINE_RUNTIME_CONTEXT_VALUE_UPSERT_TIME)
     @transaction.atomic
@@ -148,7 +144,11 @@ class ContextMixin(SerializerMixin):
             value, serializer = self._serialize(context_value.value)
 
             DBContextValue.objects.filter(pipeline_id=pipeline_id, key=k).update(
-                type=ContextValueType.PLAIN.value, value=value, serializer=serializer, code="", references="[]",
+                type=ContextValueType.PLAIN.value,
+                value=value,
+                serializer=serializer,
+                code="",
+                references="[]",
             )
 
         # insert
