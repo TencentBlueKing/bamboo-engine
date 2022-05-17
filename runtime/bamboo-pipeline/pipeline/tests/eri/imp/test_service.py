@@ -11,7 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from mock import MagicMock
+from mock import MagicMock, patch
 
 from django.test import TestCase
 
@@ -41,8 +41,11 @@ class ServiceWrapperTestCase(TestCase):
         root_pipeline_data = ExecutionData(inputs={"3": 3}, outputs={"4": 4})
 
         w = ServiceWrapper(S())
-        execute_res = w.execute(data, root_pipeline_data)
+        pre_service_execute = MagicMock()
+        with patch("pipeline.eri.imp.service.pre_service_execute", pre_service_execute):
+            execute_res = w.execute(data, root_pipeline_data)
 
+        pre_service_execute.send.assert_called_once()
         self.assertFalse(execute_res)
         self.assertEqual(data.inputs, {"1": 1, "a": 1, "b": 2})
         self.assertEqual(data.outputs, {"2": 2, "c": 3, "d": 4})
@@ -74,8 +77,11 @@ class ServiceWrapperTestCase(TestCase):
         schedule = MagicMock()
 
         w = ServiceWrapper(S())
-        schedule_res = w.schedule(schedule, data, root_pipeline_data, callback_data)
+        pre_service_schedule = MagicMock()
+        with patch("pipeline.eri.imp.service.pre_service_schedule", pre_service_schedule):
+            schedule_res = w.schedule(schedule, data, root_pipeline_data, callback_data)
 
+        pre_service_schedule.send.assert_called_once()
         self.assertFalse(schedule_res)
         self.assertEqual(data.inputs, {"1": 1, "a": 1, "b": 2})
         self.assertEqual(data.outputs, {"2": 2, "c": 3, "d": 4})

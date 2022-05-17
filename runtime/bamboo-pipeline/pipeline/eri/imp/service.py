@@ -19,6 +19,7 @@ from bamboo_engine.eri import Schedule, ExecutionData, CallbackData, ScheduleTyp
 from pipeline.core.flow.activity import Service
 from pipeline.core.data.base import DataObject
 from pipeline.eri.log import get_logger
+from pipeline.eri.signals import pre_service_execute, pre_service_schedule
 
 
 class ServiceWrapper(ServiceInterface):
@@ -38,6 +39,10 @@ class ServiceWrapper(ServiceInterface):
         """
         data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
         parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
+
+        pre_service_execute.send(
+            sender=ServiceWrapper, service=self.service, data=data_obj, parent_data=parent_data_obj
+        )
 
         try:
             execute_res = self.service.execute(data_obj, parent_data_obj)
@@ -74,6 +79,14 @@ class ServiceWrapper(ServiceInterface):
         """
         data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
         parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
+
+        pre_service_schedule.send(
+            sender=ServiceWrapper,
+            service=self.service,
+            data=data_obj,
+            parent_data=parent_data_obj,
+            callback_data=callback_data,
+        )
 
         try:
             schedule_res = self.service.schedule(
