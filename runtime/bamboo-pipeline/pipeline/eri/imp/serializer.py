@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
 import json
 import pickle
 import codecs
-from typing import Any
+from typing import Any, Tuple
 
 
 class SerializerMixin:
@@ -29,7 +29,7 @@ class SerializerMixin:
         else:
             raise ValueError("unsupport serializer type: {}".format(serializer))
 
-    def _serialize(self, data: Any) -> (str, str):
+    def _serialize(self, data: Any) -> Tuple[str, str]:
         try:
             return json.dumps(data), self.JSON_SERIALIZER
         except TypeError:

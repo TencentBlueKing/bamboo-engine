@@ -38,7 +38,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "6.2.0"
+__version__ = "6.3.0"
 
 
 def version():
@@ -1135,6 +1135,18 @@ class ContextMixin:
         """
 
     @abstractmethod
+    def update_context_values(self, pipeline_id: str, context_values: List[ContextValue]):
+        """
+        该接口应为幂等接口
+        更新上下文数据
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        :param context_values: 上下文数据
+        :type context_values: List[ContextValue]
+        """
+
+    @abstractmethod
     def upsert_plain_context_values(self, pipeline_id: str, update: Dict[str, ContextValue]):
         """
         该接口应为幂等接口
@@ -1316,7 +1328,7 @@ class DataMixin:
         """
 
     @abstractmethod
-    def serialize_execution_data(self, data: dict) -> (str, str):
+    def serialize_execution_data(self, data: dict) -> Tuple[str, str]:
         """
         幂等接口
         序列化执行数据输入或输出

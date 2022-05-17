@@ -648,3 +648,10 @@ def preview_node_inputs(
     hydrated_context = context.hydrate(deformat=True)
     inputs = Template(raw_inputs).render(hydrated_context)
     return inputs
+
+
+@_ensure_return_api_result
+def update_context_values(
+    runtime: EngineRuntimeInterface, pipeline_id: str, context_values: List[ContextValue]
+) -> EngineAPIResult:
+    return runtime.update_context_values(pipeline_id=pipeline_id, context_values=context_values)

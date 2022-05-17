@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from django.conf import settings
 from django.db import transaction
@@ -25,6 +25,7 @@ from bamboo_engine.eri import interfaces
 from bamboo_engine.eri import EngineRuntimeInterface, NodeType, ContextValueType
 
 from pipeline.eri import codec
+from pipeline.eri.utils import caculate_final_references, CONTEXT_VALUE_TYPE_MAP
 from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
 from pipeline.eri.imp.hooks import HooksMixin
 from pipeline.eri.imp.process import ProcessMixin
@@ -57,11 +58,6 @@ class BambooDjangoRuntime(
     EventMixin,
     EngineRuntimeInterface,
 ):
-    CONTEXT_VALUE_TYPE_MAP = {
-        "plain": ContextValueType.PLAIN.value,
-        "splice": ContextValueType.SPLICE.value,
-        "lazy": ContextValueType.COMPUTE.value,
-    }
 
     ERI_SUPPORT_VERSION = 6
 
@@ -80,7 +76,9 @@ class BambooDjangoRuntime(
                 % (eri_version, self.ERI_SUPPORT_VERSION)
             )
 
-    def _data_inputs_assemble(self, pipeline_id: str, node_id: str, node_inputs: dict) -> (dict, List[ContextValue]):
+    def _data_inputs_assemble(
+        self, pipeline_id: str, node_id: str, node_inputs: dict
+    ) -> Tuple[dict, List[ContextValue]]:
         inputs = {}
         context_values = []
         for k, v in node_inputs.items():
@@ -230,7 +228,7 @@ class BambooDjangoRuntime(
 
     def _prepare(
         self, pipeline: dict, root_id: str, subprocess_context: dict, parent_id: Optional[str] = None
-    ) -> (List[Node], List[Data], List[ContextValue], List[ContextOutputs]):
+    ) -> Tuple[List[Node], List[Data], List[ContextValue], List[ContextOutputs]]:
 
         parent_id = parent_id or root_id
 
@@ -254,7 +252,7 @@ class BambooDjangoRuntime(
                     ContextValue(
                         pipeline_id=pipeline["id"],
                         key=key,
-                        type=self.CONTEXT_VALUE_TYPE_MAP[input_data["type"]],
+                        type=CONTEXT_VALUE_TYPE_MAP[input_data["type"]],
                         serializer=self.JSON_SERIALIZER,
                         value=json.dumps(input_data["value"]),
                         code=input_data.get("custom_type", ""),
@@ -331,7 +329,7 @@ class BambooDjangoRuntime(
                         ContextValue(
                             pipeline_id=act["id"],
                             key=key,
-                            type=self.CONTEXT_VALUE_TYPE_MAP["plain"],
+                            type=CONTEXT_VALUE_TYPE_MAP["plain"],
                             serializer=serializer,
                             value=serialized,
                             references="[]",
@@ -375,22 +373,8 @@ class BambooDjangoRuntime(
                 self._gen_gateway_node(gateway=gateway, pipeline=pipeline, root_id=root_id, parent_id=parent_id)
             )
 
-        # resolve final references (BFS)
         # convert a:b, b:c,d -> a:b,c,d b:c,d
-        for key, references in context_var_references.items():
-            queue = []
-            queue.extend(references)
-
-            while queue:
-                r = queue.pop()
-
-                # processed
-                if r in final_references[key]:
-                    continue
-
-                final_references[key].add(r)
-                if r in context_var_references:
-                    queue.extend(context_var_references[r])
+        final_references.update(caculate_final_references(context_var_references))
 
         for cv in context_values:
             if cv.pipeline_id != parent_id:
@@ -448,7 +432,7 @@ class BambooDjangoRuntime(
                 ContextValue(
                     pipeline_id=pipeline_id,
                     key=key,
-                    type=self.CONTEXT_VALUE_TYPE_MAP["plain"],
+                    type=CONTEXT_VALUE_TYPE_MAP["plain"],
                     serializer=serializer,
                     value=serialized,
                     references="[]",

@@ -14,11 +14,14 @@ specific language governing permissions and limitations under the License.
 import json
 from typing import Dict, List, Set
 
+from django.db.models import Q
 from django.db import transaction
 
 from bamboo_engine import metrics
+from bamboo_engine.template import Template
 from bamboo_engine.eri import ContextValue, ContextValueType
 
+from pipeline.eri.utils import caculate_final_references
 from pipeline.eri.models import ContextValue as DBContextValue
 from pipeline.eri.models import ContextOutputs
 from pipeline.eri.imp.serializer import SerializerMixin
@@ -71,6 +74,56 @@ class ContextMixin(SerializerMixin):
 
         return set(references)
 
+    def update_context_values(self, pipeline_id: str, context_values: List[ContextValue]):
+        """
+        更新上下文数据
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        :param context_values: 上下文数据
+        :type context_values: List[ContextValue]
+        """
+        context_value_references = {}
+        for cv in context_values:
+            context_value_references[cv.key] = Template(cv.value).get_reference()
+
+        # 重新计算并更新整个流程的变量引用图
+        exist_context_values = DBContextValue.objects.filter(
+            ~Q(key__in=context_value_references.keys()) & Q(pipeline_id=pipeline_id)
+        )
+        exist_context_value_references = {}
+        for ecv in exist_context_values:
+            exist_context_value_references[ecv.key] = set(json.loads(ecv.references))
+            context_value_references[ecv.key] = Template(self._deserialize(ecv.value, ecv.serializer)).get_reference()
+
+        # convert a:b, b:c,d -> a:b,c,d b:c,d
+        final_references = caculate_final_references(context_value_references)
+
+        # find key which references need to be updated
+        update_references_key = []
+        for key, exist_ref_set in exist_context_value_references.items():
+            if exist_ref_set != final_references.get(key, set()):
+                update_references_key.append(key)
+
+        # do update
+        with transaction.atomic():
+            # update context value
+            for cv in context_values:
+                value, serializer = self._serialize(cv.value)
+                DBContextValue.objects.filter(pipeline_id=pipeline_id, key=cv.key).update(
+                    type=cv.type.value,
+                    value=value,
+                    serializer=serializer,
+                    code=cv.code or "",
+                    references=json.dumps(list(final_references[cv.key])),
+                )
+
+            # update references
+            for key in update_references_key:
+                DBContextValue.objects.filter(pipeline_id=pipeline_id, key=key).update(
+                    references=json.dumps(list(final_references[key]))
+                )
+
     @metrics.setup_histogram(metrics.ENGINE_RUNTIME_CONTEXT_VALUE_UPSERT_TIME)
     @transaction.atomic
     def upsert_plain_context_values(self, pipeline_id: str, update: Dict[str, ContextValue]):
@@ -91,7 +144,11 @@ class ContextMixin(SerializerMixin):
             value, serializer = self._serialize(context_value.value)
 
             DBContextValue.objects.filter(pipeline_id=pipeline_id, key=k).update(
-                type=ContextValueType.PLAIN.value, value=value, serializer=serializer, code="", references="[]",
+                type=ContextValueType.PLAIN.value,
+                value=value,
+                serializer=serializer,
+                code="",
+                references="[]",
             )
 
         # insert
