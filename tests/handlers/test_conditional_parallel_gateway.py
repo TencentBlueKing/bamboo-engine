@@ -16,7 +16,14 @@ from mock import MagicMock, patch
 
 from bamboo_engine import states
 from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
-from bamboo_engine.eri import ProcessInfo, NodeType, ConditionalParallelGateway, Condition, ExecuteInterruptPoint
+from bamboo_engine.eri import (
+    ProcessInfo,
+    NodeType,
+    ConditionalParallelGateway,
+    Condition,
+    ExecuteInterruptPoint,
+    DefaultCondition,
+)
 from bamboo_engine.handlers.conditional_parallel_gateway import (
     ConditionalParallelGatewayHandler,
 )
@@ -291,6 +298,62 @@ def test_conditional_parallel_gateway__recover_with_dispatch_processes(pi, node,
     runtime.fork.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id, version="v1", to_state=states.FINISHED, set_archive_time=True, ignore_boring_set=True
+    )
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE
+    assert len(interrupter.check_point.handler_data.dispatch_processes) > 0
+
+
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(ExecuteInterruptPoint(name="v1"), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_conditional_parallel_gateway__no_meet_target_with_default_condition(pi, node, interrupter, recover_point):
+    node.conditions = [
+        Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
+        Condition(name="c2", evaluation="0 == 1", target_id="t2", flow_id="f2"),
+        Condition(name="c3", evaluation="0 == 1", target_id="t3", flow_id="f3"),
+    ]
+    node.default_condition = DefaultCondition(name="d1", target_id="t1", flow_id="f1")
+
+    additional_refs = []
+    dispatch_processes = ["p1"]
+
+    runtime = MagicMock()
+    runtime.get_context_key_references = MagicMock(return_value=additional_refs)
+    runtime.get_context_values = MagicMock(return_value=[])
+    runtime.fork = MagicMock(return_value=dispatch_processes)
+    runtime.get_data_inputs = MagicMock(return_value={})
+
+    handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
+
+    assert result.should_sleep == True
+    assert result.schedule_ready == False
+    assert result.schedule_type == None
+    assert result.schedule_after == -1
+    assert result.dispatch_processes == dispatch_processes
+    assert result.next_node_id == None
+    assert result.should_die == False
+
+    runtime.get_data_inputs.assert_called_once_with("root")
+    runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.fork.assert_called_once_with(
+        parent_id=pi.process_id,
+        root_pipeline_id=pi.root_pipeline_id,
+        pipeline_stack=pi.pipeline_stack,
+        from_to={"t1": "cg"},
+    )
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FINISHED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
     )
 
     assert interrupter.check_point.name == ExecuteKeyPoint.CPG_PROCESS_FORK_DONE

@@ -188,6 +188,7 @@ def __grow(tree, elem):
             "type": elem.type(),
             "name": elem.name,
             "conditions": elem.link_conditions_with(outgoing),
+            "default_condition": elem.link_default_condition_with(outgoing),
         }
 
         for i, next_elem in enumerate(elem.outgoing):

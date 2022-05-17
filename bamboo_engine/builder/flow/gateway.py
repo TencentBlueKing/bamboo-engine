@@ -29,8 +29,9 @@ class ParallelGateway(Element):
 
 
 class ConditionGateway(Element):
-    def __init__(self, conditions=None, *args, **kwargs):
+    def __init__(self, conditions=None, default_condition_outgoing=None, *args, **kwargs):
         self.conditions = conditions or {}
+        self.default_condition_outgoing = default_condition_outgoing
         super(ConditionGateway, self).__init__(*args, **kwargs)
 
     def add_condition(self, index, evaluate):
@@ -42,6 +43,11 @@ class ConditionGateway(Element):
             conditions[out] = {"evaluate": self.conditions[i]}
 
         return conditions
+
+    def link_default_condition_with(self, outgoing):
+        if self.default_condition_outgoing is None:
+            return {}
+        return {"flow_id": outgoing[self.default_condition_outgoing]}
 
 
 class ConditionalParallelGateway(ConditionGateway):

@@ -173,7 +173,7 @@ class BambooDjangoRuntime(
             ]
             default_condition = gateway.get("default_condition", {})
             detail["default_condition"] = {
-                "name": default_condition["name"],
+                "name": default_condition["flow_id"],
                 "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
                 "flow_id": default_condition["flow_id"],
             } if default_condition else None
@@ -192,7 +192,7 @@ class BambooDjangoRuntime(
             ]
             default_condition = gateway.get("default_condition", {})
             detail["default_condition"] = {
-                "name": default_condition["name"],
+                "name": default_condition["flow_id"],
                 "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
                 "flow_id": default_condition["flow_id"],
             } if default_condition else None

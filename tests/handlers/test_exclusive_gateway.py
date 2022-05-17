@@ -19,7 +19,7 @@ from bamboo_engine.eri import (
     ProcessInfo,
     NodeType,
     ExclusiveGateway,
-    Condition,
+    Condition, DefaultCondition,
 )
 from bamboo_engine.handlers.exclusive_gateway import (
     ExclusiveGatewayHandler,
@@ -220,6 +220,70 @@ def test_exclusive_gateway__execute_not_meet_targets(recover_point):
     runtime.set_execution_data_outputs.assert_called_once_with(
         node.id, {"ex_data": "all conditions of branches are not meet"}
     )
+
+
+@pytest.mark.parametrize(
+    "recover_point",
+    [
+        pytest.param(MagicMock(), id="recover_is_not_none"),
+        pytest.param(None, id="recover_is_none"),
+    ],
+)
+def test_exclusive_gateway__execute_not_meet_targets_with_default(recover_point):
+    conditions = [
+        Condition(name="c1", evaluation="0 == 1", target_id="t1", flow_id="f1"),
+        Condition(name="c2", evaluation="0 == 1", target_id="t2", flow_id="f2"),
+    ]
+    default_condition = DefaultCondition(name="d1", flow_id="f1", target_id="t1")
+    node = ExclusiveGateway(
+        conditions=conditions,
+        default_condition=default_condition,
+        id="nid",
+        type=NodeType.ExclusiveGateway,
+        target_flows=["f1", "f2"],
+        target_nodes=["t1", "t2"],
+        targets={"f1": "t1", "f2": "t2"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        can_skip=True,
+    )
+    pi = ProcessInfo(
+        process_id="pid",
+        destination_id="",
+        root_pipeline_id="root",
+        pipeline_stack=["root"],
+        parent_id="parent",
+    )
+    additional_refs = []
+
+    runtime = MagicMock()
+    runtime.get_context_key_references = MagicMock(return_value=additional_refs)
+    runtime.get_context_values = MagicMock(return_value=[])
+    runtime.get_execution_data_outputs = MagicMock(return_value={})
+    runtime.get_data_inputs = MagicMock(return_value={})
+
+    handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
+    result = handler.execute(pi, 1, 1, "v1", recover_point)
+
+    assert result.should_sleep == False
+    assert result.schedule_ready == False
+    assert result.schedule_type == None
+    assert result.schedule_after == -1
+    assert result.dispatch_processes == []
+    assert result.next_node_id == "t1"
+    assert result.should_die == False
+
+    runtime.get_data_inputs.assert_called_once_with("root")
+    runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        version="v1",
+        to_state=states.FINISHED,
+        set_archive_time=True,
+        ignore_boring_set=recover_point is not None,
+    )
+
 
 
 @pytest.mark.parametrize(
