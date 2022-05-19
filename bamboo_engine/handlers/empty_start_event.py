@@ -42,10 +42,9 @@ class EmptyStartEventHandler(NodeHandler):
         :return: 执行结果
         :rtype: ExecuteResult
         """
-        
+
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             try:
                 data = self.runtime.get_data(self.node.id)
@@ -60,7 +59,9 @@ class EmptyStartEventHandler(NodeHandler):
                 upsert_context_dict = dict()
                 pre_render_keys = data.inputs["pre_render_keys"].value
 
-                logger.info("top_pipeline({}) pre_render_keys are: {}".format(top_pipeline_id, ",".join(pre_render_keys)))
+                logger.info(
+                    "top_pipeline({}) pre_render_keys are: {}".format(top_pipeline_id, ",".join(pre_render_keys))
+                )
 
                 refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=set(pre_render_keys))
 
@@ -95,8 +96,7 @@ class EmptyStartEventHandler(NodeHandler):
                 self.runtime.upsert_plain_context_values(top_pipeline_id, upsert_context_dict)
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             self.runtime.set_state(
                 node_id=self.node.id,

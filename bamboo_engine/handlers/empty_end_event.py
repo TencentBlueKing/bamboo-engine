@@ -45,8 +45,7 @@ class EmptyEndEventHandler(NodeHandler):
         :rtype: ExecuteResult
         """
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             root_pipeline_id = process_info.root_pipeline_id
             pipeline_id = process_info.pipeline_stack.pop()
@@ -133,8 +132,7 @@ class EmptyEndEventHandler(NodeHandler):
             outputs[self.INNER_LOOP_KEY] = subproc_state.inner_loop + Settings.RERUN_INDEX_OFFSET
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             self.runtime.set_execution_data_outputs(node_id=pipeline_id, outputs=outputs)
 

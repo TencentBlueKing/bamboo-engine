@@ -39,8 +39,7 @@ class ConvergeGatewayHandler(NodeHandler):
         """
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             self.runtime.set_state(
                 node_id=self.node.id,

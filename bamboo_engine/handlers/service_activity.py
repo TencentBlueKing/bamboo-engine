@@ -70,8 +70,7 @@ class ServiceActivityHandler(NodeHandler):
         """
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             top_pipeline_id = process_info.top_pipeline_id
             root_pipeline_id = process_info.root_pipeline_id
@@ -230,8 +229,7 @@ class ServiceActivityHandler(NodeHandler):
             logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
             self.interrupter.check_and_set(
@@ -392,8 +390,7 @@ class ServiceActivityHandler(NodeHandler):
         :rtype: ScheduleResult
         """
         with metrics.observe(
-            metrics.ENGINE_NODE_SCHEDULE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_SCHEDULE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             # data prepare
             top_pipeline_id = process_info.top_pipeline_id
@@ -412,7 +409,6 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_inputs,
             )
 
-            
             service = self.runtime.get_service(code=self.node.code, version=self.node.version)
             service.setup_runtime_attributes(
                 id=self.node.id,
@@ -450,8 +446,7 @@ class ServiceActivityHandler(NodeHandler):
                 is_schedule_done = service.is_schedule_done()
 
         with metrics.observe(
-            metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
             self.interrupter.check_and_set(

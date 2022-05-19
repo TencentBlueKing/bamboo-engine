@@ -47,8 +47,7 @@ class SubProcessHandler(NodeHandler):
         """
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             data = self.runtime.get_data(self.node.id)
             root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
@@ -143,8 +142,7 @@ class SubProcessHandler(NodeHandler):
         )
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             # update subprocess context, inject subprocess data
             self.runtime.upsert_plain_context_values(self.node.id, sub_context_values)

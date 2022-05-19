@@ -47,8 +47,7 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         """
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             logger.info(
                 "root_pipeline[%s] node(%s) executable end event: %s",
@@ -87,8 +86,7 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         )
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             if execute_fail:
                 self.runtime.set_execution_data_outputs(node_id=self.node.id, outputs={"ex_data": ex_data})

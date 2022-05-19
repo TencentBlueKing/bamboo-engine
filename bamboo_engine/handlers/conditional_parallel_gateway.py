@@ -49,8 +49,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
         :rtype: ExecuteResult
         """
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             evaluations = [c.evaluation for c in self.node.conditions]
             top_pipeline_id = process_info.top_pipeline_id
@@ -132,8 +131,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                     fork_targets.append(c.target_id)
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
-            type=self.node.type.value, hostname=self._hostname
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             # all miss
             if not fork_targets and not self.node.default_condition:

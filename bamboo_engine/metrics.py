@@ -268,10 +268,10 @@ ENGINE_RUNTIME_PROCESS_READ_TIME = Histogram(
 ENGINE_RUNTIME_EXECUTE_TASK_CLAIM_DELAY = Histogram(
     name="engine_runtime_execute_task_claim_delay",
     documentation="delay between execute task send and task claim",
-    labelnames=["hostname"]
+    labelnames=["hostname"],
 )
 ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY = Histogram(
     name="engine_runtime_schedule_task_claim_delay",
     documentation="delay between schedule task send and task claim",
-    labelnames=["hostname"]
+    labelnames=["hostname"],
 )

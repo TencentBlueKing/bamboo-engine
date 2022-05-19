@@ -15,6 +15,7 @@ import socket
 
 _HOSTNAME = socket.gethostname()
 
+
 def get_hostname():
     """
     获取当前主机名

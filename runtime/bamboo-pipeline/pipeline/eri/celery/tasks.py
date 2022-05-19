@@ -36,7 +36,8 @@ from pipeline.eri.runtime import BambooDjangoRuntime
 
 logger = logging.getLogger(__name__)
 
-def _observe_message_delay(metric : metrics.Histogram, headers: dict):
+
+def _observe_message_delay(metric: metrics.Histogram, headers: dict):
     if not headers or "timestamp" not in headers:
         return
 
@@ -44,7 +45,7 @@ def _observe_message_delay(metric : metrics.Histogram, headers: dict):
         metric.labels(hostname=get_hostname()).observe((time.time() * 1000) - headers["timestamp"])
     except Exception:
         logger.exception("%s observe err" % metric)
-    
+
 
 @task(ignore_result=True)
 def execute(
@@ -80,7 +81,7 @@ def execute(
 
 @task(ignore_result=True)
 def schedule(
-    process_id: int, 
+    process_id: int,
     node_id: str,
     schedule_id: str,
     callback_data_id: Optional[int],
