@@ -1062,7 +1062,7 @@ class Engine:
             engine_post_schedule_start_at = time.time()
             interrupter.check_and_set(ScheduleKeyPoint.SCHEDULE_NODE_DONE, schedule_result=schedule_result)
 
-            ENGINE_NODE_SCHEDULE_TIME.labels(type=node.type.value, hostname=self._hostname).observe(
+            ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
                 time.time() - schedule_start
             )
             logger.info(
