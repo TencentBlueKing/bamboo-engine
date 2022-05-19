@@ -37,6 +37,7 @@ class PipelineElement(object):
     gateways = "gateways"
     constants = "constants"
     conditions = "conditions"
+    default_condition = "default_condition"
     incoming = "incoming"
     outgoing = "outgoing"
     source = "source"

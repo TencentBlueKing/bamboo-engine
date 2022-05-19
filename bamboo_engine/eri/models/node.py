@@ -117,6 +117,26 @@ class Condition(Representable):
         self.flow_id = flow_id
 
 
+class DefaultCondition(Representable):
+    """
+    默认分支条件
+    """
+
+    def __init__(self, name: str, target_id: str, flow_id: str):
+        """
+
+        :param name: 条件名
+        :type name: str
+        :param target_id: 目标节点 ID
+        :type target_id: str
+        :param flow_id: 目标流 ID
+        :type flow_id: str
+        """
+        self.name = name
+        self.target_id = target_id
+        self.flow_id = flow_id
+
+
 class ParallelGateway(Node):
     """
     并行网关
@@ -137,7 +157,14 @@ class ConditionalParallelGateway(Node):
     条件并行网关
     """
 
-    def __init__(self, conditions: List[Condition], converge_gateway_id: str, *args, **kwargs):
+    def __init__(
+        self,
+        conditions: List[Condition],
+        converge_gateway_id: str,
+        default_condition: DefaultCondition = None,
+        *args,
+        **kwargs
+    ):
         """
 
         :param conditions: 分支条件
@@ -147,6 +174,7 @@ class ConditionalParallelGateway(Node):
         """
         super().__init__(*args, **kwargs)
         self.conditions = conditions
+        self.default_condition = default_condition
         self.converge_gateway_id = converge_gateway_id
 
 
@@ -155,14 +183,17 @@ class ExclusiveGateway(Node):
     分支网关
     """
 
-    def __init__(self, conditions: List[Condition], *args, **kwargs):
+    def __init__(self, conditions: List[Condition], default_condition: DefaultCondition = None, *args, **kwargs):
         """
 
         :param conditions: 分支条件
         :type conditions: List[Condition]
+        :param default_condition: 默认分支条件
+        :type default_condition: DefaultCondition
         """
         super().__init__(*args, **kwargs)
         self.conditions = conditions
+        self.default_condition = default_condition
 
 
 class ServiceActivity(Node):

@@ -142,3 +142,34 @@ def test_exclusive_execution_no_match():
     assert_all_running([pipeline["id"]])
     assert_not_executed([acts[0].id, acts[1].id, acts[2].id, acts[3].id, acts[4].id, cg.id, end.id])
     assert_exec_data_equal(node_data_dict)
+
+
+def test_exclusive_execution_no_match_with_default():
+    start = EmptyStartEvent()
+    eg = ExclusiveGateway(
+        conditions={0: "True == False", 1: "True == False", 2: "True == False", 3: "True == False", 4: "True == False"},
+        default_condition_outgoing=1,
+    )
+    acts = [ServiceActivity(component_code="debug_node") for _ in range(5)]
+    cg = ConvergeGateway()
+    end = EmptyEndEvent()
+
+    start.extend(eg).connect(*acts).converge(cg).extend(end)
+
+    pipeline = build_tree(start)
+    engine = Engine(BambooDjangoRuntime())
+    engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
+
+    node_id_list = [start.id]
+    node_data_dict = {
+        acts[1].id: {
+            "inputs": {"_loop": 1, "_inner_loop": 1},
+            "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True},
+        },
+        pipeline["id"]: {"inputs": {}, "outputs": {}},
+    }
+
+    assert_all_finish(node_id_list)
+    assert_not_executed([acts[0].id, acts[2].id, acts[3].id, acts[4].id])
+    assert_exec_data_equal(node_data_dict)
+    assert_schedule_finish(acts[1].id, times=1)

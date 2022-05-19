@@ -162,6 +162,8 @@ def _replace_flow_in_exclusive_gateway_conditions(gateway, substituted_id, flow_
     conditions = gateway[PE.conditions]
     conditions[substituted_id] = conditions[flow_id]
     conditions.pop(flow_id)
+    if gateway.get(PE.default_condition):
+        gateway[PE.default_condition]["flow_id"] = substituted_id
 
 
 def _replace_gateway_id(flows, gateways, gateway_id, substituted_id):

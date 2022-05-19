@@ -43,7 +43,9 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
             id="act2", component_code="debug_node", error_ignorable=True, skippable=True, retryable=True
         )
         cg1 = ConvergeGateway(id="cg1")
-        eg = ExclusiveGateway(id="eg", conditions={0: "True == True", 1: "True == False"})
+        eg = ExclusiveGateway(
+            id="eg", conditions={0: "True == False", 1: "True == False"}, default_condition_outgoing=0
+        )
         act3 = ServiceActivity(id="act3", component_code="debug_node")
         act4 = ServiceActivity(id="act4", component_code="debug_node")
         cg2 = ConvergeGateway(id="cg2")
@@ -242,6 +244,13 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                     }
                     for flow_id, cond in pipeline["gateways"]["eg"]["conditions"].items()
                 ],
+                "default_condition": {
+                    "name": pipeline["gateways"]["eg"]["default_condition"]["flow_id"],
+                    "flow_id": pipeline["gateways"]["eg"]["default_condition"]["flow_id"],
+                    "target_id": pipeline["flows"][pipeline["gateways"]["eg"]["default_condition"]["flow_id"]][
+                        "target"
+                    ],
+                },
             },
         )
         self.assertEqual(
@@ -307,6 +316,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                     }
                     for flow_id, cond in pipeline["gateways"]["cpg"]["conditions"].items()
                 ],
+                "default_condition": None,
                 "converge_gateway_id": "cg3",
             },
         )
