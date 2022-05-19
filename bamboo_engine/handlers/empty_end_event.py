@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
 import logging
 from typing import Optional
 
-from bamboo_engine import states
+from bamboo_engine import states, metrics
 from bamboo_engine.config import Settings
 from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
@@ -44,82 +44,86 @@ class EmptyEndEventHandler(NodeHandler):
         :return: 执行结果
         :rtype: ExecuteResult
         """
-        root_pipeline_id = process_info.root_pipeline_id
-        pipeline_id = process_info.pipeline_stack.pop()
-        root_pipeline_finished = len(process_info.pipeline_stack) == 0
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            root_pipeline_id = process_info.root_pipeline_id
+            pipeline_id = process_info.pipeline_stack.pop()
+            root_pipeline_finished = len(process_info.pipeline_stack) == 0
 
-        root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
-        if not root_pipeline_finished:
-            subproc_state = self.runtime.get_state(pipeline_id)
+            root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
+            if not root_pipeline_finished:
+                subproc_state = self.runtime.get_state(pipeline_id)
 
-        # write pipeline data
-        context_outputs = self.runtime.get_context_outputs(pipeline_id)
-        logger.info(
-            "root_pipeline[%s] pipeline(%s) context outputs: %s",
-            root_pipeline_id,
-            pipeline_id,
-            context_outputs,
-        )
+            # write pipeline data
+            context_outputs = self.runtime.get_context_outputs(pipeline_id)
+            logger.info(
+                "root_pipeline[%s] pipeline(%s) context outputs: %s",
+                root_pipeline_id,
+                pipeline_id,
+                context_outputs,
+            )
 
-        context_values = self.runtime.get_context_values(pipeline_id=pipeline_id, keys=context_outputs)
-        logger.info(
-            "root_pipeline[%s] pipeline(%s) context values: %s",
-            root_pipeline_id,
-            pipeline_id,
-            context_values,
-        )
+            context_values = self.runtime.get_context_values(pipeline_id=pipeline_id, keys=context_outputs)
+            logger.info(
+                "root_pipeline[%s] pipeline(%s) context values: %s",
+                root_pipeline_id,
+                pipeline_id,
+                context_values,
+            )
 
-        # caculate outputs values references
-        output_value_refs = set(Template([cv.value for cv in context_values]).get_reference())
-        logger.info(
-            "root_pipeline[%s] node(%s) outputs values refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            output_value_refs,
-        )
-
-        additional_refs = self.runtime.get_context_key_references(pipeline_id=pipeline_id, keys=output_value_refs)
-        output_value_refs = output_value_refs.union(additional_refs)
-        logger.info(
-            "root_pipeline[%s] pipeline(%s) outputs values final refs: %s",
-            root_pipeline_id,
-            pipeline_id,
-            output_value_refs,
-        )
-        context_values.extend(self.runtime.get_context_values(pipeline_id=pipeline_id, keys=output_value_refs))
-
-        context = Context(self.runtime, context_values, root_pipeline_inputs)
-        try:
-            hydrated_context = context.hydrate(deformat=False)
-        except Exception:
-            logger.exception(
-                "root_pipeline[%s] node(%s) context hydrate error",
+            # caculate outputs values references
+            output_value_refs = set(Template([cv.value for cv in context_values]).get_reference())
+            logger.info(
+                "root_pipeline[%s] node(%s) outputs values refs: %s",
                 root_pipeline_id,
                 self.node.id,
-            )
-            self.runtime.set_state(
-                node_id=self.node.id,
-                version=version,
-                to_state=states.FAILED,
-                set_archive_time=True,
-                ignore_boring_set=recover_point is not None,
+                output_value_refs,
             )
 
-            return ExecuteResult(
-                should_sleep=True,
-                schedule_ready=False,
-                schedule_type=None,
-                schedule_after=-1,
-                dispatch_processes=[],
-                next_node_id=None,
+            additional_refs = self.runtime.get_context_key_references(pipeline_id=pipeline_id, keys=output_value_refs)
+            output_value_refs = output_value_refs.union(additional_refs)
+            logger.info(
+                "root_pipeline[%s] pipeline(%s) outputs values final refs: %s",
+                root_pipeline_id,
+                pipeline_id,
+                output_value_refs,
             )
+            context_values.extend(self.runtime.get_context_values(pipeline_id=pipeline_id, keys=output_value_refs))
 
-        logger.info(
-            "root_pipeline[%s] pipeline(%s) hydrated context: %s",
-            root_pipeline_id,
-            pipeline_id,
-            hydrated_context,
-        )
+            context = Context(self.runtime, context_values, root_pipeline_inputs)
+            try:
+                hydrated_context = context.hydrate(deformat=False)
+            except Exception:
+                logger.exception(
+                    "root_pipeline[%s] node(%s) context hydrate error",
+                    root_pipeline_id,
+                    self.node.id,
+                )
+                self.runtime.set_state(
+                    node_id=self.node.id,
+                    version=version,
+                    to_state=states.FAILED,
+                    set_archive_time=True,
+                    ignore_boring_set=recover_point is not None,
+                )
+
+                return ExecuteResult(
+                    should_sleep=True,
+                    schedule_ready=False,
+                    schedule_type=None,
+                    schedule_after=-1,
+                    dispatch_processes=[],
+                    next_node_id=None,
+                )
+
+            logger.info(
+                "root_pipeline[%s] pipeline(%s) hydrated context: %s",
+                root_pipeline_id,
+                pipeline_id,
+                hydrated_context,
+            )
 
         outputs = {}
         for key in context_outputs:
@@ -128,56 +132,60 @@ class EmptyEndEventHandler(NodeHandler):
             outputs[self.LOOP_KEY] = subproc_state.loop + Settings.RERUN_INDEX_OFFSET
             outputs[self.INNER_LOOP_KEY] = subproc_state.inner_loop + Settings.RERUN_INDEX_OFFSET
 
-        self.runtime.set_execution_data_outputs(node_id=pipeline_id, outputs=outputs)
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            self.runtime.set_execution_data_outputs(node_id=pipeline_id, outputs=outputs)
 
-        self.runtime.set_state(
-            node_id=self.node.id,
-            version=version,
-            to_state=states.FINISHED,
-            set_archive_time=True,
-            ignore_boring_set=recover_point is not None,
-        )
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
+            )
 
-        pipeline_state = self.runtime.get_state_or_none(node_id=pipeline_id)
-        top_pipeline_state_version = pipeline_state.version if pipeline_state else None
-        self.runtime.set_state(
-            node_id=pipeline_id,
-            version=top_pipeline_state_version,
-            to_state=states.FINISHED,
-            set_archive_time=True,
-            ignore_boring_set=recover_point is not None,
-        )
+            pipeline_state = self.runtime.get_state_or_none(node_id=pipeline_id)
+            top_pipeline_state_version = pipeline_state.version if pipeline_state else None
+            self.runtime.set_state(
+                node_id=pipeline_id,
+                version=top_pipeline_state_version,
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
+            )
 
-        # root pipeline finish
-        if root_pipeline_finished:
+            # root pipeline finish
+            if root_pipeline_finished:
+                return ExecuteResult(
+                    should_sleep=False,
+                    schedule_ready=False,
+                    schedule_type=None,
+                    schedule_after=-1,
+                    dispatch_processes=[],
+                    next_node_id=None,
+                    should_die=True,
+                )
+
+            # subprocess finish
+            subprocess = self.runtime.get_node(pipeline_id)
+
+            # extract subprocess outputs to parent context
+            subprocess_outputs = self.runtime.get_data_outputs(pipeline_id)
+            context.extract_outputs(
+                pipeline_id=process_info.pipeline_stack[-1],
+                data_outputs=subprocess_outputs,
+                execution_data_outputs=outputs,
+            )
+
+            self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
+
             return ExecuteResult(
                 should_sleep=False,
                 schedule_ready=False,
                 schedule_type=None,
                 schedule_after=-1,
                 dispatch_processes=[],
-                next_node_id=None,
-                should_die=True,
+                next_node_id=subprocess.target_nodes[0],
             )
-
-        # subprocess finish
-        subprocess = self.runtime.get_node(pipeline_id)
-
-        # extract subprocess outputs to parent context
-        subprocess_outputs = self.runtime.get_data_outputs(pipeline_id)
-        context.extract_outputs(
-            pipeline_id=process_info.pipeline_stack[-1],
-            data_outputs=subprocess_outputs,
-            execution_data_outputs=outputs,
-        )
-
-        self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
-
-        return ExecuteResult(
-            should_sleep=False,
-            schedule_ready=False,
-            schedule_type=None,
-            schedule_after=-1,
-            dispatch_processes=[],
-            next_node_id=subprocess.target_nodes[0],
-        )

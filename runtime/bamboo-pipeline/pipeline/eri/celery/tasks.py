@@ -10,6 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import time
 import logging
 from typing import Optional
 
@@ -18,6 +19,8 @@ from celery.decorators import periodic_task
 from celery.schedules import crontab
 from django.conf import settings
 
+from bamboo_engine import metrics
+from bamboo_engine.utils.host import get_hostname
 from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
 from bamboo_engine.engine import Engine
 from bamboo_engine.interrupt import (
@@ -33,6 +36,15 @@ from pipeline.eri.runtime import BambooDjangoRuntime
 
 logger = logging.getLogger(__name__)
 
+def _observe_message_delay(metric : metrics.Histogram, headers: dict):
+    if not headers or "timestamp" not in headers:
+        return
+
+    try:
+        metric.labels(hostname=get_hostname()).observe((time.time() * 1000) - headers["timestamp"])
+    except Exception:
+        logger.exception("%s observe err" % metric)
+    
 
 @task(ignore_result=True)
 def execute(
@@ -41,7 +53,10 @@ def execute(
     root_pipeline_id: str = None,
     parent_pipeline_id: str = None,
     recover_point: str = None,
+    headers: dict = None,
 ):
+    _observe_message_delay(metrics.ENGINE_RUNTIME_EXECUTE_TASK_CLAIM_DELAY, headers)
+
     runtime = BambooDjangoRuntime()
     recover_point = ExecuteInterruptPoint.from_json(recover_point)
     interrupter = ExecuteInterrupter(
@@ -65,8 +80,15 @@ def execute(
 
 @task(ignore_result=True)
 def schedule(
-    process_id: int, node_id: str, schedule_id: str, callback_data_id: Optional[int], recover_point: str = None
+    process_id: int, 
+    node_id: str,
+    schedule_id: str,
+    callback_data_id: Optional[int],
+    recover_point: str = None,
+    headers: dict = None,
 ):
+    _observe_message_delay(metrics.ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY, headers)
+
     runtime = BambooDjangoRuntime()
     recover_point = ScheduleInterruptPoint.from_json(recover_point)
 

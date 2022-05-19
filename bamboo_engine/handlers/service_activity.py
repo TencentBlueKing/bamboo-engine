@@ -15,7 +15,7 @@ import logging
 import traceback
 from typing import Optional
 
-from bamboo_engine import states
+from bamboo_engine import states, metrics
 from bamboo_engine.config import Settings
 
 from bamboo_engine.context import Context
@@ -68,128 +68,133 @@ class ServiceActivityHandler(NodeHandler):
         :return: 执行结果
         :rtype: ExecuteResult
         """
-        top_pipeline_id = process_info.top_pipeline_id
-        root_pipeline_id = process_info.root_pipeline_id
 
-        data = self.runtime.get_data(self.node.id)
-        root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
-        need_render_inputs = data.need_render_inputs()
-        render_escape_inputs = data.render_escape_inputs()
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            top_pipeline_id = process_info.top_pipeline_id
+            root_pipeline_id = process_info.root_pipeline_id
 
-        logger.info(
-            "root_pipeline[%s] node(%s) activity execute data: %s, root inputs: %s",
-            root_pipeline_id,
-            self.node.id,
-            data,
-            root_pipeline_inputs,
-        )
+            data = self.runtime.get_data(self.node.id)
+            root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
+            need_render_inputs = data.need_render_inputs()
+            render_escape_inputs = data.render_escape_inputs()
 
-        # resolve inputs context references
-        inputs_refs = set(Template(need_render_inputs).get_reference())
-        logger.info(
-            "root_pipeline[%s] node(%s) activity original refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            inputs_refs,
-        )
-
-        additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
-        inputs_refs = inputs_refs.union(additional_refs)
-        logger.info(
-            "root_pipeline[%s] node(%s) activity final refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            inputs_refs,
-        )
-
-        # prepare context
-        context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=inputs_refs)
-
-        # pre extract loop outputs
-        loop_value = loop + Settings.RERUN_INDEX_OFFSET
-        need_render_inputs[self.LOOP_KEY] = loop_value
-        if self.LOOP_KEY in data.outputs:
-            loop_output_key = data.outputs[self.LOOP_KEY]
-            context_values.append(ContextValue(key=loop_output_key, type=ContextValueType.PLAIN, value=loop_value))
-
-        # pre extract inner_loop outputs
-        inner_loop_value = inner_loop + Settings.RERUN_INDEX_OFFSET
-        need_render_inputs[self.INNER_LOOP_KEY] = inner_loop_value
-        if self.INNER_LOOP_KEY in data.outputs:
-            inner_loop_output_key = data.outputs[self.INNER_LOOP_KEY]
-            context_values.append(
-                ContextValue(
-                    key=inner_loop_output_key,
-                    type=ContextValueType.PLAIN,
-                    value=inner_loop_value,
-                )
-            )
-
-        logger.info(
-            "root_pipeline[%s] node(%s) activity context values: %s",
-            root_pipeline_id,
-            self.node.id,
-            context_values,
-        )
-
-        context = Context(self.runtime, context_values, root_pipeline_inputs)
-        # hydrate will call user code, use try to catch unexpected error
-        try:
-            hydrated_context = context.hydrate(deformat=True)
-        except Exception as e:
-            logger.exception(
-                "root_pipeline[%s] node(%s) activity context hydrate error",
+            logger.info(
+                "root_pipeline[%s] node(%s) activity execute data: %s, root inputs: %s",
                 root_pipeline_id,
                 self.node.id,
+                data,
+                root_pipeline_inputs,
             )
-            service_data = ExecutionData(inputs=data.plain_inputs(), outputs={})
-            service_data.outputs.ex_data = "inputs hydrate failed(%s), check node log for details" % e
-            service_data.outputs._result = False
-            service_data.outputs._loop = loop
-            service_data.outputs._inner_loop = inner_loop
 
-            self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
-            self.runtime.set_state(
-                node_id=self.node.id,
+            # resolve inputs context references
+            inputs_refs = set(Template(need_render_inputs).get_reference())
+            logger.info(
+                "root_pipeline[%s] node(%s) activity original refs: %s",
+                root_pipeline_id,
+                self.node.id,
+                inputs_refs,
+            )
+
+            additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
+            inputs_refs = inputs_refs.union(additional_refs)
+            logger.info(
+                "root_pipeline[%s] node(%s) activity final refs: %s",
+                root_pipeline_id,
+                self.node.id,
+                inputs_refs,
+            )
+
+            # prepare context
+            context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=inputs_refs)
+
+            # pre extract loop outputs
+            loop_value = loop + Settings.RERUN_INDEX_OFFSET
+            need_render_inputs[self.LOOP_KEY] = loop_value
+            if self.LOOP_KEY in data.outputs:
+                loop_output_key = data.outputs[self.LOOP_KEY]
+                context_values.append(ContextValue(key=loop_output_key, type=ContextValueType.PLAIN, value=loop_value))
+
+            # pre extract inner_loop outputs
+            inner_loop_value = inner_loop + Settings.RERUN_INDEX_OFFSET
+            need_render_inputs[self.INNER_LOOP_KEY] = inner_loop_value
+            if self.INNER_LOOP_KEY in data.outputs:
+                inner_loop_output_key = data.outputs[self.INNER_LOOP_KEY]
+                context_values.append(
+                    ContextValue(
+                        key=inner_loop_output_key,
+                        type=ContextValueType.PLAIN,
+                        value=inner_loop_value,
+                    )
+                )
+
+            logger.info(
+                "root_pipeline[%s] node(%s) activity context values: %s",
+                root_pipeline_id,
+                self.node.id,
+                context_values,
+            )
+
+            context = Context(self.runtime, context_values, root_pipeline_inputs)
+            # hydrate will call user code, use try to catch unexpected error
+            try:
+                hydrated_context = context.hydrate(deformat=True)
+            except Exception as e:
+                logger.exception(
+                    "root_pipeline[%s] node(%s) activity context hydrate error",
+                    root_pipeline_id,
+                    self.node.id,
+                )
+                service_data = ExecutionData(inputs=data.plain_inputs(), outputs={})
+                service_data.outputs.ex_data = "inputs hydrate failed(%s), check node log for details" % e
+                service_data.outputs._result = False
+                service_data.outputs._loop = loop
+                service_data.outputs._inner_loop = inner_loop
+
+                self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
+                self.runtime.set_state(
+                    node_id=self.node.id,
+                    version=version,
+                    to_state=states.FAILED,
+                    set_archive_time=True,
+                    ignore_boring_set=recover_point is not None,
+                )
+                return ExecuteResult(
+                    should_sleep=True,
+                    schedule_ready=False,
+                    schedule_type=None,
+                    schedule_after=-1,
+                    dispatch_processes=[],
+                    next_node_id=None,
+                )
+
+            logger.info(
+                "root_pipeline[%s] node(%s) actvity hydrated context: %s",
+                root_pipeline_id,
+                self.node.id,
+                hydrated_context,
+            )
+
+            # resolve inputs
+            execute_inputs = Template(need_render_inputs).render(hydrated_context)
+            execute_inputs.update(render_escape_inputs)
+
+            # data prepare
+            service_data = ExecutionData(inputs=execute_inputs, outputs={})
+            root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
+
+            # execute
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service.setup_runtime_attributes(
+                id=self.node.id,
                 version=version,
-                to_state=states.FAILED,
-                set_archive_time=True,
-                ignore_boring_set=recover_point is not None,
+                top_pipeline_id=top_pipeline_id,
+                root_pipeline_id=root_pipeline_id,
+                loop=loop,
+                inner_loop=inner_loop,
             )
-            return ExecuteResult(
-                should_sleep=True,
-                schedule_ready=False,
-                schedule_type=None,
-                schedule_after=-1,
-                dispatch_processes=[],
-                next_node_id=None,
-            )
-
-        logger.info(
-            "root_pipeline[%s] node(%s) actvity hydrated context: %s",
-            root_pipeline_id,
-            self.node.id,
-            hydrated_context,
-        )
-
-        # resolve inputs
-        execute_inputs = Template(need_render_inputs).render(hydrated_context)
-        execute_inputs.update(render_escape_inputs)
-
-        # data prepare
-        service_data = ExecutionData(inputs=execute_inputs, outputs={})
-        root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
-
-        # execute
-        service = self.runtime.get_service(code=self.node.code, version=self.node.version)
-        service.setup_runtime_attributes(
-            id=self.node.id,
-            version=version,
-            top_pipeline_id=top_pipeline_id,
-            root_pipeline_id=root_pipeline_id,
-            loop=loop,
-            inner_loop=inner_loop,
-        )
 
         # excute
         logger.debug(
@@ -224,63 +229,94 @@ class ServiceActivityHandler(NodeHandler):
                 logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
             logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
 
-        serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
-        self.interrupter.check_and_set(
-            ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE,
-            service_executed=True,
-            service_execute_fail=not execute_success,
-            execute_serialize_outputs=serialize_ouputs,
-            execute_outputs_serializer=ouputs_serializer,
-            from_handler=True,
-        )
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
+            self.interrupter.check_and_set(
+                ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE,
+                service_executed=True,
+                service_execute_fail=not execute_success,
+                execute_serialize_outputs=serialize_ouputs,
+                execute_outputs_serializer=ouputs_serializer,
+                from_handler=True,
+            )
 
-        service_data.outputs._result = execute_success
-        service_data.outputs._loop = loop
-        service_data.outputs._inner_loop = inner_loop
+            service_data.outputs._result = execute_success
+            service_data.outputs._loop = loop
+            service_data.outputs._inner_loop = inner_loop
 
-        # execute success
-        if execute_success:
+            # execute success
+            if execute_success:
 
-            need_schedule = service.need_schedule()
-            next_node_id = None
+                need_schedule = service.need_schedule()
+                next_node_id = None
 
-            if not need_schedule:
+                if not need_schedule:
+                    self.runtime.set_state(
+                        node_id=self.node.id,
+                        version=version,
+                        to_state=states.FINISHED,
+                        set_archive_time=True,
+                        ignore_boring_set=recover_point is not None,
+                    )
+
+                    context.extract_outputs(
+                        pipeline_id=top_pipeline_id,
+                        data_outputs=data.outputs,
+                        execution_data_outputs=service_data.outputs,
+                    )
+                    next_node_id = self.node.target_nodes[0]
+
+                self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
+
+                return ExecuteResult(
+                    should_sleep=need_schedule,
+                    schedule_ready=need_schedule,
+                    schedule_type=service.schedule_type(),
+                    schedule_after=service.schedule_after(
+                        schedule=None,
+                        data=service_data,
+                        root_pipeline_data=root_pipeline_data,
+                    ),
+                    dispatch_processes=[],
+                    next_node_id=next_node_id,
+                )
+
+            if not self.node.error_ignorable:
                 self.runtime.set_state(
                     node_id=self.node.id,
                     version=version,
-                    to_state=states.FINISHED,
+                    to_state=states.FAILED,
                     set_archive_time=True,
                     ignore_boring_set=recover_point is not None,
                 )
+
+                self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
                 context.extract_outputs(
                     pipeline_id=top_pipeline_id,
                     data_outputs=data.outputs,
                     execution_data_outputs=service_data.outputs,
                 )
-                next_node_id = self.node.target_nodes[0]
 
-            self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
+                return ExecuteResult(
+                    should_sleep=True,
+                    schedule_ready=False,
+                    schedule_type=None,
+                    schedule_after=-1,
+                    dispatch_processes=[],
+                    next_node_id=None,
+                )
 
-            return ExecuteResult(
-                should_sleep=need_schedule,
-                schedule_ready=need_schedule,
-                schedule_type=service.schedule_type(),
-                schedule_after=service.schedule_after(
-                    schedule=None,
-                    data=service_data,
-                    root_pipeline_data=root_pipeline_data,
-                ),
-                dispatch_processes=[],
-                next_node_id=next_node_id,
-            )
-
-        if not self.node.error_ignorable:
+            # execute failed and error ignore
             self.runtime.set_state(
                 node_id=self.node.id,
                 version=version,
-                to_state=states.FAILED,
+                to_state=states.FINISHED,
                 set_archive_time=True,
+                error_ignored=True,
                 ignore_boring_set=recover_point is not None,
             )
 
@@ -293,40 +329,13 @@ class ServiceActivityHandler(NodeHandler):
             )
 
             return ExecuteResult(
-                should_sleep=True,
+                should_sleep=False,
                 schedule_ready=False,
                 schedule_type=None,
                 schedule_after=-1,
                 dispatch_processes=[],
-                next_node_id=None,
+                next_node_id=self.node.target_nodes[0],
             )
-
-        # execute failed and error ignore
-        self.runtime.set_state(
-            node_id=self.node.id,
-            version=version,
-            to_state=states.FINISHED,
-            set_archive_time=True,
-            error_ignored=True,
-            ignore_boring_set=recover_point is not None,
-        )
-
-        self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
-
-        context.extract_outputs(
-            pipeline_id=top_pipeline_id,
-            data_outputs=data.outputs,
-            execution_data_outputs=service_data.outputs,
-        )
-
-        return ExecuteResult(
-            should_sleep=False,
-            schedule_ready=False,
-            schedule_type=None,
-            schedule_after=-1,
-            dispatch_processes=[],
-            next_node_id=self.node.target_nodes[0],
-        )
 
     def _finish_schedule(
         self,
@@ -382,34 +391,39 @@ class ServiceActivityHandler(NodeHandler):
         :return: 调度结果
         :rtype: ScheduleResult
         """
-        # data prepare
-        top_pipeline_id = process_info.top_pipeline_id
-        root_pipeline_id = process_info.root_pipeline_id
+        with metrics.observe(
+            metrics.ENGINE_NODE_SCHEDULE_PRE_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            # data prepare
+            top_pipeline_id = process_info.top_pipeline_id
+            root_pipeline_id = process_info.root_pipeline_id
 
-        data_outputs = self.runtime.get_data_outputs(self.node.id)
-        service_data = self.runtime.get_execution_data(self.node.id)
+            data_outputs = self.runtime.get_data_outputs(self.node.id)
+            service_data = self.runtime.get_execution_data(self.node.id)
 
-        root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
-        root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
-        logger.info(
-            "root_pipeline[%s] node(%s) activity schedule data: %s, root inputs: %s",
-            root_pipeline_id,
-            self.node.id,
-            service_data,
-            root_pipeline_inputs,
-        )
+            root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
+            root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
+            logger.info(
+                "root_pipeline[%s] node(%s) activity schedule data: %s, root inputs: %s",
+                root_pipeline_id,
+                self.node.id,
+                service_data,
+                root_pipeline_inputs,
+            )
+
+            
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service.setup_runtime_attributes(
+                id=self.node.id,
+                version=schedule.version,
+                top_pipeline_id=top_pipeline_id,
+                root_pipeline_id=root_pipeline_id,
+                loop=loop,
+                inner_loop=inner_loop,
+            )
 
         # schedule
-        service = self.runtime.get_service(code=self.node.code, version=self.node.version)
-        service.setup_runtime_attributes(
-            id=self.node.id,
-            version=schedule.version,
-            top_pipeline_id=top_pipeline_id,
-            root_pipeline_id=root_pipeline_id,
-            loop=loop,
-            inner_loop=inner_loop,
-        )
-
         schedule_success = False
         is_schedule_done = False
         schedule.times += 1
@@ -435,45 +449,37 @@ class ServiceActivityHandler(NodeHandler):
             else:
                 is_schedule_done = service.is_schedule_done()
 
-        serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
-        self.interrupter.check_and_set(
-            ScheduleKeyPoint.SA_SERVICE_SCHEDULE_DONE,
-            service_scheduled=True,
-            is_schedule_done=is_schedule_done,
-            service_schedule_fail=not schedule_success,
-            schedule_serialize_outputs=serialize_ouputs,
-            schedule_outputs_serializer=ouputs_serializer,
-            from_handler=True,
-        )
+        with metrics.observe(
+            metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
+            self.interrupter.check_and_set(
+                ScheduleKeyPoint.SA_SERVICE_SCHEDULE_DONE,
+                service_scheduled=True,
+                is_schedule_done=is_schedule_done,
+                service_schedule_fail=not schedule_success,
+                schedule_serialize_outputs=serialize_ouputs,
+                schedule_outputs_serializer=ouputs_serializer,
+                from_handler=True,
+            )
 
-        service_data.outputs._result = schedule_success
-        service_data.outputs._loop = loop
-        service_data.outputs._inner_loop = inner_loop
+            service_data.outputs._result = schedule_success
+            service_data.outputs._loop = loop
+            service_data.outputs._inner_loop = inner_loop
 
-        if not recover_point or not recover_point.handler_data.schedule_times_added:
-            self.runtime.add_schedule_times(schedule.id)
-        self.interrupter.check_and_set(
-            ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED, schedule_times_added=True, from_handler=True
-        )
-        self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
+            if not recover_point or not recover_point.handler_data.schedule_times_added:
+                self.runtime.add_schedule_times(schedule.id)
+            self.interrupter.check_and_set(
+                ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED, schedule_times_added=True, from_handler=True
+            )
+            self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
-        schedule_type = service.schedule_type()
+            schedule_type = service.schedule_type()
 
-        # schedule success
-        if schedule_success:
-            if schedule_type == ScheduleType.CALLBACK:
-                return self._finish_schedule(
-                    process_info=process_info,
-                    schedule=schedule,
-                    data_outputs=data_outputs,
-                    execution_data=service_data,
-                    error_ignored=False,
-                    root_pipeline_inputs=root_pipeline_inputs,
-                    recover_point=recover_point,
-                )
-            else:
-                # poll or multi-callback finished
-                if is_schedule_done:
+            # schedule success
+            if schedule_success:
+                if schedule_type == ScheduleType.CALLBACK:
                     return self._finish_schedule(
                         process_info=process_info,
                         schedule=schedule,
@@ -483,50 +489,62 @@ class ServiceActivityHandler(NodeHandler):
                         root_pipeline_inputs=root_pipeline_inputs,
                         recover_point=recover_point,
                     )
+                else:
+                    # poll or multi-callback finished
+                    if is_schedule_done:
+                        return self._finish_schedule(
+                            process_info=process_info,
+                            schedule=schedule,
+                            data_outputs=data_outputs,
+                            execution_data=service_data,
+                            error_ignored=False,
+                            root_pipeline_inputs=root_pipeline_inputs,
+                            recover_point=recover_point,
+                        )
 
-                has_next_schedule = schedule_type == ScheduleType.POLL
+                    has_next_schedule = schedule_type == ScheduleType.POLL
+                    return ScheduleResult(
+                        has_next_schedule=has_next_schedule,
+                        schedule_after=service.schedule_after(
+                            schedule=schedule,
+                            data=service_data,
+                            root_pipeline_data=root_pipeline_data,
+                        ),
+                        schedule_done=False,
+                        next_node_id=None,
+                    )
+
+            # schedule fail
+            if not self.node.error_ignorable:
+                self.runtime.set_state(
+                    node_id=self.node.id,
+                    version=schedule.version,
+                    to_state=states.FAILED,
+                    set_archive_time=True,
+                    ignore_boring_set=recover_point is not None,
+                )
+
+                context = Context(self.runtime, [], root_pipeline_inputs)
+                context.extract_outputs(
+                    pipeline_id=process_info.top_pipeline_id,
+                    data_outputs=data_outputs,
+                    execution_data_outputs=service_data.outputs,
+                )
+
                 return ScheduleResult(
-                    has_next_schedule=has_next_schedule,
-                    schedule_after=service.schedule_after(
-                        schedule=schedule,
-                        data=service_data,
-                        root_pipeline_data=root_pipeline_data,
-                    ),
+                    has_next_schedule=False,
+                    schedule_after=-1,
                     schedule_done=False,
                     next_node_id=None,
                 )
 
-        # schedule fail
-        if not self.node.error_ignorable:
-            self.runtime.set_state(
-                node_id=self.node.id,
-                version=schedule.version,
-                to_state=states.FAILED,
-                set_archive_time=True,
-                ignore_boring_set=recover_point is not None,
-            )
-
-            context = Context(self.runtime, [], root_pipeline_inputs)
-            context.extract_outputs(
-                pipeline_id=process_info.top_pipeline_id,
+            # schedule fail and error ignore
+            return self._finish_schedule(
+                process_info=process_info,
+                schedule=schedule,
                 data_outputs=data_outputs,
-                execution_data_outputs=service_data.outputs,
+                execution_data=service_data,
+                error_ignored=True,
+                root_pipeline_inputs=root_pipeline_inputs,
+                recover_point=recover_point,
             )
-
-            return ScheduleResult(
-                has_next_schedule=False,
-                schedule_after=-1,
-                schedule_done=False,
-                next_node_id=None,
-            )
-
-        # schedule fail and error ignore
-        return self._finish_schedule(
-            process_info=process_info,
-            schedule=schedule,
-            data_outputs=data_outputs,
-            execution_data=service_data,
-            error_ignored=True,
-            root_pipeline_inputs=root_pipeline_inputs,
-            recover_point=recover_point,
-        )

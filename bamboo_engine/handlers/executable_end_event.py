@@ -15,7 +15,7 @@ import logging
 import traceback
 from typing import Optional
 
-from bamboo_engine import states
+from bamboo_engine import states, metrics
 from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, ExecuteResult
 from bamboo_engine.interrupt import ExecuteKeyPoint
@@ -46,13 +46,17 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
         :rtype: ExecuteResult
         """
 
-        logger.info(
-            "root_pipeline[%s] node(%s) executable end event: %s",
-            process_info.root_pipeline_id,
-            self.node.id,
-            self.node,
-        )
-        event = self.runtime.get_executable_end_event(code=self.node.code)
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            logger.info(
+                "root_pipeline[%s] node(%s) executable end event: %s",
+                process_info.root_pipeline_id,
+                self.node.id,
+                self.node,
+            )
+            event = self.runtime.get_executable_end_event(code=self.node.code)
 
         execute_fail = False
         ex_data = ""
@@ -82,25 +86,29 @@ class ExecutableEndEventHandler(EmptyEndEventHandler):
             from_handler=True,
         )
 
-        if execute_fail:
-            self.runtime.set_execution_data_outputs(node_id=self.node.id, outputs={"ex_data": ex_data})
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            if execute_fail:
+                self.runtime.set_execution_data_outputs(node_id=self.node.id, outputs={"ex_data": ex_data})
 
-            self.runtime.set_state(
-                node_id=self.node.id,
-                version=version,
-                to_state=states.FAILED,
-                set_archive_time=True,
-                ignore_boring_set=recover_point is not None,
-            )
+                self.runtime.set_state(
+                    node_id=self.node.id,
+                    version=version,
+                    to_state=states.FAILED,
+                    set_archive_time=True,
+                    ignore_boring_set=recover_point is not None,
+                )
 
-            return ExecuteResult(
-                should_sleep=True,
-                schedule_ready=False,
-                schedule_type=None,
-                schedule_after=-1,
-                dispatch_processes=[],
-                next_node_id=None,
-            )
+                return ExecuteResult(
+                    should_sleep=True,
+                    schedule_ready=False,
+                    schedule_type=None,
+                    schedule_after=-1,
+                    dispatch_processes=[],
+                    next_node_id=None,
+                )
 
         return super().execute(
             process_info=process_info, loop=loop, inner_loop=inner_loop, version=version, recover_point=recover_point

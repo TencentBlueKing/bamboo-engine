@@ -10,6 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+from email.errors import ObsoleteHeaderDefect
 import json
 import logging
 from typing import Optional
@@ -18,7 +19,7 @@ from bamboo_engine.interrupt import ExecuteKeyPoint
 from bamboo_engine.utils.boolrule import BoolRule
 from bamboo_engine.template.template import Template
 
-from bamboo_engine import states
+from bamboo_engine import states, metrics
 from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
 from bamboo_engine.context import Context
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
@@ -47,48 +48,52 @@ class ConditionalParallelGatewayHandler(NodeHandler):
         :return: 执行结果
         :rtype: ExecuteResult
         """
-        evaluations = [c.evaluation for c in self.node.conditions]
-        top_pipeline_id = process_info.top_pipeline_id
-        root_pipeline_id = process_info.root_pipeline_id
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            evaluations = [c.evaluation for c in self.node.conditions]
+            top_pipeline_id = process_info.top_pipeline_id
+            root_pipeline_id = process_info.root_pipeline_id
 
-        root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
+            root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
 
-        # resolve conditions references
-        evaluation_refs = set()
-        for e in evaluations:
-            refs = Template(e).get_reference()
-            evaluation_refs = evaluation_refs.union(refs)
+            # resolve conditions references
+            evaluation_refs = set()
+            for e in evaluations:
+                refs = Template(e).get_reference()
+                evaluation_refs = evaluation_refs.union(refs)
 
-        logger.info(
-            "root_pipeline[%s] node(%s) evaluation original refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            evaluation_refs,
-        )
-        additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=evaluation_refs)
-        evaluation_refs = evaluation_refs.union(additional_refs)
-
-        logger.info(
-            "root_pipeline[%s] node(%s) evaluation final refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            evaluation_refs,
-        )
-        context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=evaluation_refs)
-        context = Context(self.runtime, context_values, root_pipeline_inputs)
-        try:
-            hydrated_context = {k: transform_escape_char(v) for k, v in context.hydrate(deformat=True).items()}
-        except Exception as e:
-            logger.exception(
-                "root_pipeline[%s] node(%s) context hydrate error",
+            logger.info(
+                "root_pipeline[%s] node(%s) evaluation original refs: %s",
                 root_pipeline_id,
                 self.node.id,
+                evaluation_refs,
             )
-            return self._execute_fail(
-                ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
-                version=version,
-                ignore_boring_set=recover_point is not None,
+            additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=evaluation_refs)
+            evaluation_refs = evaluation_refs.union(additional_refs)
+
+            logger.info(
+                "root_pipeline[%s] node(%s) evaluation final refs: %s",
+                root_pipeline_id,
+                self.node.id,
+                evaluation_refs,
             )
+            context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=evaluation_refs)
+            context = Context(self.runtime, context_values, root_pipeline_inputs)
+            try:
+                hydrated_context = {k: transform_escape_char(v) for k, v in context.hydrate(deformat=True).items()}
+            except Exception as e:
+                logger.exception(
+                    "root_pipeline[%s] node(%s) context hydrate error",
+                    root_pipeline_id,
+                    self.node.id,
+                )
+                return self._execute_fail(
+                    ex_data="evaluation context hydrate failed(%s), check node log for details." % e,
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
+                )
 
         # check conditions
         fork_targets = []
@@ -126,49 +131,53 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                 if result:
                     fork_targets.append(c.target_id)
 
-        # all miss
-        if not fork_targets and not self.node.default_condition:
-            return self._execute_fail(
-                ex_data="all conditions of branches are not meet",
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION,
+            type=self.node.type.value, hostname=self._hostname
+        ):
+            # all miss
+            if not fork_targets and not self.node.default_condition:
+                return self._execute_fail(
+                    ex_data="all conditions of branches are not meet",
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
+                )
+            elif not fork_targets:
+                fork_targets.append(self.node.default_condition.target_id)
+
+            # fork
+            from_to = {}
+            for target in fork_targets:
+                from_to[target] = self.node.converge_gateway_id
+
+            # try to recover forked processes
+            if recover_point and recover_point.handler_data.dispatch_processes:
+                dispatch_processes = recover_point.handler_data.dispatch_processes
+            else:
+                dispatch_processes = self.runtime.fork(
+                    parent_id=process_info.process_id,
+                    root_pipeline_id=process_info.root_pipeline_id,
+                    pipeline_stack=process_info.pipeline_stack,
+                    from_to=from_to,
+                )
+            self.interrupter.check_and_set(
+                ExecuteKeyPoint.CPG_PROCESS_FORK_DONE, dispatch_processes=dispatch_processes, from_handler=True
+            )
+
+            # if this statement fail, just retry it, check is not necessary
+            self.runtime.set_state(
+                node_id=self.node.id,
                 version=version,
+                to_state=states.FINISHED,
+                set_archive_time=True,
                 ignore_boring_set=recover_point is not None,
             )
-        elif not fork_targets:
-            fork_targets.append(self.node.default_condition.target_id)
 
-        # fork
-        from_to = {}
-        for target in fork_targets:
-            from_to[target] = self.node.converge_gateway_id
-
-        # try to recover forked processes
-        if recover_point and recover_point.handler_data.dispatch_processes:
-            dispatch_processes = recover_point.handler_data.dispatch_processes
-        else:
-            dispatch_processes = self.runtime.fork(
-                parent_id=process_info.process_id,
-                root_pipeline_id=process_info.root_pipeline_id,
-                pipeline_stack=process_info.pipeline_stack,
-                from_to=from_to,
+            return ExecuteResult(
+                should_sleep=True,
+                schedule_ready=False,
+                schedule_type=None,
+                schedule_after=-1,
+                dispatch_processes=dispatch_processes,
+                next_node_id=None,
             )
-        self.interrupter.check_and_set(
-            ExecuteKeyPoint.CPG_PROCESS_FORK_DONE, dispatch_processes=dispatch_processes, from_handler=True
-        )
-
-        # if this statement fail, just retry it, check is not necessary
-        self.runtime.set_state(
-            node_id=self.node.id,
-            version=version,
-            to_state=states.FINISHED,
-            set_archive_time=True,
-            ignore_boring_set=recover_point is not None,
-        )
-
-        return ExecuteResult(
-            should_sleep=True,
-            schedule_ready=False,
-            schedule_type=None,
-            schedule_after=-1,
-            dispatch_processes=dispatch_processes,
-            next_node_id=None,
-        )

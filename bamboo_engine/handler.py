@@ -30,6 +30,7 @@ from .eri import (
     ExecuteInterruptPoint,
     ScheduleInterruptPoint,
 )
+from .utils.host import get_hostname
 from .interrupt import Interrupter
 from .exceptions import NotFoundError, InvalidOperationError
 
@@ -68,6 +69,7 @@ class NodeHandler(metaclass=ABCMeta):
         self.node = node
         self.runtime = runtime
         self.interrupter = interrupter
+        self._hostname = get_hostname()
 
     @abstractmethod
     def execute(

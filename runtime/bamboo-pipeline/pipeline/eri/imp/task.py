@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import time
 import logging
 from typing import Optional
 
@@ -72,6 +73,9 @@ class TaskMixin:
                     "root_pipeline_id": root_pipeline_id,
                     "parent_pipeline_id": parent_pipeline_id,
                     "recover_point": "{}" if not recover_point else recover_point.to_json(),
+                    "headers": {
+                        "timestamp": time.time() * 1000
+                    }
                 },
                 **route_params,
             )
@@ -113,6 +117,9 @@ class TaskMixin:
                     "schedule_id": schedule_id,
                     "callback_data_id": callback_data_id,
                     "recover_point": "{}" if not recover_point else recover_point.to_json(),
+                    "headers": {
+                        "timestamp": time.time() * 1000
+                    }
                 },
                 **route_params,
             )
@@ -151,6 +158,9 @@ class TaskMixin:
                     "schedule_id": schedule_id,
                     "callback_data_id": callback_data_id,
                     "recover_point": "{}",
+                    "headers": {
+                        "timestamp": time.time() * 1000
+                    }
                 },
                 countdown=schedule_after,
                 **route_params,
