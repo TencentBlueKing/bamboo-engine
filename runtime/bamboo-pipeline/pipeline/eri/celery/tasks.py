@@ -55,6 +55,7 @@ def execute(
     parent_pipeline_id: str = None,
     recover_point: str = None,
     headers: dict = None,
+    **kwargs,
 ):
     _observe_message_delay(metrics.ENGINE_RUNTIME_EXECUTE_TASK_CLAIM_DELAY, headers)
 
@@ -87,6 +88,7 @@ def schedule(
     callback_data_id: Optional[int],
     recover_point: str = None,
     headers: dict = None,
+    **kwargs,
 ):
     _observe_message_delay(metrics.ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY, headers)
 
