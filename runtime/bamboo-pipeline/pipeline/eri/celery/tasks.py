@@ -10,6 +10,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import imp
+from multiprocessing.spawn import import_main_path
 import time
 import logging
 from typing import Optional
@@ -42,7 +44,7 @@ def _observe_message_delay(metric: metrics.Histogram, headers: dict):
         return
 
     try:
-        metric.labels(hostname=get_hostname()).observe((time.time() * 1000) - headers["timestamp"])
+        metric.labels(hostname=get_hostname()).observe(time.time() - headers["timestamp"])
     except Exception:
         logger.exception("%s observe err" % metric)
 
