@@ -59,7 +59,7 @@ class BambooDjangoRuntime(
     EngineRuntimeInterface,
 ):
 
-    ERI_SUPPORT_VERSION = 6
+    ERI_SUPPORT_VERSION = 7
 
     def __init__(self):
         try:
@@ -170,11 +170,15 @@ class BambooDjangoRuntime(
                 for flow_id, cond in gateway["conditions"].items()
             ]
             default_condition = gateway.get("default_condition", {})
-            detail["default_condition"] = {
-                "name": default_condition["flow_id"],
-                "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
-                "flow_id": default_condition["flow_id"],
-            } if default_condition else None
+            detail["default_condition"] = (
+                {
+                    "name": default_condition["flow_id"],
+                    "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
+                    "flow_id": default_condition["flow_id"],
+                }
+                if default_condition
+                else None
+            )
         elif gateway["type"] == NodeType.ParallelGateway.value:
             detail["converge_gateway_id"] = gateway["converge_gateway_id"]
 
@@ -189,11 +193,15 @@ class BambooDjangoRuntime(
                 for flow_id, cond in gateway["conditions"].items()
             ]
             default_condition = gateway.get("default_condition", {})
-            detail["default_condition"] = {
-                "name": default_condition["flow_id"],
-                "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
-                "flow_id": default_condition["flow_id"],
-            } if default_condition else None
+            detail["default_condition"] = (
+                {
+                    "name": default_condition["flow_id"],
+                    "target_id": pipeline["flows"][default_condition["flow_id"]]["target"],
+                    "flow_id": default_condition["flow_id"],
+                }
+                if default_condition
+                else None
+            )
             detail["converge_gateway_id"] = gateway["converge_gateway_id"]
         elif gateway["type"] == NodeType.ConvergeGateway.value:
             pass

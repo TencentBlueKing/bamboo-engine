@@ -13,6 +13,7 @@ specific language governing permissions and limitations under the License.
 
 # 引擎核心模块
 
+from email import header
 import logging
 import random
 import time
@@ -578,6 +579,7 @@ class Engine:
         root_pipeline_id: str,
         parent_pipeline_id: str,
         interrupter: ExecuteInterrupter,
+        headers: dict,
     ):
         """
         在某个进程上从某个节点开始进入推进循环
@@ -631,6 +633,7 @@ class Engine:
                             node_id=process_info.destination_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
+                            headers=headers,
                         )
 
                     logger.info(
@@ -840,7 +843,9 @@ class Engine:
                     if execute_result.schedule_type == ScheduleType.POLL and (
                         not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
                     ):
-                        self.runtime.schedule(process_id, current_node_id, schedule_id)
+                        self.runtime.schedule(
+                            process_id=process_id, node_id=current_node_id, schedule_id=schedule_id, headers=headers
+                        )
 
                     interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, set_schedule_done=True)
 
@@ -863,6 +868,7 @@ class Engine:
                             node_id=d.node_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
+                            headers=headers,
                         )
 
                 if execute_result.should_die:
@@ -889,6 +895,7 @@ class Engine:
         node_id: str,
         schedule_id: str,
         interrupter: ScheduleInterrupter,
+        headers: dict,
         callback_data_id: Optional[int] = None,
     ):
         """
@@ -1008,6 +1015,7 @@ class Engine:
                     schedule_id=schedule_id,
                     callback_data_id=callback_data_id,
                     schedule_after=try_after,
+                    headers=headers,
                 )
                 return
 
@@ -1079,10 +1087,11 @@ class Engine:
 
             if schedule_result.has_next_schedule:
                 self.runtime.set_next_schedule(
-                    process_info.process_id,
-                    node_id,
-                    schedule_id,
-                    schedule_result.schedule_after,
+                    process_id=process_info.process_id,
+                    node_id=node_id,
+                    schedule_id=schedule_id,
+                    schedule_after=schedule_result.schedule_after,
+                    headers=headers,
                 )
 
             if schedule_result.schedule_done:
@@ -1092,6 +1101,7 @@ class Engine:
                     node_id=schedule_result.next_node_id,
                     root_pipeline_id=process_info.root_pipeline_id,
                     parent_pipeline_id=process_info.top_pipeline_id,
+                    headers=headers,
                 )
 
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(

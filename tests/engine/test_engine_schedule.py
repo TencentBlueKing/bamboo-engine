@@ -102,6 +102,7 @@ def interrupter(pi, node_id, schedule_id):
         callback_data_id=None,
         check_point=ScheduleInterruptPoint(name="name"),
         recover_point=None,
+        headers={},
     )
 
 
@@ -135,7 +136,7 @@ def test_schedule__lock_get_failed(node_id, schedule_id, state, pi, schedule, in
     runtime.get_schedule = MagicMock(return_value=schedule)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule_id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -164,7 +165,7 @@ def test_schedule__lock_get_failed_but_not_retry(node_id, schedule_id, state, pi
     runtime.get_schedule = MagicMock(return_value=schedule)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule_id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -188,7 +189,7 @@ def test_schedule__schedule_is_finished(node_id, pi, schedule, interrupter):
     runtime.get_state = MagicMock()
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
@@ -207,7 +208,7 @@ def test_schedule__schedule_version_not_match(node_id, pi, state, schedule, inte
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -231,7 +232,7 @@ def test_schedule__schedule_node_state_is_not_running(node_id, pi, state, schedu
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -277,7 +278,9 @@ def test_schedule__has_callback_data(node_id, state, pi, version, schedule, node
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, callback_data.id)
+        engine.schedule(
+            pi.process_id, node_id, schedule.id, interrupter, callback_data_id=callback_data.id, headers={"k": "v"}
+        )
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -331,7 +334,7 @@ def test_schedule__without_callback_data(node_id, state, pi, schedule, node, int
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -385,7 +388,7 @@ def test_schedule__has_next_schedule(node_id, state, pi, schedule, node, interru
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={"k": "v"})
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -403,7 +406,9 @@ def test_schedule__has_next_schedule(node_id, state, pi, schedule, node, interru
         callback_data=None,
         recover_point=interrupter.recover_point,
     )
-    runtime.set_next_schedule.assert_called_once_with(pi.process_id, node_id, schedule.id, 60)
+    runtime.set_next_schedule.assert_called_once_with(
+        process_id=pi.process_id, node_id=node_id, schedule_id=schedule.id, schedule_after=60, headers={"k": "v"}
+    )
     runtime.finish_schedule.assert_not_called()
     runtime.execute.assert_not_called()
 
@@ -442,7 +447,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -463,7 +468,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.set_next_schedule.assert_not_called()
     runtime.finish_schedule.assert_called_once_with(schedule.id)
     runtime.execute.assert_called_once_with(
-        process_id=pi.process_id, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root"
+        process_id=pi.process_id, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root", headers={}
     )
 
     assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
@@ -485,7 +490,7 @@ def test_schedule__recover_version_mismatch(node_id, pi, state, schedule, interr
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -510,7 +515,7 @@ def test_schedule__recover_not_not_running(node_id, pi, state, schedule, interru
     runtime.get_state = MagicMock(return_value=state)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+    engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
 
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.schedule.assert_not_called()
@@ -550,7 +555,7 @@ def test_schedule__recover_has_schedule_result(node_id, pi, node, state, schedul
         "bamboo_engine.engine.HandlerFactory.get_handler",
         get_handler,
     ):
-        engine.schedule(pi.process_id, node_id, schedule.id, interrupter)
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={"k": "v"})
 
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_process_info.assert_called_once_with(pi.process_id)
@@ -560,7 +565,9 @@ def test_schedule__recover_has_schedule_result(node_id, pi, node, state, schedul
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_not_called()
-    runtime.set_next_schedule.assert_called_once_with(pi.process_id, node_id, schedule.id, 60)
+    runtime.set_next_schedule.assert_called_once_with(
+        process_id=pi.process_id, node_id=node_id, schedule_id=schedule.id, schedule_after=60, headers={"k": "v"}
+    )
     runtime.finish_schedule.assert_not_called()
     runtime.execute.assert_not_called()
     get_handler.assert_not_called()

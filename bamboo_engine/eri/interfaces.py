@@ -38,7 +38,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "6.3.0"
+__version__ = "7.0.0"
 
 
 def version():
@@ -506,6 +506,7 @@ class TaskMixin:
         root_pipeline_id: str,
         parent_pipeline_id: str,
         recover_point: Optional[ExecuteInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
@@ -520,6 +521,8 @@ class TaskMixin:
         :type parent_pipeline_id: str
         :param recover_point: 执行中断点
         :type recover_point: Optional[ExecuteInterruptPoint]
+        :param headers: 任务头部信息
+        :type headers: Optional[dict]
         """
 
     @abstractmethod
@@ -530,6 +533,7 @@ class TaskMixin:
         schedule_id: str,
         callback_data_id: Optional[int] = None,
         recover_point: Optional[ScheduleInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -544,6 +548,8 @@ class TaskMixin:
         :type callback_data_id: Optional[int], optional
         :param recover_point: 调度中断点
         :type recover_point: Optional[ExecuteInterruptPoint]
+        :param headers: 任务头部信息
+        :type headers: Optional[dict]
         """
 
     @abstractmethod
@@ -554,6 +560,7 @@ class TaskMixin:
         schedule_id: str,
         schedule_after: int,
         callback_data_id: Optional[int] = None,
+        headers: Optional[dict] = None,
     ):
         """
         设置下次调度时间，调度倒数归零后应该执行 Engine 实例的 schedule 方法
@@ -568,6 +575,8 @@ class TaskMixin:
         :type schedule_after: int
         :param callback_data_id: 回调数据, defaults to None
         :type callback_data_id: Optional[int], optional
+        :param headers: 任务头部信息
+        :type headers: Optional[dict]
         """
 
 

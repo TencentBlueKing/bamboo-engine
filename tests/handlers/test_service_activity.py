@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations underExecutableEndEvent the License.
 """
 
+from email import header
 import pytest
 from mock import MagicMock, call, patch
 
@@ -72,6 +73,7 @@ def interrupter():
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
 
@@ -99,6 +101,7 @@ def schedule_interrupter():
         callback_data_id=None,
         check_point=ScheduleInterruptPoint(name="n"),
         recover_point=None,
+        headers={},
     )
 
 

@@ -19,7 +19,8 @@ from bamboo_engine.eri import (
     ProcessInfo,
     NodeType,
     ExclusiveGateway,
-    Condition, DefaultCondition,
+    Condition,
+    DefaultCondition,
 )
 from bamboo_engine.handlers.exclusive_gateway import (
     ExclusiveGatewayHandler,
@@ -283,7 +284,6 @@ def test_exclusive_gateway__execute_not_meet_targets_with_default(recover_point)
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-
 
 
 @pytest.mark.parametrize(

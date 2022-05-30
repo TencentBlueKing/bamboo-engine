@@ -59,6 +59,7 @@ def interrupter():
             ),
         ),
         recover_point=ExecuteInterruptPoint(name="s3", version=10),
+        headers={},
     )
 
 
@@ -70,6 +71,7 @@ def no_recover_point_interrupter():
         current_node_id="node",
         check_point=ExecuteInterruptPoint(name="s2", version=1),
         recover_point=None,
+        headers={},
     )
 
 
