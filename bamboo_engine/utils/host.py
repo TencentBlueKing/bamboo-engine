@@ -13,9 +13,11 @@ specific language governing permissions and limitations under the License.
 
 import socket
 
+_HOSTNAME = socket.gethostname()
+
 
 def get_hostname():
     """
     获取当前主机名
     """
-    return socket.gethostname()
+    return _HOSTNAME

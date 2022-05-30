@@ -46,6 +46,10 @@ from .metrics import (
     ENGINE_RUNNING_PROCESSES,
     ENGINE_RUNNING_SCHEDULES,
     ENGINE_SCHEDULE_RUNNING_TIME,
+    ENGINE_EXECUTE_PRE_PROCESS_DURATION,
+    ENGINE_EXECUTE_POST_PROCESS_DURATION,
+    ENGINE_SCHEDULE_PRE_PROCESS_DURATION,
+    ENGINE_SCHEDULE_POST_PROCESS_DURATION,
     setup_gauge,
     setup_histogram,
 )
@@ -587,6 +591,7 @@ class Engine:
         :param parent_pipeline_id: 父流程 ID
         :type parent_pipeline_id: str
         """
+        engine_pre_execute_start_at = time.time()
         if interrupter.recover_point:
             logger.info(
                 "[pipeline-trace](root_pipeline: %s) recover execute with point(%s)",
@@ -793,6 +798,9 @@ class Engine:
                     execute_result = interrupter.recover_point.execute_result
                 else:
                     handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
+                    ENGINE_EXECUTE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
+                        time.time() - engine_pre_execute_start_at
+                    )
                     execute_result = handler.execute(
                         process_info=process_info,
                         loop=loop,
@@ -800,6 +808,8 @@ class Engine:
                         version=version,
                         recover_point=interrupter.recover_point,
                     )
+
+                engine_post_execute_start_at = time.time()
                 interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_NODE_DONE, execute_result=execute_result)
 
                 logger.info(
@@ -859,10 +869,16 @@ class Engine:
                     self.runtime.die(process_id)
 
                 if execute_result.should_sleep or execute_result.should_die:
+                    ENGINE_EXECUTE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
+                        time.time() - engine_post_execute_start_at
+                    )
                     return
 
                 current_node_id = execute_result.next_node_id
                 interrupter.to_node(current_node_id)
+                ENGINE_EXECUTE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
+                    time.time() - engine_post_execute_start_at
+                )
 
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)
@@ -887,6 +903,7 @@ class Engine:
         :param callback_data_id: 回调数据 ID, defaults to None
         :type callback_data_id: Optional[int], optional
         """
+        engine_pre_schedule_start_at = time.time()
         if interrupter.recover_point:
             logger.info(
                 "[pipeline-trace](schedule: %s) recover schedule with point(%s)",
@@ -1030,6 +1047,9 @@ class Engine:
                 schedule_result = interrupter.recover_point.schedule_result
             else:
                 handler = HandlerFactory.get_handler(node, self.runtime, interrupter)
+                ENGINE_SCHEDULE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
+                    time.time() - engine_pre_schedule_start_at
+                )
                 schedule_result = handler.schedule(
                     process_info=process_info,
                     loop=state.loop,
@@ -1038,6 +1058,8 @@ class Engine:
                     callback_data=callback_data,
                     recover_point=interrupter.recover_point,
                 )
+
+            engine_post_schedule_start_at = time.time()
             interrupter.check_and_set(ScheduleKeyPoint.SCHEDULE_NODE_DONE, schedule_result=schedule_result)
 
             ENGINE_NODE_SCHEDULE_TIME.labels(type=type_label, hostname=self._hostname).observe(
@@ -1071,6 +1093,10 @@ class Engine:
                     root_pipeline_id=process_info.root_pipeline_id,
                     parent_pipeline_id=process_info.top_pipeline_id,
                 )
+
+            ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
+                time.time() - engine_post_schedule_start_at
+            )
 
     def _add_history(
         self,

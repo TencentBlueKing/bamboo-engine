@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 from typing import Optional
 
-from bamboo_engine import states
+from bamboo_engine import states, metrics
 from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
 from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 
@@ -38,19 +38,22 @@ class ConvergeGatewayHandler(NodeHandler):
         :rtype: ExecuteResult
         """
 
-        self.runtime.set_state(
-            node_id=self.node.id,
-            version=version,
-            to_state=states.FINISHED,
-            set_archive_time=True,
-            ignore_boring_set=recover_point is not None,
-        )
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+        ):
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.FINISHED,
+                set_archive_time=True,
+                ignore_boring_set=recover_point is not None,
+            )
 
-        return ExecuteResult(
-            should_sleep=False,
-            schedule_ready=False,
-            schedule_type=None,
-            schedule_after=-1,
-            dispatch_processes=[],
-            next_node_id=self.node.target_nodes[0],
-        )
+            return ExecuteResult(
+                should_sleep=False,
+                schedule_ready=False,
+                schedule_type=None,
+                schedule_after=-1,
+                dispatch_processes=[],
+                next_node_id=self.node.target_nodes[0],
+            )

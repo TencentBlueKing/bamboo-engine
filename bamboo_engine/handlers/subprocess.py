@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 import logging
 from typing import Optional
 
+from bamboo_engine import metrics
 from bamboo_engine.context import Context
 from bamboo_engine.config import Settings
 from bamboo_engine.interrupt import ExecuteKeyPoint
@@ -44,61 +45,65 @@ class SubProcessHandler(NodeHandler):
         :return: 执行结果
         :rtype: ExecuteResult
         """
-        data = self.runtime.get_data(self.node.id)
-        root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
-        need_render_inputs = data.need_render_inputs()
-        render_escape_inputs = data.render_escape_inputs()
-        top_pipeline_id = process_info.top_pipeline_id
-        root_pipeline_id = process_info.root_pipeline_id
 
-        logger.info(
-            "root_pipeline[%s] node(%s) subprocess data: %s",
-            root_pipeline_id,
-            self.node.id,
-            data,
-        )
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+        ):
+            data = self.runtime.get_data(self.node.id)
+            root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
+            need_render_inputs = data.need_render_inputs()
+            render_escape_inputs = data.render_escape_inputs()
+            top_pipeline_id = process_info.top_pipeline_id
+            root_pipeline_id = process_info.root_pipeline_id
 
-        # reset inner_loop of nodes in subprocess
-        self.runtime.reset_children_state_inner_loop(self.node.id)
-
-        # resolve inputs context references
-        inputs_refs = Template(need_render_inputs).get_reference()
-        logger.info(
-            "root_pipeline[%s] node(%s) subprocess original refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            inputs_refs,
-        )
-
-        additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
-        inputs_refs = inputs_refs.union(additional_refs)
-        logger.info(
-            "root_pipeline[%s] node(%s) subprocess final refs: %s",
-            root_pipeline_id,
-            self.node.id,
-            inputs_refs,
-        )
-
-        # prepare context
-        context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=inputs_refs)
-
-        # pre extract loop outputs
-        loop_value = loop + Settings.RERUN_INDEX_OFFSET
-        if self.LOOP_KEY in data.outputs:
-            loop_output_key = data.outputs[self.LOOP_KEY]
-            context_values.append(
-                ContextValue(
-                    key=loop_output_key,
-                    type=ContextValueType.PLAIN,
-                    value=loop_value,
-                )
+            logger.info(
+                "root_pipeline[%s] node(%s) subprocess data: %s",
+                root_pipeline_id,
+                self.node.id,
+                data,
             )
-        logger.info(
-            "root_pipeline[%s] node(%s) subprocess parent context values: %s",
-            root_pipeline_id,
-            self.node.id,
-            context_values,
-        )
+
+            # reset inner_loop of nodes in subprocess
+            self.runtime.reset_children_state_inner_loop(self.node.id)
+
+            # resolve inputs context references
+            inputs_refs = Template(need_render_inputs).get_reference()
+            logger.info(
+                "root_pipeline[%s] node(%s) subprocess original refs: %s",
+                root_pipeline_id,
+                self.node.id,
+                inputs_refs,
+            )
+
+            additional_refs = self.runtime.get_context_key_references(pipeline_id=top_pipeline_id, keys=inputs_refs)
+            inputs_refs = inputs_refs.union(additional_refs)
+            logger.info(
+                "root_pipeline[%s] node(%s) subprocess final refs: %s",
+                root_pipeline_id,
+                self.node.id,
+                inputs_refs,
+            )
+
+            # prepare context
+            context_values = self.runtime.get_context_values(pipeline_id=top_pipeline_id, keys=inputs_refs)
+
+            # pre extract loop outputs
+            loop_value = loop + Settings.RERUN_INDEX_OFFSET
+            if self.LOOP_KEY in data.outputs:
+                loop_output_key = data.outputs[self.LOOP_KEY]
+                context_values.append(
+                    ContextValue(
+                        key=loop_output_key,
+                        type=ContextValueType.PLAIN,
+                        value=loop_value,
+                    )
+                )
+            logger.info(
+                "root_pipeline[%s] node(%s) subprocess parent context values: %s",
+                root_pipeline_id,
+                self.node.id,
+                context_values,
+            )
 
         context = Context(self.runtime, context_values, root_pipeline_inputs)
         try:
@@ -136,20 +141,23 @@ class SubProcessHandler(NodeHandler):
             sub_context_values,
         )
 
-        # update subprocess context, inject subprocess data
-        self.runtime.upsert_plain_context_values(self.node.id, sub_context_values)
-        if not recover_point or not recover_point.handler_data.pipeline_stack_setted:
-            process_info.pipeline_stack.append(self.node.id)
-            self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
-        self.interrupter.check_and_set(
-            ExecuteKeyPoint.SP_SET_PIPELINE_STACK_DONE, pipeline_stack_setted=True, from_handler=True
-        )
+        with metrics.observe(
+            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+        ):
+            # update subprocess context, inject subprocess data
+            self.runtime.upsert_plain_context_values(self.node.id, sub_context_values)
+            if not recover_point or not recover_point.handler_data.pipeline_stack_setted:
+                process_info.pipeline_stack.append(self.node.id)
+                self.runtime.set_pipeline_stack(process_info.process_id, process_info.pipeline_stack)
+            self.interrupter.check_and_set(
+                ExecuteKeyPoint.SP_SET_PIPELINE_STACK_DONE, pipeline_stack_setted=True, from_handler=True
+            )
 
-        return ExecuteResult(
-            should_sleep=False,
-            schedule_ready=False,
-            schedule_type=None,
-            schedule_after=-1,
-            dispatch_processes=[],
-            next_node_id=self.node.start_event_id,
-        )
+            return ExecuteResult(
+                should_sleep=False,
+                schedule_ready=False,
+                schedule_type=None,
+                schedule_after=-1,
+                dispatch_processes=[],
+                next_node_id=self.node.start_event_id,
+            )
