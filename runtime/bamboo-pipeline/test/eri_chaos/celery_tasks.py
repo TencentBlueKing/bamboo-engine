@@ -39,6 +39,7 @@ def chaos_execute(
     execute_plan_index: int = 0,
     schedule_choas_plans: str = "[]",
     schedule_plan_index: int = 0,
+    headers: dict = None,
 ):
     runtime = ChoasBambooDjangoRuntime(
         stage="execute",
@@ -56,6 +57,7 @@ def chaos_execute(
         root_pipeline_id=root_pipeline_id,
         check_point=ExecuteInterruptPoint(name=ExecuteKeyPoint.ENTRY),
         recover_point=recover_point,
+        headers=headers or {},
     )
 
     Engine(runtime).execute(
@@ -64,6 +66,7 @@ def chaos_execute(
         root_pipeline_id=root_pipeline_id,
         parent_pipeline_id=parent_pipeline_id,
         interrupter=interrupter,
+        headers=headers or {},
     )
 
 
@@ -78,6 +81,7 @@ def chaos_schedule(
     execute_plan_index: int = 0,
     schedule_choas_plans: str = "[]",
     schedule_plan_index: int = 0,
+    headers: dict = None,
 ):
     runtime = ChoasBambooDjangoRuntime(
         stage="schedule",
@@ -95,6 +99,7 @@ def chaos_schedule(
         callback_data_id=callback_data_id,
         check_point=ScheduleInterruptPoint(name=ScheduleKeyPoint.ENTRY),
         recover_point=recover_point,
+        headers=headers or {},
     )
     Engine(runtime).schedule(
         process_id=process_id,
@@ -102,4 +107,5 @@ def chaos_schedule(
         schedule_id=schedule_id,
         interrupter=interrupter,
         callback_data_id=callback_data_id,
+        headers=headers or {},
     )

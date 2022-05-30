@@ -139,6 +139,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
         root_pipeline_id: str,
         parent_pipeline_id: str,
         recover_point: Optional[ExecuteInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
@@ -161,6 +162,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
                 "execute_plan_index": self.execute_plan_index + 1,
                 "schedule_choas_plans": json.dumps(self.schedule_choas_plans),
                 "schedule_plan_index": self.schedule_plan_index,
+                "headers": headers,
             },
             **{
                 "queue": "er_execute",
@@ -175,6 +177,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
         schedule_id: str,
         callback_data_id: Optional[int] = None,
         recover_point: Optional[ScheduleInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -199,6 +202,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
                 "execute_plan_index": self.execute_plan_index,
                 "schedule_choas_plans": json.dumps(self.schedule_choas_plans),
                 "schedule_plan_index": self.schedule_plan_index + 1,
+                "headers": headers,
             },
             **{
                 "queue": "er_schedule",
@@ -213,6 +217,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
         schedule_id: str,
         schedule_after: int,
         callback_data_id: Optional[int] = None,
+        headers: Optional[dict] = None,
     ):
         """
         设置下次调度时间，调度倒数归零后应该执行 Engine 实例的 schedule 方法
@@ -239,6 +244,7 @@ class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
                 "execute_plan_index": self.execute_plan_index,
                 "schedule_choas_plans": json.dumps(self.schedule_choas_plans),
                 "schedule_plan_index": self.schedule_plan_index + 1,
+                "headers": headers,
             },
             countdown=schedule_after,
             **{
