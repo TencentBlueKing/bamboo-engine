@@ -11,7 +11,6 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from email import header
 import pytest
 from mock import MagicMock
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint

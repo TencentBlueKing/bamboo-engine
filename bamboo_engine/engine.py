@@ -13,7 +13,6 @@ specific language governing permissions and limitations under the License.
 
 # 引擎核心模块
 
-from email import header
 import logging
 import random
 import time
