@@ -27,7 +27,7 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
   - [流程构造生成树字段摘要](./docs/user_guide/builded_pipeline_tree_schema.md)
   - [SPLICE 变量](./docs/user_guide/splice_var.md)
   - [Engine API](./docs/user_guide/engine_api.md)
-  - [监控](./docs/user_guide/monitor.md)
+  - [Metrics](./docs/user_guide/monitor.md)
   - 升级指引
     - [如何升级到 2.x 版本](./docs/upgrade/bamboo_engine_2.md)
 - 运行时文档
@@ -36,16 +36,20 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
     - [运行自定义组件](./docs/user_guide/run_your_component.md)
     - [组件单元测试](./docs/user_guide/component_unit_test.md)
     - [Worker 配置](./docs/user_guide/workers.md)
+    - [运行时钩子](./docs/user_guide/signals.md)
     - [设置](./docs/user_guide/settings.md)
 
 
 ## 整体设计
 
+![](./docs/assets/img/engine_arch.png)
+
 bamboo-engine 是流程引擎核心模块、调度逻辑的定义和实现，并没有内置特定的引擎运行时，需要搭配实现了 `bamboo_engine.eri.interfaces.EngineRuntimeInterface` 接口的引擎运行时使用，目前提供了以下运行时可供使用：
 
 - 基于 Django，Celery 的运行时：[bamboo-pipeline](./runtime/bamboo-pipeline)
 
-引擎整体架构：
+
+engine 模块结构：
 
 ![](./docs/assets/img/code_arch.png)
 
