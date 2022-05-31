@@ -61,7 +61,7 @@ bamboo-engine 定义了运行时应该记录并向外暴露的 prometheus metric
 
 ### bamboo-pipeline
 
-目前 bamboo-pipeline 仅支持暴露以**非 prefork**模式启动的 worker 记录的 metrics，当 celery worker 以 gevent 模式启动后：
+目前 bamboo-pipeline 仅支持暴露以**非 prefork**模式启动的 worker 记录的 metrics。例如，当 celery worker 以 gevent 模式启动后：
 
 ```shell
 $ python manage.py celery worker -Q er_execute,er_schedule -l info -P gevent
