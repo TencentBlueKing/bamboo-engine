@@ -35,6 +35,7 @@ def interrupter():
             handler_data=MagicMock(),
         ),
         recover_point=MagicMock(),
+        headers={},
     )
 
 
@@ -50,6 +51,7 @@ def call_interrupter():
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
 
@@ -83,6 +85,7 @@ def test_call(call_interrupter):
             root_pipeline_id=call_interrupter.root_pipeline_id,
             parent_pipeline_id=call_interrupter.parent_pipeline_id,
             recover_point=call_interrupter.latest_recover_point,
+            headers=call_interrupter.headers,
         )
         call_interrupter.runtime.handle_execute_interrupt_event.assert_called_once()
     else:

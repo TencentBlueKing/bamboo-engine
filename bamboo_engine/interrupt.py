@@ -10,6 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+
 import logging
 import traceback
 from typing import Optional
@@ -53,6 +54,7 @@ class Interrupter:
         process_id: int,
         current_node_id: str,
         check_point: InterruptPoint,
+        headers: dict,
         recover_point: Optional[InterruptPoint],
     ) -> None:
         self.runtime = runtime
@@ -60,6 +62,7 @@ class Interrupter:
         self.current_node_id = current_node_id
         self.check_point = check_point
         self.recover_point = recover_point
+        self.headers = headers
 
     def _update_check_point_version(self):
         self.check_point.version += 1
@@ -106,6 +109,7 @@ class ExecuteInterrupter(Interrupter):
         parent_pipeline_id: str,
         root_pipeline_id: str,
         check_point: ExecuteInterruptPoint,
+        headers: dict,
         recover_point: Optional[ExecuteInterruptPoint],
     ) -> None:
         super().__init__(
@@ -114,6 +118,7 @@ class ExecuteInterrupter(Interrupter):
             current_node_id=current_node_id,
             check_point=check_point,
             recover_point=recover_point,
+            headers=headers,
         )
         self.parent_pipeline_id = parent_pipeline_id
         self.root_pipeline_id = root_pipeline_id
@@ -147,6 +152,7 @@ class ExecuteInterrupter(Interrupter):
                 root_pipeline_id=self.root_pipeline_id,
                 parent_pipeline_id=self.parent_pipeline_id,
                 recover_point=recover_point,
+                headers=self.headers,
             )
 
             exec_trace = traceback.format_exc()
@@ -191,6 +197,7 @@ class ScheduleInterrupter(Interrupter):
         process_id: int,
         current_node_id: str,
         schedule_id: int,
+        headers: dict,
         callback_data_id: Optional[int],
         check_point: ScheduleInterruptPoint,
         recover_point: Optional[ScheduleInterruptPoint],
@@ -201,6 +208,7 @@ class ScheduleInterrupter(Interrupter):
             current_node_id=current_node_id,
             check_point=check_point,
             recover_point=recover_point,
+            headers=headers,
         )
         self.schedule_id = schedule_id
         self.callback_data_id = callback_data_id
@@ -225,6 +233,7 @@ class ScheduleInterrupter(Interrupter):
                 schedule_id=self.schedule_id,
                 callback_data_id=self.callback_data_id,
                 recover_point=recover_point,
+                headers=self.headers,
             )
 
             exec_trace = traceback.format_exc()

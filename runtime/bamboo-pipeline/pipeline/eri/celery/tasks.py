@@ -69,6 +69,7 @@ def execute(
         root_pipeline_id=root_pipeline_id,
         check_point=ExecuteInterruptPoint(name=ExecuteKeyPoint.ENTRY),
         recover_point=recover_point,
+        headers=headers or {},
     )
 
     Engine(runtime).execute(
@@ -77,6 +78,7 @@ def execute(
         root_pipeline_id=root_pipeline_id,
         parent_pipeline_id=parent_pipeline_id,
         interrupter=interrupter,
+        headers=headers or {},
     )
 
 
@@ -103,6 +105,7 @@ def schedule(
         callback_data_id=callback_data_id,
         check_point=ScheduleInterruptPoint(name=ScheduleKeyPoint.ENTRY),
         recover_point=recover_point,
+        headers=headers or {},
     )
     Engine(runtime).schedule(
         process_id=process_id,
@@ -110,6 +113,7 @@ def schedule(
         schedule_id=schedule_id,
         interrupter=interrupter,
         callback_data_id=callback_data_id,
+        headers=headers or {},
     )
 
 

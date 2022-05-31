@@ -72,6 +72,7 @@ def interrupter():
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
 
@@ -99,6 +100,7 @@ def schedule_interrupter():
         callback_data_id=None,
         check_point=ScheduleInterruptPoint(name="n"),
         recover_point=None,
+        headers={},
     )
 
 

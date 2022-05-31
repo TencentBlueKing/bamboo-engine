@@ -30,6 +30,7 @@ def interrupter():
         callback_data_id=3,
         check_point=ScheduleInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
 
@@ -52,6 +53,7 @@ def test_call(interrupter):
             schedule_id=interrupter.schedule_id,
             callback_data_id=interrupter.callback_data_id,
             recover_point=interrupter.latest_recover_point,
+            headers=interrupter.headers,
         )
         interrupter.runtime.handle_schedule_interrupt_event.assert_called_once()
     else:

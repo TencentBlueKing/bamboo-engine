@@ -80,6 +80,7 @@ def test_subprocess_handler__execute_success(recover_point):
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
     runtime = MagicMock()

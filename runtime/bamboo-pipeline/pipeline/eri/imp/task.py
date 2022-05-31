@@ -36,15 +36,25 @@ def _retry_once(action: callable):
 
 
 class TaskMixin:
-    def _get_task_route_params(self, task_name: str, process_id: int):
-        process = Process.objects.filter(id=process_id).only("priority", "queue").first()
-        resolver = QueueResolver(process.queue)
+    def _get_task_route_params(self, task_name: str, queue: str, priority: int):
+        resolver = QueueResolver(queue)
         queue, routing_key = resolver.resolve_task_queue_and_routing_key(task_name)
         return {
             "queue": queue,
-            "priority": process.priority,
+            "priority": priority,
             "routing_key": routing_key,
         }
+
+    def _standardize_headers(self, headers: Optional[dict], process_id: int):
+        if headers is None:
+            headers = {}
+
+        if "route_info" not in headers:
+            process = Process.objects.filter(id=process_id).only("priority", "queue").first()
+            headers["route_info"] = {"queue": process.queue, "priority": process.priority}
+
+        headers["timestamp"] = time.time()
+        return headers
 
     def execute(
         self,
@@ -53,6 +63,7 @@ class TaskMixin:
         root_pipeline_id: str,
         parent_pipeline_id: str,
         recover_point: Optional[ExecuteInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
@@ -63,7 +74,10 @@ class TaskMixin:
         :type node_id: str
         """
         task_name = "pipeline.eri.celery.tasks.execute"
-        route_params = self._get_task_route_params(task_name, process_id)
+        headers = self._standardize_headers(headers=headers, process_id=process_id)
+        route_params = self._get_task_route_params(
+            task_name=task_name, queue=headers["route_info"]["queue"], priority=headers["route_info"]["priority"]
+        )
 
         def action():
             result = current_app.tasks[task_name].apply_async(
@@ -73,7 +87,7 @@ class TaskMixin:
                     "root_pipeline_id": root_pipeline_id,
                     "parent_pipeline_id": parent_pipeline_id,
                     "recover_point": "{}" if not recover_point else recover_point.to_json(),
-                    "headers": {"timestamp": time.time()},
+                    "headers": headers,
                 },
                 **route_params,
             )
@@ -93,6 +107,7 @@ class TaskMixin:
         schedule_id: str,
         callback_data_id: Optional[int] = None,
         recover_point: Optional[ScheduleInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -105,7 +120,10 @@ class TaskMixin:
         :type schedule_id: str
         """
         task_name = "pipeline.eri.celery.tasks.schedule"
-        route_params = self._get_task_route_params(task_name, process_id)
+        headers = self._standardize_headers(headers=headers, process_id=process_id)
+        route_params = self._get_task_route_params(
+            task_name=task_name, queue=headers["route_info"]["queue"], priority=headers["route_info"]["priority"]
+        )
 
         def action():
             result = current_app.tasks[task_name].apply_async(
@@ -115,7 +133,7 @@ class TaskMixin:
                     "schedule_id": schedule_id,
                     "callback_data_id": callback_data_id,
                     "recover_point": "{}" if not recover_point else recover_point.to_json(),
-                    "headers": {"timestamp": time.time()},
+                    "headers": headers,
                 },
                 **route_params,
             )
@@ -129,6 +147,7 @@ class TaskMixin:
         node_id: str,
         schedule_id: str,
         schedule_after: int,
+        headers: Optional[dict] = None,
         callback_data_id: Optional[int] = None,
     ):
         """
@@ -144,7 +163,11 @@ class TaskMixin:
         :type schedule_after: int
         """
         task_name = "pipeline.eri.celery.tasks.schedule"
-        route_params = self._get_task_route_params(task_name, process_id)
+        headers = self._standardize_headers(headers=headers, process_id=process_id)
+        route_params = self._get_task_route_params(
+            task_name=task_name, queue=headers["route_info"]["queue"], priority=headers["route_info"]["priority"]
+        )
+        headers["timestamp"] += schedule_after
 
         def action():
             result = current_app.tasks[task_name].apply_async(
@@ -154,7 +177,7 @@ class TaskMixin:
                     "schedule_id": schedule_id,
                     "callback_data_id": callback_data_id,
                     "recover_point": "{}",
-                    "headers": {"timestamp": time.time() + schedule_after},
+                    "headers": headers,
                 },
                 countdown=schedule_after,
                 **route_params,

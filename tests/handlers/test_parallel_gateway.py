@@ -64,6 +64,7 @@ def test_parallel_gateway_handler__execute_success(recover_point):
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
     dispatch_processes = ["p1", "p2", "p3"]

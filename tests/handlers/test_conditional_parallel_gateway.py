@@ -74,6 +74,7 @@ def interrupter():
         root_pipeline_id="root",
         check_point=ExecuteInterruptPoint(name="s1"),
         recover_point=None,
+        headers={},
     )
 
 
