@@ -141,8 +141,8 @@ class PeriodicTask(models.Model):
         self.celery_task.enabled = enabled
         self.celery_task.save()
 
-    def modify_cron(self, cron, timezone=None):
-        if self.enabled:
+    def modify_cron(self, cron, timezone=None, must_disabled=True):
+        if must_disabled and self.enabled:
             raise InvalidOperationException("can not modify cron when task is enabled")
         schedule, _ = DjangoCeleryBeatCrontabSchedule.objects.get_or_create(
             minute=cron.get("minute", "*"),
@@ -159,8 +159,8 @@ class PeriodicTask(models.Model):
         self.celery_task.save()
         self.save()
 
-    def modify_constants(self, constants):
-        if self.enabled:
+    def modify_constants(self, constants, must_disabled=True):
+        if must_disabled and self.enabled:
             raise InvalidOperationException("can not modify constants when task is enabled")
         exec_data = self.execution_data
         for key, value in list(constants.items()):
