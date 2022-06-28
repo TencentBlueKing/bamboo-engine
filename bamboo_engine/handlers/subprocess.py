@@ -145,6 +145,7 @@ class SubProcessHandler(NodeHandler):
             metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             # update subprocess context, inject subprocess data
+            self.runtime.set_execution_data_inputs(self.node.id, subprocess_inputs)
             self.runtime.upsert_plain_context_values(self.node.id, sub_context_values)
             if not recover_point or not recover_point.handler_data.pipeline_stack_setted:
                 process_info.pipeline_stack.append(self.node.id)

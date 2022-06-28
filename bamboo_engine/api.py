@@ -22,9 +22,11 @@ from typing import Any, List, Optional
 from .context import Context
 from .engine import Engine
 from .eri import ContextValue, EngineRuntimeInterface
+from .eri.models.node import NodeType
 from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
 from .utils.object import Representable
+from .exceptions import InvalidOperationError
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -643,7 +645,14 @@ def preview_node_inputs(
             root_pipeline_data=root_pipeline_data,
             parent_params=formatted_param_data,
         )
-    raw_inputs = pipeline["activities"][node_id]["component"]["inputs"]
+
+    node_type = pipeline["activities"][node_id]["type"]
+    if node_type == NodeType.ServiceActivity.value:
+        raw_inputs = pipeline["activities"][node_id]["component"]["inputs"]
+    elif node_type == NodeType.SubProcess.value:
+        raw_inputs = pipeline["activities"][node_id]["params"]
+    else:
+        raise InvalidOperationError(f"can not preview inputs for node type: {node_type}")
     raw_inputs = {key: info["value"] for key, info in raw_inputs.items()}
     hydrated_context = context.hydrate(deformat=True)
     inputs = Template(raw_inputs).render(hydrated_context)
