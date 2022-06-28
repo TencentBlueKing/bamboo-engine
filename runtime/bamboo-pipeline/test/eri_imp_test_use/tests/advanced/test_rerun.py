@@ -103,7 +103,7 @@ def test_subprocess_rerun():
             },
             "outputs": ["${output_a}"],
         },
-        params={"${a_i}": {"type": "splice", "value": u"${s_i}"}},
+        params={"${a_i}": {"type": "splice", "value": "${s_i}"}},
     )
     eg = ExclusiveGateway(conditions={0: "${s_i} < 4", 1: "${s_i} >= 4"})
 
@@ -155,7 +155,7 @@ def test_subprocess_rerun():
                 "inputs": {"_loop": 1, "_inner_loop": 1},
                 "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True},
             },
-            act_2.id: {"inputs": {}, "outputs": {"${output_a}": "e", "_loop": 4, "_inner_loop": 4}},
+            act_2.id: {"inputs": {"${a_i}": 4}, "outputs": {"${output_a}": "e", "_loop": 4, "_inner_loop": 4}},
         }
     )
 

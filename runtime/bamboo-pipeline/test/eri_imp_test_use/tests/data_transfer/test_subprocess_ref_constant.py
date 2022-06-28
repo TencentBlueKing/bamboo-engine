@@ -33,8 +33,6 @@ def test_ref_constant():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     assert_all_finish([pipeline["id"]])
 
     assert_exec_data_equal(
@@ -43,7 +41,7 @@ def test_ref_constant():
                 "inputs": {"_loop": 1, "_inner_loop": 1, "param_1": "value_1"},
                 "outputs": {"_loop": 1, "_inner_loop": 1, "param_1": "value_1", "_result": True},
             },
-            subprocess.id: {"inputs": {}, "outputs": {"_loop": 1, "_inner_loop": 1}},
+            subprocess.id: {"inputs": {"${sub_constant_1}": "value_1"}, "outputs": {"_loop": 1, "_inner_loop": 1}},
         }
     )
 
@@ -83,8 +81,6 @@ def test_ref_constant_using_splice_input():
     runtime = BambooDjangoRuntime()
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     assert_all_finish([pipeline["id"]])
 
@@ -135,8 +131,6 @@ def test_ref_constant_using_default_value():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     assert_all_finish([pipeline["id"]])
 
     assert_exec_data_equal(
@@ -145,7 +139,7 @@ def test_ref_constant_using_default_value():
                 "inputs": {"_loop": 1, "_inner_loop": 1, "param_1": "default_value"},
                 "outputs": {"_loop": 1, "_inner_loop": 1, "param_1": "default_value", "_result": True},
             },
-            subprocess.id: {"inputs": {}, "outputs": {"_loop": 1, "_inner_loop": 1}},
+            subprocess.id: {"inputs": {"${sub_constant_1}": "value_1"}, "outputs": {"_loop": 1, "_inner_loop": 1}},
         }
     )
 
@@ -197,8 +191,6 @@ def test_nesting_ref_constant():
     runtime = BambooDjangoRuntime()
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     assert_all_finish([pipeline["id"]])
 
@@ -267,8 +259,6 @@ def test_nesting_ref_constant_with_same_key():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     assert_all_finish([pipeline["id"]])
 
     assert_exec_data_equal(
@@ -277,8 +267,8 @@ def test_nesting_ref_constant_with_same_key():
                 "inputs": {"_loop": 1, "_inner_loop": 1, "param_1": "value_3"},
                 "outputs": {"_loop": 1, "_inner_loop": 1, "param_1": "value_3", "_result": True},
             },
-            subprocess_1.id: {"inputs": {}, "outputs": {"_loop": 1, "_inner_loop": 1}},
-            subprocess_2.id: {"inputs": {}, "outputs": {"_loop": 1, "_inner_loop": 1}},
+            subprocess_1.id: {"inputs": {"${same_key}": "value_3"}, "outputs": {"_loop": 1, "_inner_loop": 1}},
+            subprocess_2.id: {"inputs": {"${same_key}": "value_3"}, "outputs": {"_loop": 1, "_inner_loop": 1}},
         }
     )
 

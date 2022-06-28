@@ -54,7 +54,7 @@ def test(execute_choas_plans):
             "inputs": {"param_1": "value_1", "_loop": 1, "_inner_loop": 1},
             "outputs": {"param_1": "value_1", "_loop": 1, "_inner_loop": 1, "execute_count": 1, "_result": True},
         },
-        subproc.id: {"inputs": {}, "outputs": {"_loop": 1, "_inner_loop": 1}},
+        subproc.id: {"inputs": {"${sub_constant_1}": "value_1"}, "outputs": {"_loop": 1, "_inner_loop": 1}},
     }
 
     assert_all_finish(node_id_list)
