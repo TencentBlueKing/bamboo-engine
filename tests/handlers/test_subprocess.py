@@ -104,6 +104,7 @@ def test_subprocess_handler__execute_success(recover_point):
     runtime.get_context_key_references.assert_called_once_with(pipeline_id="root", keys={"${v1}", "${sub_loop}"})
     runtime.get_context_values.assert_called_once_with(pipeline_id="root", keys={"${v1}", "${sub_loop}"})
     runtime.reset_children_state_inner_loop.assert_called_once_with(node.id)
+    runtime.set_execution_data_inputs.assert_called_once_with(node.id, {"${k1}": "var", "${k2}": 1})
     upsert_call_args = runtime.upsert_plain_context_values.call_args.args
     assert upsert_call_args[0] == node.id
     assert upsert_call_args[1]["${k1}"].key == "${k1}"

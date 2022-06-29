@@ -1201,7 +1201,33 @@ def test_callback__schedule_expired():
 
 def test_preview_node_inputs__plain_variable():
     node_id = "nid"
-    pipeline = {"data": {}, "activities": {"nid": {"component": {"inputs": {"input": {"value": "test"}}}}}}
+    pipeline = {
+        "data": {},
+        "activities": {
+            "nid": {
+                "component": {"inputs": {"input": {"value": "test"}}},
+                "type": "ServiceActivity",
+            }
+        },
+    }
+    runtime = MagicMock()
+
+    api_result = preview_node_inputs(runtime, pipeline, node_id)
+    assert api_result.result is True
+    assert api_result.data == {"input": "test"}
+
+
+def test_preview_node_inputs__subprocess_plain_variable():
+    node_id = "nid"
+    pipeline = {
+        "data": {},
+        "activities": {
+            "nid": {
+                "params": {"input": {"value": "test"}},
+                "type": "SubProcess",
+            }
+        },
+    }
     runtime = MagicMock()
 
     api_result = preview_node_inputs(runtime, pipeline, node_id)
@@ -1228,6 +1254,7 @@ def test_preview_node_inputs__ref_variable():
         },
         "activities": {
             "nid": {
+                "type": "ServiceActivity",
                 "component": {
                     "inputs": {
                         "input": {
@@ -1236,7 +1263,38 @@ def test_preview_node_inputs__ref_variable():
                             "value": "${input}",
                         }
                     }
-                }
+                },
+            }
+        },
+    }
+
+    compute_var = MockCV(pipeline["data"]["inputs"]["${test}"]["value"])
+    runtime = MagicMock()
+    runtime.get_compute_variable = MagicMock(return_value=compute_var)
+
+    api_result = preview_node_inputs(runtime, pipeline, node_id)
+    assert api_result.result is True
+    assert api_result.data == {"input": "compute_result of test in input"}
+
+
+def test_preview_node_inputs__subprocess_ref_variable():
+    node_id = "nid"
+    pipeline = {
+        "data": {
+            "inputs": {
+                "${test}": {"custom_type": "custom_type", "value": "test", "is_param": False, "type": "lazy"},
+                "${input}": {"type": "splice", "is_param": False, "value": "${test} in input"},
+            }
+        },
+        "activities": {
+            "nid": {
+                "type": "SubProcess",
+                "params": {
+                    "input": {
+                        "type": "splice",
+                        "value": "${input}",
+                    }
+                },
             }
         },
     }
@@ -1256,7 +1314,12 @@ def test_preview_node_inputs__with_subprocess():
     subprocess_pipeline = {
         "data": {"inputs": {"${input}": {"value": "${test}", "type": "splice", "is_param": True}}},
         "activities": {
-            "nid": {"component": {"inputs": {"input": {"value": "${input}", "type": "splice", "is_param": False}}}}
+            "nid": {
+                "component": {
+                    "inputs": {"input": {"value": "${input}", "type": "splice", "is_param": False}},
+                },
+                "type": "ServiceActivity",
+            }
         },
     }
     pipeline = {

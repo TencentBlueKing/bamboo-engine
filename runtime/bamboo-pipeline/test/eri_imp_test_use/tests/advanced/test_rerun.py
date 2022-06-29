@@ -103,7 +103,7 @@ def test_subprocess_rerun():
             },
             "outputs": ["${output_a}"],
         },
-        params={"${a_i}": {"type": "splice", "value": u"${s_i}"}},
+        params={"${a_i}": {"type": "splice", "value": "${s_i}"}},
     )
     eg = ExclusiveGateway(conditions={0: "${s_i} < 4", 1: "${s_i} >= 4"})
 
@@ -155,7 +155,7 @@ def test_subprocess_rerun():
                 "inputs": {"_loop": 1, "_inner_loop": 1},
                 "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True},
             },
-            act_2.id: {"inputs": {}, "outputs": {"${output_a}": "e", "_loop": 4, "_inner_loop": 4}},
+            act_2.id: {"inputs": {"${a_i}": 4}, "outputs": {"${output_a}": "e", "_loop": 4, "_inner_loop": 4}},
         }
     )
 
@@ -173,13 +173,13 @@ def test_subprocess_rerun():
 
     histories = runtime.get_histories(act_2.id)
     assert len(histories) == 3
-    assert histories[0].inputs == {}
+    assert histories[0].inputs == {"${a_i}": 1}
     assert histories[0].outputs == {"${output_a}": "b", "_loop": 1, "_inner_loop": 1}
     assert histories[0].loop == 1
-    assert histories[1].inputs == {}
+    assert histories[1].inputs == {"${a_i}": 2}
     assert histories[1].outputs == {"${output_a}": "c", "_loop": 2, "_inner_loop": 2}
     assert histories[1].loop == 2
-    assert histories[2].inputs == {}
+    assert histories[2].inputs == {"${a_i}": 3}
     assert histories[2].outputs == {"${output_a}": "d", "_loop": 3, "_inner_loop": 3}
     assert histories[2].loop == 3
 
