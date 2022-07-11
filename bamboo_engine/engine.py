@@ -750,10 +750,11 @@ class Engine:
                             loop = node_state.loop + 1
                             inner_loop = node_state.inner_loop + 1
                             reset_mark_bit = True
-
-                        # 重入前记录历史
-                        if node_state.name == states.FINISHED:
+                            # 重入前记录历史
                             self._add_history(node_id=current_node_id, state=node_state)
+                        else:
+                            loop = node_state.loop
+                            inner_loop = node_state.inner_loop
                 else:
                     interrupter.check_and_set(
                         ExecuteKeyPoint.SET_NODE_RUNNING_PRE_CHECK_DONE, state_already_exist=False
