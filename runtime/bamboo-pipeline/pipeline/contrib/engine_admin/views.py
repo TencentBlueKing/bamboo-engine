@@ -125,8 +125,8 @@ def node_skip(request, engine_type, instance_id):
 @_check_api_permission
 @_ensure_return_json_response
 def node_callback(request, engine_type, instance_id):
-    data = request.POST.get("data")
-    version = request.POST.get("version")
+    body = json.loads(request.body)
+    data, version = body.get("data"), body.get("version")
     handler = ENGINE_REQUEST_HANDLERS[engine_type](request, "node_callback", instance_id)
     return handler.execute(data=data, version=version)
 

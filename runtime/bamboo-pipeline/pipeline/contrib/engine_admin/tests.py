@@ -40,9 +40,9 @@ class EngineAdminTestCase(TestCase):
         def func_return_action_result(*args, **kwargs):
             return ActionResult(result=True, message="success")
 
-        self.assertTrue(isinstance(_ensure_return_json_response(func_return_json_response)(), JsonResponse))
-        self.assertTrue(isinstance(_ensure_return_json_response(func_return_engine_api_result)(), JsonResponse))
-        self.assertTrue(isinstance(_ensure_return_json_response(func_return_action_result)(), JsonResponse))
+        self.assertIsInstance(_ensure_return_json_response(func_return_json_response)(), JsonResponse)
+        self.assertIsInstance(_ensure_return_json_response(func_return_engine_api_result)(), JsonResponse)
+        self.assertIsInstance(_ensure_return_json_response(func_return_action_result)(), JsonResponse)
 
     def test_check_api_permission(self):
         def func_return_json_response(request, *args, **kwargs):
