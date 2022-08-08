@@ -36,6 +36,7 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
     - [运行自定义组件](./docs/user_guide/run_your_component.md)
     - [组件单元测试](./docs/user_guide/component_unit_test.md)
     - [Worker 配置](./docs/user_guide/workers.md)
+    - [引擎管理端配置](./docs/user_guide/engine_admin_config.md)
     - [运行时钩子](./docs/user_guide/signals.md)
     - [设置](./docs/user_guide/settings.md)
 
