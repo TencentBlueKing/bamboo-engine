@@ -57,6 +57,10 @@ def execute(
     headers: dict = None,
     **kwargs,
 ):
+    logger.info(
+        f"[eri_execute worker] received task with info "
+        f"(process_id: {process_id}, node_id: {node_id}, root_pipeline_id: {root_pipeline_id}, headers: {headers})"
+    )
     _observe_message_delay(metrics.ENGINE_RUNTIME_EXECUTE_TASK_CLAIM_DELAY, headers)
 
     runtime = BambooDjangoRuntime()
@@ -92,6 +96,10 @@ def schedule(
     headers: dict = None,
     **kwargs,
 ):
+    logger.info(
+        f"[eri_schedule worker] received task with info "
+        f"(process_id: {process_id}, node_id: {node_id}, schedule_id: {schedule_id}, headers: {headers})"
+    )
     _observe_message_delay(metrics.ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY, headers)
 
     runtime = BambooDjangoRuntime()
