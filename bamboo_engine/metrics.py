@@ -16,7 +16,7 @@ import time
 from functools import wraps
 from contextlib import contextmanager
 
-from prometheus_client import Gauge, Histogram
+from prometheus_client import Gauge, Histogram, Counter
 
 from .utils.host import get_hostname
 
@@ -102,6 +102,34 @@ ENGINE_RUNNING_PROCESSES = Gauge(
 ENGINE_RUNNING_SCHEDULES = Gauge(
     name="engine_running_schedules", documentation="count running state schedules", labelnames=["hostname"]
 )
+
+ENGINE_EXECUTE_FAILED_COUNT = Counter(
+    name="engine_execute_failed_count",
+    documentation="count execute failed",
+    labelnames=["type", "hostname"],
+)
+
+ENGINE_SCHEDULE_FAILED_COUNT = Counter(
+    name="engine_schedule_failed_count",
+    documentation="count schedule failed",
+    labelnames=["type", "hostname"],
+)
+
+
+ENGINE_EXECUTE_EXCEPTION_COUNT = Counter(
+    name="engine_execute_exception_count",
+    documentation="count execute exceptions ",
+    labelnames=["type", "hostname"],
+)
+
+
+ENGINE_SCHEDULE_EXCEPTION_COUNT = Counter(
+    name="engine_schedule_exception_count",
+    documentation="count schedule exceptions",
+    labelnames=["type", "hostname"],
+)
+
+
 ENGINE_PROCESS_RUNNING_TIME = Histogram(
     name="engine_process_running_time",
     documentation="time spent running process",

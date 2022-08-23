@@ -21,6 +21,8 @@ from bamboo_engine.config import Settings
 from bamboo_engine.context import Context
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
 from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
+from bamboo_engine.metrics import ENGINE_SCHEDULE_FAILED_COUNT, ENGINE_EXECUTE_FAILED_COUNT, \
+    ENGINE_EXECUTE_EXCEPTION_COUNT, ENGINE_SCHEDULE_EXCEPTION_COUNT
 from bamboo_engine.template import Template
 from bamboo_engine.eri import (
     ProcessInfo,
@@ -51,12 +53,12 @@ class ServiceActivityHandler(NodeHandler):
     """
 
     def execute(
-        self,
-        process_info: ProcessInfo,
-        loop: int,
-        inner_loop: int,
-        version: str,
-        recover_point: Optional[ExecuteInterruptPoint] = None,
+            self,
+            process_info: ProcessInfo,
+            loop: int,
+            inner_loop: int,
+            version: str,
+            recover_point: Optional[ExecuteInterruptPoint] = None,
     ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
@@ -70,7 +72,7 @@ class ServiceActivityHandler(NodeHandler):
         """
 
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+                metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             top_pipeline_id = process_info.top_pipeline_id
             root_pipeline_id = process_info.root_pipeline_id
@@ -223,13 +225,19 @@ class ServiceActivityHandler(NodeHandler):
             try:
                 execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
             except Exception:
+                # build_node_type: sleep_timer_legacy
+                node_type = "{}_{}".format(self.node.code, self.node.version)
+                ENGINE_EXECUTE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 ex_data = traceback.format_exc()
                 service_data.outputs.ex_data = ex_data
                 logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
             logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
 
+        if not execute_success:
+            ENGINE_EXECUTE_FAILED_COUNT.labels(type=self.node.type.value, hostname=self._hostname).inc()
+
         with metrics.observe(
-            metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+                metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
             self.interrupter.check_and_set(
@@ -336,14 +344,14 @@ class ServiceActivityHandler(NodeHandler):
             )
 
     def _finish_schedule(
-        self,
-        process_info: ProcessInfo,
-        schedule: Schedule,
-        data_outputs: dict,
-        execution_data: ExecutionData,
-        error_ignored: bool,
-        root_pipeline_inputs: dict,
-        recover_point: Optional[ScheduleInterruptPoint] = None,
+            self,
+            process_info: ProcessInfo,
+            schedule: Schedule,
+            data_outputs: dict,
+            execution_data: ExecutionData,
+            error_ignored: bool,
+            root_pipeline_inputs: dict,
+            recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         self.runtime.set_state(
             node_id=self.node.id,
@@ -369,13 +377,13 @@ class ServiceActivityHandler(NodeHandler):
         )
 
     def schedule(
-        self,
-        process_info: ProcessInfo,
-        loop: int,
-        inner_loop: int,
-        schedule: Schedule,
-        callback_data: Optional[CallbackData] = None,
-        recover_point: Optional[ScheduleInterruptPoint] = None,
+            self,
+            process_info: ProcessInfo,
+            loop: int,
+            inner_loop: int,
+            schedule: Schedule,
+            callback_data: Optional[CallbackData] = None,
+            recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         """
         节点的 schedule 处理逻辑
@@ -390,7 +398,7 @@ class ServiceActivityHandler(NodeHandler):
         :rtype: ScheduleResult
         """
         with metrics.observe(
-            metrics.ENGINE_NODE_SCHEDULE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+                metrics.ENGINE_NODE_SCHEDULE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             # data prepare
             top_pipeline_id = process_info.top_pipeline_id
@@ -441,12 +449,17 @@ class ServiceActivityHandler(NodeHandler):
                     callback_data=callback_data,
                 )
             except Exception:
+                node_type = "{}_{}".format(self.node.code, self.node.version)
+                ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
             else:
                 is_schedule_done = service.is_schedule_done()
 
+        if not schedule_success:
+            ENGINE_SCHEDULE_FAILED_COUNT.labels(type=self.node.type.value, hostname=self._hostname).inc()
+
         with metrics.observe(
-            metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
+                metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             serialize_ouputs, ouputs_serializer = self.runtime.serialize_execution_data(service_data.outputs)
             self.interrupter.check_and_set(
