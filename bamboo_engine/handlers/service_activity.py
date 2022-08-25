@@ -210,7 +210,8 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_id,
             root_pipeline_data,
         )
-
+        # build_node_type: sleep_timer_legacy
+        node_type = "{}_{}".format(self.node.code, self.node.version)
         # try recover from executed recover point
         execute_success = False
         if recover_point and recover_point.handler_data.service_executed:
@@ -225,8 +226,6 @@ class ServiceActivityHandler(NodeHandler):
             try:
                 execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
             except Exception:
-                # build_node_type: sleep_timer_legacy
-                node_type = "{}_{}".format(self.node.code, self.node.version)
                 ENGINE_EXECUTE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 ex_data = traceback.format_exc()
                 service_data.outputs.ex_data = ex_data
@@ -234,7 +233,7 @@ class ServiceActivityHandler(NodeHandler):
             logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
 
         if not execute_success:
-            ENGINE_EXECUTE_FAILED_COUNT.labels(type=self.node.type.value, hostname=self._hostname).inc()
+            ENGINE_EXECUTE_FAILED_COUNT.labels(type=node_type, hostname=self._hostname).inc()
 
         with metrics.observe(
                 metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
@@ -427,6 +426,8 @@ class ServiceActivityHandler(NodeHandler):
                 inner_loop=inner_loop,
             )
 
+        # build_node_type: sleep_timer_legacy
+        node_type = "{}_{}".format(self.node.code, self.node.version)
         # schedule
         schedule_success = False
         is_schedule_done = False
@@ -449,14 +450,13 @@ class ServiceActivityHandler(NodeHandler):
                     callback_data=callback_data,
                 )
             except Exception:
-                node_type = "{}_{}".format(self.node.code, self.node.version)
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
             else:
                 is_schedule_done = service.is_schedule_done()
 
         if not schedule_success:
-            ENGINE_SCHEDULE_FAILED_COUNT.labels(type=self.node.type.value, hostname=self._hostname).inc()
+            ENGINE_SCHEDULE_FAILED_COUNT.labels(type=node_type, hostname=self._hostname).inc()
 
         with metrics.observe(
                 metrics.ENGINE_NODE_SCHEDULE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
