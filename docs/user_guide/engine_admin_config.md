@@ -28,6 +28,14 @@ urlpatterns = [
 
 `{{PATH_TO_ENGINE_ADMIN}}`为项目下配置的引擎管理端路由地址。
 
+
+### 3. 收集静态文件
+将管理端所需静态资源收集到项目静态资源目录下：
+```shell
+python manage.py collectstatic
+```
+
+
 ## 引擎管理端的使用
 
 至此，引擎管理端已经完成了快速集成，可以通过调用对应的url进行流程控制。
@@ -52,17 +60,17 @@ urlpatterns = [
 
 ### 操作列表
 
-| 操作名称             | 操作描述     | 其他参数                                                           |
-| ---------------- | -------- | -------------------------------------------------------------- |
-| task_pause       | 任务暂停     | 无                                                              |
-| task_resume      | 任务恢复     | 无                                                              |
-| task_revoke      | 任务撤销     | 无                                                              |
-| node_retry       | 节点重试     | inputs: 节点输入                                                   |
-| node_skip        | 节点跳过     | 无                                                              |
-| node_callback    | 节点回调     | data: 回调数据<br/>version: 回调的节点版本                                |
-| node_skip_exg    | 条件分支网关跳过 | flow_id：希望执行的条件flow id                                         |
-| node_skip_cpg    | 条件并行网关跳过 | flow_ids: 希望执行的条件flow id列表 <br/>converge_gateway_id: 对应的汇聚网关id |
-| node_forced_fail | 节点强制失败   | 无                                                              |
+| 操作名称             | 操作描述     | 其他参数                                                                    |
+| ---------------- | -------- |-------------------------------------------------------------------------|
+| task_pause       | 任务暂停     | 无                                                                       |
+| task_resume      | 任务恢复     | 无                                                                       |
+| task_revoke      | 任务撤销     | 无                                                                       |
+| node_retry       | 节点重试     | inputs(dict): 节点输入                                                      |
+| node_skip        | 节点跳过     | 无                                                                       |
+| node_callback    | 节点回调     | data(str): 回调数据<br/>version(str): 回调的节点版本                               |
+| node_skip_exg    | 条件分支网关跳过 | flow_id(str)：希望执行的条件flow id                                             |
+| node_skip_cpg    | 条件并行网关跳过 | flow_ids(list): 希望执行的条件flow id列表 <br/>converge_gateway_id(str): 对应的汇聚网关id |
+| node_forced_fail | 节点强制失败   | 无                                                                       |
 
 ### 管理端接口调用鉴权配置
 
