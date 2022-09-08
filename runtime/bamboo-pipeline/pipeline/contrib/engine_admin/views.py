@@ -16,6 +16,7 @@ import json
 from django.conf import settings
 from django.http import JsonResponse
 from bamboo_engine.api import EngineAPIResult
+from django.shortcuts import render
 from django.utils.module_loading import import_string
 from django.views.decorators.http import require_POST
 
@@ -75,6 +76,11 @@ def _check_api_permission(func):
         return func(request, *args, **kwargs)
 
     return wrapper
+
+
+@_check_api_permission
+def render_index(request, *args, **kwargs):
+    return render(request, "index.html")
 
 
 @require_POST
