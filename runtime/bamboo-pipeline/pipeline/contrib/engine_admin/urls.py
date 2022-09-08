@@ -26,7 +26,7 @@ register_converter(EngineConverter, "engine")
 
 
 urlpatterns = [
-    path(f"", views.render_index),
+    path("", views.render_index),
     path(f"api/{API_VERSION}/<engine:engine_type>/task_pause/<str:instance_id>/", views.task_pause),
     path(f"api/{API_VERSION}/<engine:engine_type>/task_resume/<str:instance_id>/", views.task_resume),
     path(f"api/{API_VERSION}/<engine:engine_type>/task_revoke/<str:instance_id>/", views.task_revoke),
