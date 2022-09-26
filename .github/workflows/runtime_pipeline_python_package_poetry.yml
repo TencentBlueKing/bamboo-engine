@@ -10,15 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.6
+      - name: Set up Python 3.7
         uses: actions/setup-python@v2
         with:
-          python-version: 3.6
+          python-version: 3.7
 
       - name: Set up Poetry
         uses: abatilo/actions-poetry@v2.0.0
         with:
-          poetry-version: 1.1.9
+          poetry-version: 1.2.1
 
       - name: Remove Test Code
         run: |
