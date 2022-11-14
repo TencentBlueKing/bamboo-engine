@@ -250,6 +250,7 @@ class Engine:
         :type data: Optional[dict], optional
         """
         node = self.runtime.get_node(node_id)
+        escape_render_keys = data.pop("_escape_render_keys", []) if data else []
 
         if not node.can_retry:
             raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can_retry))
@@ -263,7 +264,10 @@ class Engine:
         if data is not None:
             self.runtime.set_data_inputs(
                 node_id,
-                {k: DataInput(need_render=True, value=v) for k, v in data.items()},
+                {
+                    k: DataInput(need_render=False if k in escape_render_keys else True, value=v)
+                    for k, v in data.items()
+                },
             )
 
         self._add_history(node_id, state)
