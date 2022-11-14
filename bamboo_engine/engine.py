@@ -250,7 +250,7 @@ class Engine:
         :type data: Optional[dict], optional
         """
         node = self.runtime.get_node(node_id)
-        escape_render_keys = data.pop("_escape_render_keys", [])
+        escape_render_keys = data.pop("_escape_render_keys", []) if data else []
 
         if not node.can_retry:
             raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can_retry))
