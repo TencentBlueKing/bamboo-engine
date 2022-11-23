@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
-from typing import Dict
+from typing import Dict, List
 
 from bamboo_engine import metrics, exceptions
 from bamboo_engine.eri import Data, DataInput, ExecutionData, CallbackData
@@ -46,6 +46,24 @@ class DataMixin(SerializerMixin):
             inputs=self._get_data_inputs(codec.data_json_loads(data_model.inputs)),
             outputs=json.loads(data_model.outputs),
         )
+
+    def get_batch_data(self, node_ids: List[str]) -> Dict[str, Data]:
+        """
+        批量获取节点数据对象
+
+        :param node_ids: 节点 ID 列表
+        :type node_ids: List[str]
+        :return: 节点数据对象字典 node_id: Data
+        :rtype: dict
+        """
+        data_models = DBData.objects.filter(node_id__in=node_ids)
+        data = {}
+        for data_model in data_models:
+            data[data_model.node_id] = Data(
+                inputs=self._get_data_inputs(codec.data_json_loads(data_model.inputs)),
+                outputs=json.loads(data_model.outputs),
+            )
+        return data
 
     @metrics.setup_histogram(metrics.ENGINE_RUNTIME_DATA_INPUTS_READ_TIME)
     def get_data_inputs(self, node_id: str) -> Dict[str, DataInput]:

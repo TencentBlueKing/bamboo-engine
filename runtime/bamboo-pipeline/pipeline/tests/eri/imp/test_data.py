@@ -86,6 +86,17 @@ class DataMixinTestCase(TransactionTestCase):
         self.assertEqual(data.inputs["b"].value, 2)
         self.assertTrue(data.inputs["b"].value)
 
+    def test_get_batch_data(self):
+        batch_data = self.mixin.get_batch_data([self.node_id])
+        self.assertTrue(isinstance(batch_data, dict))
+        self.assertTrue(isinstance(batch_data[self.node_id], Data))
+        data = batch_data[self.node_id]
+        self.assertEqual(data.outputs, self.data_outputs)
+        self.assertEqual(data.inputs["a"].value, 1)
+        self.assertTrue(data.inputs["a"].value)
+        self.assertEqual(data.inputs["b"].value, 2)
+        self.assertTrue(data.inputs["b"].value)
+
     def test_get_data_inputs(self):
         inputs = self.mixin.get_data_inputs(self.node_id)
         self.assertEqual(inputs["a"].value, 1)
