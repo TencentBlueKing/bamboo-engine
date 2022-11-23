@@ -38,7 +38,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "7.0.0"
+__version__ = "7.1.0"
 
 
 def version():
@@ -1202,6 +1202,17 @@ class DataMixin:
         :type node_id: str
         :return: 数据对象实例
         :rtype: Data
+        """
+
+    @abstractmethod
+    def get_batch_data(self, node_ids: List[str]) -> Dict[str, Data]:
+        """
+        批量获取节点数据对象
+
+        :param node_ids: 节点 ID 列表
+        :type node_ids: List[str]
+        :return: 节点数据对象字典 node_id: Data
+        :rtype: dict
         """
 
     @abstractmethod
