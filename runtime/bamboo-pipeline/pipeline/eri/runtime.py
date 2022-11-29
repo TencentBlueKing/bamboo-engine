@@ -89,13 +89,14 @@ class BambooDjangoRuntime(
                     cv_key = "${%s_%s}" % (k, node_id)
                 if len(cv_key) > 128:
                     raise ValueError("var key %s length exceeds 128" % cv_key)
+                serialized, serializer = self._serialize(v["value"])
                 context_values.append(
                     ContextValue(
                         pipeline_id=pipeline_id,
                         key=cv_key,
                         type=ContextValueType.COMPUTE.value,
-                        serializer=self.JSON_SERIALIZER,
-                        value=json.dumps(v["value"]),
+                        serializer=serializer,
+                        value=serialized,
                         code=v.get("custom_type", ""),
                     )
                 )
@@ -268,13 +269,14 @@ class BambooDjangoRuntime(
             if not source_act:
                 context_var_references[key] = Template(input_data["value"]).get_reference()
                 final_references[key] = set()
+                serialized, serializer = self._serialize(input_data["value"])
                 context_values.append(
                     ContextValue(
                         pipeline_id=pipeline["id"],
                         key=key,
                         type=CONTEXT_VALUE_TYPE_MAP[input_data["type"]],
-                        serializer=self.JSON_SERIALIZER,
-                        value=json.dumps(input_data["value"]),
+                        serializer=serializer,
+                        value=serialized,
                         code=input_data.get("custom_type", ""),
                     )
                 )
