@@ -306,7 +306,7 @@ class StateMixin:
             fields["started_time"] = timezone.now()
 
         if clear_archived_time and state:
-            fields["archived_time"] = timezone.now()
+            fields["archived_time"] = None
 
         if set_archive_time:
             fields["archived_time"] = timezone.now()
