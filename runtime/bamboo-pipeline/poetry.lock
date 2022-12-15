@@ -41,7 +41,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "bamboo-engine"
-version = "2.6.0"
+version = "2.6.1"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
