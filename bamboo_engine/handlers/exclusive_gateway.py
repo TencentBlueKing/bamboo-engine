@@ -14,6 +14,8 @@ import json
 import logging
 from typing import Optional
 
+from pyparsing import ParseException
+
 from bamboo_engine import states, metrics
 from bamboo_engine.context import Context
 from bamboo_engine.template import Template
@@ -120,6 +122,18 @@ class ExclusiveGatewayHandler(NodeHandler):
                     self.node.id,
                     resolved_evaluate,
                     result,
+                )
+            except ParseException as e:
+                logger.exception(f"[exclusive_gateway] evaluation parse error: {e}")
+                return self._execute_fail(
+                    ex_data="evaluate[{}] fail with data[{}]："
+                    "please check if some variable not exists or the expression is unsupported, "
+                    "related reference is "
+                    '<a href="https://boolrule.readthedocs.io/en/latest/expressions.html">boolrule</a>'.format(
+                        c.evaluation, json.dumps(hydrated_context)
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
             except Exception as e:
                 # test failed

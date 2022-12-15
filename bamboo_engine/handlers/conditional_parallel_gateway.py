@@ -14,11 +14,12 @@ specific language governing permissions and limitations under the License.
 import json
 import logging
 from typing import Optional
-from bamboo_engine.interrupt import ExecuteKeyPoint
+
+from pyparsing import ParseException
 
 from bamboo_engine.utils.boolrule import BoolRule
 from bamboo_engine.template.template import Template
-
+from bamboo_engine.interrupt import ExecuteKeyPoint
 from bamboo_engine import states, metrics
 from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
 from bamboo_engine.context import Context
@@ -115,6 +116,18 @@ class ConditionalParallelGatewayHandler(NodeHandler):
                     self.node.id,
                     resolved_evaluate,
                     result,
+                )
+            except ParseException as e:
+                logger.exception(f"[conditional_parallel_gateway] evaluation parse error: {e}")
+                return self._execute_fail(
+                    ex_data="evaluate[{}] fail with data[{}]："
+                    "please check if some variable not exists or the expression is unsupported, "
+                    "related reference is "
+                    '<a href="https://boolrule.readthedocs.io/en/latest/expressions.html">boolrule</a>'.format(
+                        c.evaluation, json.dumps(hydrated_context)
+                    ),
+                    version=version,
+                    ignore_boring_set=recover_point is not None,
                 )
             except Exception as e:
                 # test failed
