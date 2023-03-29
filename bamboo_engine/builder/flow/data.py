@@ -94,3 +94,15 @@ class RewritableNodeOutput(Var):
         base = super(RewritableNodeOutput, self).to_dict()
         base["source_act"] = self.source_act
         return base
+
+
+class InitializedRewritableNodeOutput(Var):
+    def __init__(self, source_act, *args, **kwargs):
+        self.source_act = source_act
+        super(InitializedRewritableNodeOutput, self).__init__(*args, **kwargs)
+
+    def to_dict(self):
+        base = super(InitializedRewritableNodeOutput, self).to_dict()
+        base["source_act"] = self.source_act
+        base["need_initialization"] = True
+        return base
