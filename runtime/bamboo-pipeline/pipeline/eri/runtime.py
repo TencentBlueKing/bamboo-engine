@@ -287,6 +287,20 @@ class BambooDjangoRuntime(
                 else:
                     node_outputs.setdefault(source_act, {})[source_key] = key
 
+            need_initialization = input_data.get("need_initialization")
+            if need_initialization is True:
+                serialized, serializer = self._serialize(input_data["value"])
+                context_values.append(
+                    ContextValue(
+                        pipeline_id=pipeline["id"],
+                        key=key,
+                        type=CONTEXT_VALUE_TYPE_MAP[input_data["type"]],
+                        serializer=serializer,
+                        value=serialized,
+                        code=input_data.get("custom_type", ""),
+                    )
+                )
+
         # pre_render_keys in start_event
         if "pre_render_keys" in pipeline["data"] and pipeline["data"]["pre_render_keys"]:
             datas.append(
