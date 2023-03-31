@@ -13,4 +13,4 @@ specific language governing permissions and limitations under the License.
 
 default_app_config = "pipeline.apps.PipelineConfig"
 
-__version__ = "3.24.1"
+__version__ = "3.25.0"
