@@ -45,7 +45,7 @@ version = "2.7.0"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
-python-versions = ">=3.6,<3.8"
+python-versions = ">=3.6"
 
 [package.dependencies]
 Mako = ">=1.1.4,<2.0.0"
