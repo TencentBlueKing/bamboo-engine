@@ -64,3 +64,6 @@ class Settings:
     MAKO_SANDBOX_IMPORT_MODULES = {}
 
     RERUN_INDEX_OFFSET = 0
+
+    # worker ping的次数
+    WORKER_PING_TIMES = 2
