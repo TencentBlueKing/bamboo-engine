@@ -71,11 +71,11 @@ class DataInput(Var):
 
 
 class NodeOutput(Var):
-    def __init__(self, source_act, source_key, *args, **kwargs):
+    def __init__(self, source_act, source_key, type="plain", *args, **kwargs):
         self.source_act = source_act
         self.source_key = source_key
         kwargs["value"] = None
-        kwargs["type"] = self.PLAIN if type not in kwargs else kwargs["type"]
+        kwargs["type"] = type
         super(NodeOutput, self).__init__(*args, **kwargs)
 
     def to_dict(self):
