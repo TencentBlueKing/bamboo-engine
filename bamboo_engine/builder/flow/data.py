@@ -75,6 +75,7 @@ class NodeOutput(Var):
         self.source_act = source_act
         self.source_key = source_key
         kwargs["value"] = None
+        kwargs["type"] = self.PLAIN if type not in kwargs else kwargs["type"]
         super(NodeOutput, self).__init__(*args, **kwargs)
 
     def to_dict(self):
