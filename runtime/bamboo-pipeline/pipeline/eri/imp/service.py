@@ -57,11 +57,11 @@ class ServiceWrapper(ServiceInterface):
         return execute_res
 
     def schedule(
-        self,
-        schedule: Schedule,
-        data: ExecutionData,
-        root_pipeline_data: ExecutionData,
-        callback_data: Optional[CallbackData] = None,
+            self,
+            schedule: Schedule,
+            data: ExecutionData,
+            root_pipeline_data: ExecutionData,
+            callback_data: Optional[CallbackData] = None,
     ) -> bool:
         """
         schedule 逻辑
@@ -104,6 +104,37 @@ class ServiceWrapper(ServiceInterface):
 
         return schedule_res
 
+    def rollback(self,
+                 data: ExecutionData,
+                 root_pipeline_data: ExecutionData,
+                 rollback_data: Optional[CallbackData] = None):
+
+        """
+        回滚逻辑
+        @param data: 任务执行data
+        @param root_pipeline_data: 根流程执行数据
+        @param rollback_data: 回滚数据defaults to None
+        @return:
+        """
+
+        data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
+        parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
+
+        try:
+            rollback_res = self.service.rollback(
+                data_obj, parent_data_obj, rollback_data.data if rollback_data else None
+            )
+        except Exception as e:
+            raise e
+        finally:
+            data.inputs = data_obj.inputs
+            data.outputs = data_obj.outputs
+
+        if rollback_res is None:
+            rollback_res = True
+
+        return rollback_res
+
     def need_schedule(self) -> bool:
         """
         服务是否需要调度
@@ -141,7 +172,7 @@ class ServiceWrapper(ServiceInterface):
         return self.service.is_schedule_finished()
 
     def schedule_after(
-        self, schedule: Optional[Schedule], data: ExecutionData, root_pipeline_data: ExecutionData
+            self, schedule: Optional[Schedule], data: ExecutionData, root_pipeline_data: ExecutionData
     ) -> int:
         """
         计算下一次调度间隔
