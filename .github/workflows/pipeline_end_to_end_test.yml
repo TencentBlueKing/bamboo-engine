@@ -55,6 +55,7 @@ jobs:
         cd runtime/bamboo-pipeline/test
         cp -r ../../../bamboo_engine/ .
         cp -r ../pipeline .
+        python -m pip install urllib3==1.26.9
         poetry run python manage.py migrate
         poetry run python manage.py celery worker &
         while ! poetry run celery inspect ping; do

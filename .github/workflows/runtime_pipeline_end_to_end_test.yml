@@ -57,6 +57,7 @@ jobs:
         cp -r ../pipeline .
         poetry run python manage.py migrate
         poetry run python manage.py celery worker &
+        python -m pip install urllib3==1.26.9
         while ! poetry run celery inspect ping; do
             sleep 1
         done

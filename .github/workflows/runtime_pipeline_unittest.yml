@@ -45,6 +45,7 @@ jobs:
         cp -r bamboo_engine runtime/bamboo-pipeline/test
         cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
         cd runtime/bamboo-pipeline/test
+        python -m pip install urllib3==1.26.9
         poetry run coverage run --source="." manage.py test pipeline.tests
         poetry run coverage report -m
       env:

@@ -26,6 +26,7 @@ jobs:
           rm -rf pipeline/django_signal_valve/tests
           rm -rf pipeline/tests
           rm -rf pipeline/contrib/external_plugins/tests
+          python -m pip install urllib3==1.26.9
           poetry build -vvv
           poetry config pypi-token.pypi ${{ secrets.PIPELINE_PYPI_TOKEN }}
           poetry publish
