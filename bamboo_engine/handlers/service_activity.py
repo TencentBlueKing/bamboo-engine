@@ -546,7 +546,7 @@ class ServiceActivityHandler(NodeHandler):
                 return ScheduleResult(
                     has_next_schedule=False,
                     schedule_after=-1,
-                    schedule_done=False,
+                    schedule_done=True,
                     next_node_id=None,
                 )
 
