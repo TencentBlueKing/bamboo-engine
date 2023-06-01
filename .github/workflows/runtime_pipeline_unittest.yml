@@ -32,13 +32,13 @@ jobs:
     - name: Set up Poetry
       uses: abatilo/actions-poetry@v2.0.0
       with:
+        urllib3: 1.26.9
         poetry-version: 1.1.9
 
     - name: Install Dependencies
       run: |
         cd runtime/bamboo-pipeline/
         poetry install
-        python -m pip install urllib3==1.26.9
         poetry run pip install "Django>${{ matrix.django-version }}"
 
     - name: Run Tests
