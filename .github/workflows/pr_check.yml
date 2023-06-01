@@ -6,14 +6,14 @@ on:
 
 jobs:
   engine-lint:
-    uses: hanshuaikang/bamboo-engine/.github/workflows/engine_flake8_and_black.yml@pipeline_unittest_fix
+    uses: hanshuaikang/bamboo-engine/.github/workflows/engine_flake8_and_black.yml@feature/pipeline_unittest_fix
 
   pipeline-lint:
-    uses: hanshuaikang/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@pipeline_unittest_fix
+    uses: hanshuaikang/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@feature/pipeline_unittest_fix
 
   engine-unittest:
     needs: engine-lint
-    uses: hanshuaikang/bamboo-engine/.github/workflows/engine_unittest.yml@pipeline_unittest_fix
+    uses: hanshuaikang/bamboo-engine/.github/workflows/engine_unittest.yml@feature/pipeline_unittest_fix
 
   pipeline-unittest:
     needs: pipeline-lint
@@ -21,8 +21,8 @@ jobs:
   
   runtime-pipeline-intergration-test:
     needs: [engine-unittest, pipeline-unittest]
-    uses: hanshuaikang/bamboo-engine/.github/workflows/runtime_pipeline_end_to_end_test.yml@pipeline_unittest_fix
+    uses: hanshuaikang/bamboo-engine/.github/workflows/runtime_pipeline_end_to_end_test.yml@feature/pipeline_unittest_fix
   
   pipeline-intergration-test:
     needs: pipeline-unittest
-    uses: hanshuaikang/bamboo-engine/.github/workflows/pipeline_end_to_end_test.yml@pipeline_unittest_fix
+    uses: hanshuaikang/bamboo-engine/.github/workflows/pipeline_end_to_end_test.yml@feature/pipeline_unittest_fix
