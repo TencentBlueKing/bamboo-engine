@@ -49,13 +49,13 @@ class ExecuteKeyPoint:
 
 class Interrupter:
     def __init__(
-        self,
-        runtime: EngineRuntimeInterface,
-        process_id: int,
-        current_node_id: str,
-        check_point: InterruptPoint,
-        headers: dict,
-        recover_point: Optional[InterruptPoint],
+            self,
+            runtime: EngineRuntimeInterface,
+            process_id: int,
+            current_node_id: str,
+            check_point: InterruptPoint,
+            headers: dict,
+            recover_point: Optional[InterruptPoint],
     ) -> None:
         self.runtime = runtime
         self.process_id = process_id
@@ -102,15 +102,15 @@ class Interrupter:
 
 class ExecuteInterrupter(Interrupter):
     def __init__(
-        self,
-        runtime: EngineRuntimeInterface,
-        current_node_id: str,
-        process_id: int,
-        parent_pipeline_id: str,
-        root_pipeline_id: str,
-        check_point: ExecuteInterruptPoint,
-        headers: dict,
-        recover_point: Optional[ExecuteInterruptPoint],
+            self,
+            runtime: EngineRuntimeInterface,
+            current_node_id: str,
+            process_id: int,
+            parent_pipeline_id: str,
+            root_pipeline_id: str,
+            check_point: ExecuteInterruptPoint,
+            headers: dict,
+            recover_point: Optional[ExecuteInterruptPoint],
     ) -> None:
         super().__init__(
             runtime=runtime,
@@ -192,15 +192,15 @@ class ScheduleKeyPoint:
 
 class ScheduleInterrupter(Interrupter):
     def __init__(
-        self,
-        runtime: EngineRuntimeInterface,
-        process_id: int,
-        current_node_id: str,
-        schedule_id: int,
-        headers: dict,
-        callback_data_id: Optional[int],
-        check_point: ScheduleInterruptPoint,
-        recover_point: Optional[ScheduleInterruptPoint],
+            self,
+            runtime: EngineRuntimeInterface,
+            process_id: int,
+            current_node_id: str,
+            schedule_id: int,
+            headers: dict,
+            callback_data_id: Optional[int],
+            check_point: ScheduleInterruptPoint,
+            recover_point: Optional[ScheduleInterruptPoint],
     ) -> None:
         super().__init__(
             runtime=runtime,
@@ -257,3 +257,7 @@ class ScheduleInterrupter(Interrupter):
                 logger.exception("[interrupt({})] schedule interrupt event handle error.".format(self.current_node_id))
 
             raise InterruptException()
+
+
+class RollbackInterrupter(Interrupter):
+    pass

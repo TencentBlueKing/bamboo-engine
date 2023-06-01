@@ -36,7 +36,7 @@ from .interrupt import (
     ExecuteKeyPoint,
     InterruptException,
     ScheduleInterrupter,
-    ScheduleKeyPoint,
+    ScheduleKeyPoint, RollbackInterrupter,
 )
 from .local import CurrentNodeInfo, clear_node_info, set_node_info
 from .metrics import (
@@ -85,12 +85,12 @@ class Engine:
 
     # api
     def run_pipeline(
-        self,
-        pipeline: dict,
-        root_pipeline_data: Optional[dict] = None,
-        root_pipeline_context: Optional[dict] = None,
-        subprocess_context: Optional[dict] = None,
-        **options
+            self,
+            pipeline: dict,
+            root_pipeline_data: Optional[dict] = None,
+            root_pipeline_context: Optional[dict] = None,
+            subprocess_context: Optional[dict] = None,
+            **options
     ):
         """
         运行流程
@@ -576,13 +576,13 @@ class Engine:
     @setup_histogram(ENGINE_PROCESS_RUNNING_TIME)
     @interrupt_exception_catcher
     def execute(
-        self,
-        process_id: int,
-        node_id: str,
-        root_pipeline_id: str,
-        parent_pipeline_id: str,
-        interrupter: ExecuteInterrupter,
-        headers: dict,
+            self,
+            process_id: int,
+            node_id: str,
+            root_pipeline_id: str,
+            parent_pipeline_id: str,
+            interrupter: ExecuteInterrupter,
+            headers: dict,
     ):
         """
         在某个进程上从某个节点开始进入推进循环
@@ -699,9 +699,9 @@ class Engine:
                         rerun_limit = self.runtime.node_rerun_limit(process_info.root_pipeline_id, current_node_id)
                         # 重入次数超过限制
                         if (
-                            node_state.name == states.FINISHED
-                            and node.type != NodeType.SubProcess
-                            and node_state.loop > rerun_limit
+                                node_state.name == states.FINISHED
+                                and node.type != NodeType.SubProcess
+                                and node_state.loop > rerun_limit
                         ):
                             exec_outputs = self.runtime.get_execution_data_outputs(current_node_id)
 
@@ -743,7 +743,8 @@ class Engine:
                         # 设置状态前检测
                         if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
                             logger.info(
-                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",  # noqa
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",
+                                # noqa
                                 process_info.root_pipeline_id,
                                 node_state.name,
                             )
@@ -845,7 +846,7 @@ class Engine:
                     schedule_id = schedule.id
 
                     if execute_result.schedule_type == ScheduleType.POLL and (
-                        not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
+                            not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
                     ):
                         self.runtime.schedule(
                             process_id=process_id, node_id=current_node_id, schedule_id=schedule_id, headers=headers
@@ -890,17 +891,56 @@ class Engine:
                     time.time() - engine_post_execute_start_at
                 )
 
+    def rollback(self, node_id, version, rollback_data):
+        """
+        回滚某个进程
+        """
+        state = self.runtime.get_state(node_id)
+        if not state:
+            return
+
+        data_id = self.runtime.set_callback_data(node_id, state.version, rollback_data)
+        node = self.runtime.get_node(node_id)
+        # only nodes in the end of the end are allowed to be rolled back
+
+        if state.name != states.FINISHED:
+            raise InvalidOperationError("rollback only support finished state")
+
+        # 设置节点状态为运行时
+        self.runtime.set_state(
+            node_id=node_id,
+            to_state=states.ROLLING,
+            version=state.version
+        )
+
+        handler = HandlerFactory.get_handler(node, self.runtime, RollbackInterrupter)
+        rollback_data = self.runtime.get_callback_data(data_id)
+        try:
+            rollback_result = handler.rollback(root_pipeline_id=state.root_id, loop=state.loop, version=version,
+                                               rollback_data=rollback_data)
+        except Exception as err:
+            self.runtime.set_state(
+                node_id=node_id,
+                to_state=states.ROLLBACK_FAILED,
+                version=state.version
+            )
+            logger.exception("node_id(%s) rollback error" % node_id)
+            raise InvalidOperationError(err)
+
+        if not rollback_result.rollback_done:
+            raise InvalidOperationError("rollback failed")
+
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)
     @interrupt_exception_catcher
     def schedule(
-        self,
-        process_id: int,
-        node_id: str,
-        schedule_id: str,
-        interrupter: ScheduleInterrupter,
-        headers: dict,
-        callback_data_id: Optional[int] = None,
+            self,
+            process_id: int,
+            node_id: str,
+            schedule_id: str,
+            interrupter: ScheduleInterrupter,
+            headers: dict,
+            callback_data_id: Optional[int] = None,
     ):
         """
         在某个进程上开始某个节点的调度
@@ -996,7 +1036,8 @@ class Engine:
                 # only retry at multiple calback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",
+                        # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
@@ -1113,10 +1154,10 @@ class Engine:
             )
 
     def _add_history(
-        self,
-        node_id: str,
-        state: Optional[State] = None,
-        exec_data: Optional[ExecutionData] = None,
+            self,
+            node_id: str,
+            state: Optional[State] = None,
+            exec_data: Optional[ExecutionData] = None,
     ) -> int:
         if not state:
             state = self.runtime.get_state(node_id)

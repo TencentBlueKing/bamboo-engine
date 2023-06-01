@@ -22,14 +22,14 @@ class ExecuteResult:
     """
 
     def __init__(
-        self,
-        should_sleep: bool,
-        schedule_ready: bool,
-        schedule_type: Optional[ScheduleType],
-        schedule_after: int,
-        dispatch_processes: List[DispatchProcess],
-        next_node_id: Optional[str],
-        should_die: bool = False,
+            self,
+            should_sleep: bool,
+            schedule_ready: bool,
+            schedule_type: Optional[ScheduleType],
+            schedule_after: int,
+            dispatch_processes: List[DispatchProcess],
+            next_node_id: Optional[str],
+            should_die: bool = False,
     ):
         """
 
@@ -87,11 +87,11 @@ class ScheduleResult:
     """
 
     def __init__(
-        self,
-        has_next_schedule: bool,
-        schedule_after: int,
-        schedule_done: bool,
-        next_node_id: Optional[str],
+            self,
+            has_next_schedule: bool,
+            schedule_after: int,
+            schedule_done: bool,
+            next_node_id: Optional[str],
     ):
         """
 
@@ -125,3 +125,17 @@ class ScheduleResult:
             schedule_done=obj["schedule_done"],
             next_node_id=obj["next_node_id"],
         )
+
+
+class RollbackResult:
+
+    def __init__(
+            self,
+            rollback_done: bool
+    ):
+        self.rollback_done = rollback_done
+
+    def to_dict(self) -> dict:
+        return {
+            "rollback_done": self.rollback_done,
+        }

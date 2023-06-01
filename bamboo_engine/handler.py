@@ -28,7 +28,7 @@ from .eri import (
     ExecuteResult,
     ScheduleResult,
     ExecuteInterruptPoint,
-    ScheduleInterruptPoint,
+    ScheduleInterruptPoint, RollbackResult,
 )
 from .utils.host import get_hostname
 from .interrupt import Interrupter
@@ -73,12 +73,12 @@ class NodeHandler(metaclass=ABCMeta):
 
     @abstractmethod
     def execute(
-        self,
-        process_info: ProcessInfo,
-        loop: int,
-        inner_loop: int,
-        version: str,
-        recover_point: Optional[ExecuteInterruptPoint] = None,
+            self,
+            process_info: ProcessInfo,
+            loop: int,
+            inner_loop: int,
+            version: str,
+            recover_point: Optional[ExecuteInterruptPoint] = None,
     ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
@@ -96,13 +96,13 @@ class NodeHandler(metaclass=ABCMeta):
         """
 
     def schedule(
-        self,
-        process_info: ProcessInfo,
-        loop: int,
-        inner_loop: int,
-        schedule: Schedule,
-        callback_data: Optional[CallbackData] = None,
-        recover_point: Optional[ScheduleInterruptPoint] = None,
+            self,
+            process_info: ProcessInfo,
+            loop: int,
+            inner_loop: int,
+            schedule: Schedule,
+            callback_data: Optional[CallbackData] = None,
+            recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         """
         节点的 schedule 处理逻辑，不支持 schedule 的节点可以不实现该方法
@@ -120,6 +120,10 @@ class NodeHandler(metaclass=ABCMeta):
         :return: 调度结果
         :rtype: ScheduleResult
         """
+        raise NotImplementedError()
+
+    def rollback(self, root_pipeline_id: str, loop: int, version: str,
+                 rollback_data: Optional[CallbackData] = None) -> RollbackResult:
         raise NotImplementedError()
 
     def _execute_fail(self, ex_data: str, version: str, ignore_boring_set: bool) -> ExecuteResult:
