@@ -71,7 +71,7 @@ class DataInput(Var):
 
 
 class NodeOutput(Var):
-    def __init__(self, source_act, source_key, type="plain", *args, **kwargs):
+    def __init__(self, source_act, source_key, *args, type=Var.PLAIN, **kwargs):
         self.source_act = source_act
         self.source_key = source_key
         kwargs["value"] = None
