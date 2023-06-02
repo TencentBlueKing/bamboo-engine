@@ -126,6 +126,8 @@ pipeline = builder.build_tree(start)
 # 执行流程对象
 runtime = BambooDjangoRuntime()
 
+# 如果需要忽略流程中的环检查，可以指定为True cycle_tolerate
+# api.run_pipeline(runtime=runtime, pipeline=pipeline, cycle_tolerate=True)
 api.run_pipeline(runtime=runtime, pipeline=pipeline)
 
 # 等待 1s 后获取流程执行结果
