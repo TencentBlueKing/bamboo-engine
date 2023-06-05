@@ -65,11 +65,11 @@ class Service(metaclass=ABCMeta):
 
     @abstractmethod
     def schedule(
-            self,
-            schedule: Schedule,
-            data: ExecutionData,
-            root_pipeline_data: ExecutionData,
-            callback_data: Optional[CallbackData] = None,
+        self,
+        schedule: Schedule,
+        data: ExecutionData,
+        root_pipeline_data: ExecutionData,
+        callback_data: Optional[CallbackData] = None,
     ) -> bool:
         """
         schedule 逻辑
@@ -87,10 +87,9 @@ class Service(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def rollback(self,
-                 data: ExecutionData,
-                 root_pipeline_data: ExecutionData,
-                 callback_data: Optional[CallbackData] = None):
+    def rollback(
+        self, data: ExecutionData, root_pipeline_data: ExecutionData, callback_data: Optional[CallbackData] = None
+    ):
         """
         执行回滚逻辑
         """
@@ -124,10 +123,10 @@ class Service(metaclass=ABCMeta):
 
     @abstractmethod
     def schedule_after(
-            self,
-            schedule: Optional[Schedule],
-            data: ExecutionData,
-            root_pipeline_data: ExecutionData,
+        self,
+        schedule: Optional[Schedule],
+        data: ExecutionData,
+        root_pipeline_data: ExecutionData,
     ) -> int:
         """
         计算下一次调度间隔
@@ -218,11 +217,11 @@ class PluginManagerMixin:
 
     @abstractmethod
     def get_compute_variable(
-            self,
-            code: str,
-            key: str,
-            value: Variable,
-            additional_data: dict,
+        self,
+        code: str,
+        key: str,
+        value: Variable,
+        additional_data: dict,
     ) -> Variable:
         """
         根据代号获取变量实例
@@ -246,8 +245,7 @@ class EngineAPIHooksMixin:
     """
 
     def pre_prepare_run_pipeline(
-            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
-            **options
+        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
         """
         调用 pre_prepare_run_pipeline 前执行的钩子
@@ -263,8 +261,7 @@ class EngineAPIHooksMixin:
         """
 
     def post_prepare_run_pipeline(
-            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
-            **options
+        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
         """
         调用 pre_prepare_run_pipeline 后执行的钩子
@@ -511,13 +508,13 @@ class TaskMixin:
 
     @abstractmethod
     def execute(
-            self,
-            process_id: int,
-            node_id: str,
-            root_pipeline_id: str,
-            parent_pipeline_id: str,
-            recover_point: Optional[ExecuteInterruptPoint] = None,
-            headers: Optional[dict] = None,
+        self,
+        process_id: int,
+        node_id: str,
+        root_pipeline_id: str,
+        parent_pipeline_id: str,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发执行任务，执行任务被拉起执行时应该调用 Engine 实例的 execute 方法
@@ -538,13 +535,13 @@ class TaskMixin:
 
     @abstractmethod
     def schedule(
-            self,
-            process_id: int,
-            node_id: str,
-            schedule_id: str,
-            callback_data_id: Optional[int] = None,
-            recover_point: Optional[ScheduleInterruptPoint] = None,
-            headers: Optional[dict] = None,
+        self,
+        process_id: int,
+        node_id: str,
+        schedule_id: str,
+        callback_data_id: Optional[int] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
+        headers: Optional[dict] = None,
     ):
         """
         派发调度任务，调度任务被拉起执行时应该调用 Engine 实例的 schedule 方法
@@ -565,13 +562,13 @@ class TaskMixin:
 
     @abstractmethod
     def set_next_schedule(
-            self,
-            process_id: int,
-            node_id: str,
-            schedule_id: str,
-            schedule_after: int,
-            callback_data_id: Optional[int] = None,
-            headers: Optional[dict] = None,
+        self,
+        process_id: int,
+        node_id: str,
+        schedule_id: str,
+        schedule_after: int,
+        callback_data_id: Optional[int] = None,
+        headers: Optional[dict] = None,
     ):
         """
         设置下次调度时间，调度倒数归零后应该执行 Engine 实例的 schedule 方法
@@ -781,11 +778,11 @@ class ProcessMixin:
 
     @abstractmethod
     def fork(
-            self,
-            parent_id: str,
-            root_pipeline_id: str,
-            pipeline_stack: List[str],
-            from_to: Dict[str, str],
+        self,
+        parent_id: str,
+        root_pipeline_id: str,
+        pipeline_stack: List[str],
+        from_to: Dict[str, str],
     ) -> List[DispatchProcess]:
         """
         根据当前进程 fork 出多个子进程
@@ -920,27 +917,27 @@ class StateMixin:
 
     @abstractmethod
     def set_state(
-            self,
-            node_id: str,
-            to_state: str,
-            loop: int = -1,
-            inner_loop: int = -1,
-            version: Optional[str] = None,
-            root_id: Optional[str] = None,
-            parent_id: Optional[str] = None,
-            is_retry: bool = False,
-            is_skip: bool = False,
-            reset_retry: bool = False,
-            reset_skip: bool = False,
-            error_ignored: bool = False,
-            reset_error_ignored: bool = False,
-            refresh_version: bool = False,
-            clear_started_time: bool = False,
-            set_started_time: bool = False,
-            clear_archived_time: bool = False,
-            set_archive_time: bool = False,
-            ignore_boring_set: bool = False,
-            send_post_set_state_signal: bool = True,
+        self,
+        node_id: str,
+        to_state: str,
+        loop: int = -1,
+        inner_loop: int = -1,
+        version: Optional[str] = None,
+        root_id: Optional[str] = None,
+        parent_id: Optional[str] = None,
+        is_retry: bool = False,
+        is_skip: bool = False,
+        reset_retry: bool = False,
+        reset_skip: bool = False,
+        error_ignored: bool = False,
+        reset_error_ignored: bool = False,
+        refresh_version: bool = False,
+        clear_started_time: bool = False,
+        set_started_time: bool = False,
+        clear_archived_time: bool = False,
+        set_archive_time: bool = False,
+        ignore_boring_set: bool = False,
+        send_post_set_state_signal: bool = True,
     ) -> str:
         """
         设置节点的状态，如果节点存在，进行状态转换时需要满足状态转换状态机
@@ -1027,11 +1024,11 @@ class ScheduleMixin:
 
     @abstractmethod
     def set_schedule(
-            self,
-            process_id: int,
-            node_id: str,
-            version: str,
-            schedule_type: ScheduleType,
+        self,
+        process_id: int,
+        node_id: str,
+        version: str,
+        schedule_type: ScheduleType,
     ) -> Schedule:
         """
         该接口应为幂等接口
@@ -1387,16 +1384,16 @@ class ExecutionHistoryMixin:
 
     @abstractmethod
     def add_history(
-            self,
-            node_id: str,
-            started_time: datetime,
-            archived_time: datetime,
-            loop: int,
-            skip: bool,
-            retry: int,
-            version: str,
-            inputs: dict,
-            outputs: dict,
+        self,
+        node_id: str,
+        started_time: datetime,
+        archived_time: datetime,
+        loop: int,
+        skip: bool,
+        retry: int,
+        version: str,
+        inputs: dict,
+        outputs: dict,
     ) -> int:
         """
         为某个节点记录一次执行历史
@@ -1496,8 +1493,7 @@ class EngineRuntimeInterface(
 ):
     @abstractmethod
     def prepare_run_pipeline(
-            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
-            **options
+        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ) -> int:
         """
         进行 pipeline 执行前的准备工作，并返回 进程 ID，该函数执行完成后即代表

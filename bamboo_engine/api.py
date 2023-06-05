@@ -37,12 +37,12 @@ class EngineAPIResult(Representable):
     """
 
     def __init__(
-            self,
-            result: bool,
-            message: str,
-            exc: Optional[Exception] = None,
-            data: Optional[Any] = None,
-            exc_trace: Optional[str] = None,
+        self,
+        result: bool,
+        message: str,
+        exc: Optional[Exception] = None,
+        data: Optional[Any] = None,
+        exc_trace: Optional[str] = None,
     ):
         """
         :param result: 是否执行成功
@@ -236,10 +236,10 @@ def skip_exclusive_gateway(runtime: EngineRuntimeInterface, node_id: str, flow_i
 
 @_ensure_return_api_result
 def skip_conditional_parallel_gateway(
-        runtime: EngineRuntimeInterface,
-        node_id: str,
-        flow_ids: list,
-        converge_gateway_id: str,
+    runtime: EngineRuntimeInterface,
+    node_id: str,
+    flow_ids: list,
+    converge_gateway_id: str,
 ) -> EngineAPIResult:
     """
     跳过某个执行失败的条件并行网关
@@ -260,7 +260,7 @@ def skip_conditional_parallel_gateway(
 
 @_ensure_return_api_result
 def forced_fail_activity(
-        runtime: EngineRuntimeInterface, node_id: str, ex_data: str, send_post_set_state_signal: bool = True
+    runtime: EngineRuntimeInterface, node_id: str, ex_data: str, send_post_set_state_signal: bool = True
 ) -> EngineAPIResult:
     """
     强制失败某个 activity 节点
@@ -619,12 +619,12 @@ def get_node_debug_info(runtime: EngineRuntimeInterface, node_id: str):
 
 @_ensure_return_api_result
 def preview_node_inputs(
-        runtime: EngineRuntimeInterface,
-        pipeline: dict,
-        node_id: str,
-        subprocess_stack: List[str] = [],
-        root_pipeline_data: dict = {},
-        parent_params: dict = {},
+    runtime: EngineRuntimeInterface,
+    pipeline: dict,
+    node_id: str,
+    subprocess_stack: List[str] = [],
+    root_pipeline_data: dict = {},
+    parent_params: dict = {},
 ):
     """
     预览某个节点的输入结果
@@ -677,6 +677,6 @@ def preview_node_inputs(
 
 @_ensure_return_api_result
 def update_context_values(
-        runtime: EngineRuntimeInterface, pipeline_id: str, context_values: List[ContextValue]
+    runtime: EngineRuntimeInterface, pipeline_id: str, context_values: List[ContextValue]
 ) -> EngineAPIResult:
     return runtime.update_context_values(pipeline_id=pipeline_id, context_values=context_values)

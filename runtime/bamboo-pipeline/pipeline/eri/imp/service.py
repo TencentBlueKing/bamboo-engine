@@ -57,11 +57,11 @@ class ServiceWrapper(ServiceInterface):
         return execute_res
 
     def schedule(
-            self,
-            schedule: Schedule,
-            data: ExecutionData,
-            root_pipeline_data: ExecutionData,
-            callback_data: Optional[CallbackData] = None,
+        self,
+        schedule: Schedule,
+        data: ExecutionData,
+        root_pipeline_data: ExecutionData,
+        callback_data: Optional[CallbackData] = None,
     ) -> bool:
         """
         schedule 逻辑
@@ -104,10 +104,9 @@ class ServiceWrapper(ServiceInterface):
 
         return schedule_res
 
-    def rollback(self,
-                 data: ExecutionData,
-                 root_pipeline_data: ExecutionData,
-                 rollback_data: Optional[CallbackData] = None):
+    def rollback(
+        self, data: ExecutionData, root_pipeline_data: ExecutionData, rollback_data: Optional[CallbackData] = None
+    ):
 
         """
         回滚逻辑
@@ -172,7 +171,7 @@ class ServiceWrapper(ServiceInterface):
         return self.service.is_schedule_finished()
 
     def schedule_after(
-            self, schedule: Optional[Schedule], data: ExecutionData, root_pipeline_data: ExecutionData
+        self, schedule: Optional[Schedule], data: ExecutionData, root_pipeline_data: ExecutionData
     ) -> int:
         """
         计算下一次调度间隔
