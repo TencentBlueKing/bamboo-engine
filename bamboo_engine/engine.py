@@ -898,16 +898,16 @@ class Engine:
         """
         state = self.runtime.get_state(node_id)
         if not state:
-            return
+            raise InvalidOperationError("state not found, node_id: {}".format(node_id))
 
         data_id = self.runtime.set_callback_data(node_id, state.version, rollback_data)
         node = self.runtime.get_node(node_id)
+
         # only nodes in the end of the end are allowed to be rolled back
-
         if state.name != states.FINISHED:
-            raise InvalidOperationError("rollback only support finished state")
+            raise InvalidOperationError("rollback only support finished state, current state is {}".format(state.name))
 
-        # 设置节点状态为运行时
+        # 设置节点状态为回滚中
         self.runtime.set_state(node_id=node_id, to_state=states.ROLLING, version=state.version)
 
         handler = HandlerFactory.get_handler(node, self.runtime, RollbackInterrupter)

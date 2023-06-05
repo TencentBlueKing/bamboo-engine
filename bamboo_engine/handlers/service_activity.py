@@ -39,6 +39,7 @@ from bamboo_engine.eri import (
     Schedule,
     ExecuteInterruptPoint,
     FancyDict,
+    RollbackResult,
 )
 from bamboo_engine.handler import (
     register_handler,
@@ -546,7 +547,7 @@ class ServiceActivityHandler(NodeHandler):
                 return ScheduleResult(
                     has_next_schedule=False,
                     schedule_after=-1,
-                    schedule_done=False,
+                    schedule_done=True,
                     next_node_id=None,
                 )
 
@@ -560,3 +561,58 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_inputs=root_pipeline_inputs,
                 recover_point=recover_point,
             )
+
+    def rollback(
+        self, root_pipeline_id: str, loop: int, version: str, rollback_data: Optional[CallbackData] = None
+    ) -> RollbackResult:
+
+        top_pipeline_id = root_pipeline_id
+        root_pipeline_id = root_pipeline_id
+
+        service_data = self.runtime.get_execution_data(self.node.id)
+
+        root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
+        root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
+        logger.info(
+            "root_pipeline[%s] node(%s) activity rollback data: %s, root inputs: %s",
+            root_pipeline_id,
+            self.node.id,
+            service_data,
+            root_pipeline_inputs,
+        )
+        service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+        service.setup_runtime_attributes(
+            id=self.node.id,
+            top_pipeline_id=top_pipeline_id,
+            root_pipeline_id=root_pipeline_id,
+            loop=loop + 1,
+            version=version,
+        )
+        try:
+            rollback_success = service.rollback(
+                data=service_data,
+                root_pipeline_data=root_pipeline_data,
+                rollback_data=rollback_data,
+            )
+        except Exception:
+            service_data.outputs.ex_data = traceback.format_exc()
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_FAILED,
+            )
+            return RollbackResult(rollback_done=False)
+
+        if rollback_success:
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_FINISHED,
+            )
+        else:
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_FAILED,
+            )
+        return RollbackResult(rollback_done=rollback_success)
