@@ -223,6 +223,7 @@ class BambooDjangoRuntime(
                     "parent_pipeline_id": parent_id,
                     "can_skip": act["skippable"],
                     "code": act["component"]["code"],
+                    "name": act.get("name", ""),
                     "version": act["component"].get("version", "legacy"),
                     "error_ignorable": act["error_ignorable"],
                     "can_retry": act["retryable"],
