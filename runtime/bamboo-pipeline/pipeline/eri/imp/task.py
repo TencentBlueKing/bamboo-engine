@@ -141,6 +141,25 @@ class TaskMixin:
 
         _retry_once(action=action)
 
+    def rollback(self, node_id: str, version: str, rollback_data_id: int):
+        """
+        执行回滚任务
+        """
+        task_name = "pipeline.eri.celery.tasks.rollback"
+        route_params = {'priority': 100, 'queue': 'er_schedule', 'routing_key': 'er_schedule'}
+        def action():
+            result = current_app.tasks[task_name].apply_async(
+                kwargs={
+                    "node_id": node_id,
+                    "version": version,
+                    "rollback_data_id": rollback_data_id
+                },
+                **route_params
+            )
+            logger.info("[pipeline-trace] node(%s) rollback task %s sended", node_id, result.id)
+
+        _retry_once(action=action)
+
     def set_next_schedule(
         self,
         process_id: int,

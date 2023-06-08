@@ -19,7 +19,8 @@ from celery.decorators import periodic_task
 from celery.schedules import crontab
 from django.conf import settings
 
-from bamboo_engine import metrics
+from bamboo_engine import metrics, states
+from bamboo_engine.handler import HandlerFactory
 from bamboo_engine.utils.host import get_hostname
 from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
 from bamboo_engine.engine import Engine
@@ -27,12 +28,11 @@ from bamboo_engine.interrupt import (
     ExecuteInterrupter,
     ExecuteKeyPoint,
     ScheduleInterrupter,
-    ScheduleKeyPoint,
+    ScheduleKeyPoint, RollbackInterrupter,
 )
 
 from pipeline.eri.models import LogEntry
 from pipeline.eri.runtime import BambooDjangoRuntime
-
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +49,13 @@ def _observe_message_delay(metric: metrics.Histogram, headers: dict):
 
 @task(ignore_result=True)
 def execute(
-    process_id: int,
-    node_id: str,
-    root_pipeline_id: str = None,
-    parent_pipeline_id: str = None,
-    recover_point: str = None,
-    headers: dict = None,
-    **kwargs,
+        process_id: int,
+        node_id: str,
+        root_pipeline_id: str = None,
+        parent_pipeline_id: str = None,
+        recover_point: str = None,
+        headers: dict = None,
+        **kwargs,
 ):
     logger.info(
         f"[eri_execute worker] received task with info "
@@ -88,13 +88,13 @@ def execute(
 
 @task(ignore_result=True)
 def schedule(
-    process_id: int,
-    node_id: str,
-    schedule_id: str,
-    callback_data_id: Optional[int],
-    recover_point: str = None,
-    headers: dict = None,
-    **kwargs,
+        process_id: int,
+        node_id: str,
+        schedule_id: str,
+        callback_data_id: Optional[int],
+        recover_point: str = None,
+        headers: dict = None,
+        **kwargs,
 ):
     logger.info(
         f"[eri_schedule worker] received task with info "
@@ -123,6 +123,39 @@ def schedule(
         callback_data_id=callback_data_id,
         headers=headers or {},
     )
+
+
+@task(ignore_result=True)
+def rollback(node_id, version, rollback_data_id):
+    runtime = BambooDjangoRuntime()
+    # 设置节点状态为运行时
+    node = runtime.get_node(node_id)
+    state = runtime.get_state(node_id)
+    if not state:
+        logger.info("[rollback] not found state by node_id, node_id={}, version={}".format(node_id, version))
+        return
+
+    runtime.set_state(
+        node_id=node_id,
+        to_state=states.ROLLING,
+        version=state.version
+    )
+
+    # rollback 不需要中断逻辑，所以不传interrupter即可
+    handler = HandlerFactory.get_handler(node, runtime, None)
+    # get rollback_data
+    rollback_data = runtime.get_callback_data(rollback_data_id)
+    try:
+        # execute rollback
+        handler.rollback(root_pipeline_id=state.root_id, loop=state.loop, version=version,
+                         rollback_data=rollback_data)
+    except Exception as err:
+        logger.info("[rollback] rollback error, node_id={}, versio={}, error={}".format(node_id, version, err))
+        runtime.set_state(
+            node_id=node_id,
+            to_state=states.ROLLBACK_FAILED,
+            version=state.version
+        )
 
 
 @periodic_task(run_every=(crontab(minute=0, hour=0)), ignore_result=True)

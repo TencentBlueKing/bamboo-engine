@@ -258,6 +258,3 @@ class ScheduleInterrupter(Interrupter):
 
             raise InterruptException()
 
-
-class RollbackInterrupter(Interrupter):
-    pass

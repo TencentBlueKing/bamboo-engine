@@ -898,31 +898,14 @@ class Engine:
         """
         state = self.runtime.get_state(node_id)
         if not state:
-            raise InvalidOperationError("state not found, node_id: {}".format(node_id))
+            return
 
         data_id = self.runtime.set_callback_data(node_id, state.version, rollback_data)
-        node = self.runtime.get_node(node_id)
 
-        # only nodes in the end of the end are allowed to be rolled back
-        if state.name != states.FINISHED:
-            raise InvalidOperationError("rollback only support finished state, current state is {}".format(state.name))
+        if state.name not in [states.FINISHED, states.ROLLBACK_FAILED]:
+            raise InvalidOperationError("rollback only support finished state")
 
-        # 设置节点状态为回滚中
-        self.runtime.set_state(node_id=node_id, to_state=states.ROLLING, version=state.version)
-
-        handler = HandlerFactory.get_handler(node, self.runtime, RollbackInterrupter)
-        rollback_data = self.runtime.get_callback_data(data_id)
-        try:
-            rollback_result = handler.rollback(
-                root_pipeline_id=state.root_id, loop=state.loop, version=version, rollback_data=rollback_data
-            )
-        except Exception as err:
-            self.runtime.set_state(node_id=node_id, to_state=states.ROLLBACK_FAILED, version=state.version)
-            logger.exception("node_id(%s) rollback error" % node_id)
-            raise InvalidOperationError(err)
-
-        if not rollback_result.rollback_done:
-            raise InvalidOperationError("rollback failed")
+        self.runtime.rollback(node_id, version, rollback_data_id=data_id)
 
     @setup_gauge(ENGINE_RUNNING_SCHEDULES)
     @setup_histogram(ENGINE_SCHEDULE_RUNNING_TIME)

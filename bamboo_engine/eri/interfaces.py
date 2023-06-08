@@ -561,6 +561,18 @@ class TaskMixin:
         """
 
     @abstractmethod
+    def rollback(self, node_id: str, version: str, rollback_data_id: int):
+        """
+        执行回滚任务, 调度任务被拉起时执行时应该执行callback方法
+        @param node_id: 节点ID
+        @type node_id: str
+        @param version: 节点版本
+        @type version: str
+        @param rollback_data_id: 回滚数据ID
+        @type rollback_data_id: int
+        """
+
+    @abstractmethod
     def set_next_schedule(
         self,
         process_id: int,
