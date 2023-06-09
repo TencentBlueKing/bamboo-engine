@@ -561,7 +561,7 @@ def get_pipeline_debug_info(runtime: EngineRuntimeInterface, pipeline_id: str):
     """
 
     return {
-        "contex_values": runtime.get_context(pipeline_id),
+        "context_values": runtime.get_context(pipeline_id),
         "processes": runtime.get_process_info_with_root_pipeline(pipeline_id),
     }
 
