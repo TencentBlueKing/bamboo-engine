@@ -547,7 +547,7 @@ class ServiceActivityHandler(NodeHandler):
                 return ScheduleResult(
                     has_next_schedule=False,
                     schedule_after=-1,
-                    schedule_done=True,
+                    schedule_done=False,
                     next_node_id=None,
                 )
 
@@ -581,13 +581,6 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_inputs,
         )
         service = self.runtime.get_service(code=self.node.code, version=self.node.version)
-        service.setup_runtime_attributes(
-            id=self.node.id,
-            top_pipeline_id=top_pipeline_id,
-            root_pipeline_id=root_pipeline_id,
-            loop=loop + 1,
-            version=version,
-        )
         try:
             rollback_success = service.rollback(
                 data=service_data,
@@ -607,7 +600,7 @@ class ServiceActivityHandler(NodeHandler):
             self.runtime.set_state(
                 node_id=self.node.id,
                 version=version,
-                to_state=states.ROLLBACK_FINISHED,
+                to_state=states.ROLLBACK_SUCCESS,
             )
         else:
             self.runtime.set_state(

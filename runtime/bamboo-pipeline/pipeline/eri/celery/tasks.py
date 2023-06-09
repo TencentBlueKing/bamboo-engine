@@ -137,7 +137,7 @@ def rollback(node_id, version, rollback_data_id):
 
     runtime.set_state(
         node_id=node_id,
-        to_state=states.ROLLING,
+        to_state=states.ROLL_BACKING,
         version=state.version
     )
 

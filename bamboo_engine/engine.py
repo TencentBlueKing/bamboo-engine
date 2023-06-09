@@ -894,16 +894,16 @@ class Engine:
 
     def rollback(self, node_id, version, rollback_data):
         """
-        回滚某个进程
+        回滚某个节点
         """
         state = self.runtime.get_state(node_id)
         if not state:
             return
 
-        data_id = self.runtime.set_callback_data(node_id, state.version, rollback_data)
-
         if state.name not in [states.FINISHED, states.ROLLBACK_FAILED]:
             raise InvalidOperationError("rollback only support finished state")
+
+        data_id = self.runtime.set_callback_data(node_id, state.version, rollback_data)
 
         self.runtime.rollback(node_id, version, rollback_data_id=data_id)
 
