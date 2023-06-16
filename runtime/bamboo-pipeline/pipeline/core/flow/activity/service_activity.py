@@ -13,11 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
-
-from botocore.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from pipeline.conf import settings
+from pipeline.exceptions import ValidationError as PipelineInputValidationError
 from pipeline.core.flow.activity.base import Activity
 from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
 from pipeline.utils.utils import convert_bytes_to_str
@@ -73,13 +72,18 @@ class Service(object, metaclass=ABCMeta):
         pass
 
     def validate_input(self, data):
+        errors = {}
         for item in self.inputs_format():
             if item.required and item.key not in data:
-                raise ValidationError("this field is required")
-            item.validate(data.get(item.key))
+                errors[item.key] = "this field is required"
+                continue
+            try:
+                item.validate(data.get(item.key))
+            except Exception as e:
+                errors[item.key] = str(e)
 
-    def validate_output(self, data):
-        pass
+        if errors:
+            raise PipelineInputValidationError(errors)
 
     def outputs_format(self):
         return []

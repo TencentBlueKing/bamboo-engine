@@ -39,6 +39,8 @@ class HooksMixin:
         if not settings.PLUGIN_INPUT_VALIDATE_ENABLED:
             return
 
+        errors = {}
+
         for activity_id, activity in pipeline["activities"].items():
             code = activity["component"].get("code")
             inputs = activity["component"].get("inputs", {})
@@ -47,7 +49,13 @@ class HooksMixin:
             component_class = ComponentLibrary.get_component_class(component_code=code, version=version)
             if not component_class:
                 raise ValidationError("not fond component by code={}, version={}".format(code, version))
-            component_class.bound_service.validate_input(data)
+            try:
+                component_class.bound_service().validate_input(data)
+            except Exception as e:
+                errors.setdefault("{}({})".format(code, activity_id), []).append(str(e))
+
+        if errors:
+            raise ValidationError(errors)
 
     def post_prepare_run_pipeline(
             self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,

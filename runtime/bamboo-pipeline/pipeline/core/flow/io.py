@@ -47,10 +47,7 @@ class InputItem(DataItem):
     def validate(self, value):
         if self.schema is None:
             return
-        try:
-            self.schema.validate(value)
-        except Exception as e:
-            raise ValidationError("key: {}, error: {}".format(self.key, e))
+        self.schema.validate(value)
 
     def as_dict(self):
         base = super(InputItem, self).as_dict()
