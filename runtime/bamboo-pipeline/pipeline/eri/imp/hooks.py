@@ -13,12 +13,16 @@ specific language governing permissions and limitations under the License.
 
 from typing import Optional
 
+from pipeline.conf import settings
+from pipeline.component_framework.library import ComponentLibrary
 from pipeline.eri.models import LogEntry
+from pipeline.exceptions import ValidationError
 
 
 class HooksMixin:
     def pre_prepare_run_pipeline(
-        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
+            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
+            **options
     ):
         """
         调用 pre_prepare_run_pipeline 前执行的钩子
@@ -32,9 +36,22 @@ class HooksMixin:
         :param subprocess_context 子流程预置流程上下文
         :type subprocess_context: dict
         """
+        if not settings.PLUGIN_INPUT_VALIDATE_ENABLED:
+            return
+
+        for activity_id, activity in pipeline["activities"].items():
+            code = activity["component"].get("code")
+            inputs = activity["component"].get("inputs", {})
+            version = activity["component"].get("version", "legacy")
+            data = {key: value["value"] for key, value in inputs.items()}
+            component_class = ComponentLibrary.get_component_class(component_code=code, version=version)
+            if not component_class:
+                raise ValidationError("not fond component by code={}, version={}".format(code, version))
+            component_class.bound_service.validate_input(data)
 
     def post_prepare_run_pipeline(
-        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
+            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
+            **options
     ):
         """
         调用 pre_prepare_run_pipeline 后执行的钩子

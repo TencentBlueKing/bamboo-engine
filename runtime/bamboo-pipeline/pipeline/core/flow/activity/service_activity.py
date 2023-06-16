@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
+from botocore.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from pipeline.conf import settings
@@ -71,6 +72,15 @@ class Service(object, metaclass=ABCMeta):
         # get params from data
         pass
 
+    def validate_input(self, data):
+        for item in self.inputs_format():
+            if item.required and item.key not in data:
+                raise ValidationError("this field is required")
+            item.validate(data.get(item.key))
+
+    def validate_output(self, data):
+        pass
+
     def outputs_format(self):
         return []
 
@@ -117,16 +127,16 @@ class ServiceActivity(Activity):
     ON_RETRY = "_on_retry"
 
     def __init__(
-        self,
-        id,
-        service,
-        name=None,
-        data=None,
-        error_ignorable=False,
-        failure_handler=None,
-        skippable=True,
-        retryable=True,
-        timeout=None,
+            self,
+            id,
+            service,
+            name=None,
+            data=None,
+            error_ignorable=False,
+            failure_handler=None,
+            skippable=True,
+            retryable=True,
+            timeout=None,
     ):
         super(ServiceActivity, self).__init__(id, name, data, failure_handler)
         self.service = service

@@ -17,6 +17,11 @@ try:
 except ImportError:
     from collections import Mapping
 
+from pipeline.core.flow.validator import StringValidator, IntValidator, FloatValidator, BooleanValidator, \
+    ArrayValidator, ObjectValidator, DefaultValidator
+
+from pipeline.exceptions import ValidationError
+
 
 class DataItem(object, metaclass=abc.ABCMeta):
     def __init__(self, name, key, type, schema=None):
@@ -39,6 +44,14 @@ class InputItem(DataItem):
         self.required = required
         super(InputItem, self).__init__(*args, **kwargs)
 
+    def validate(self, value):
+        if self.schema is None:
+            return
+        try:
+            self.schema.validate(value)
+        except Exception as e:
+            raise ValidationError("key: {}, error: {}".format(self.key, e))
+
     def as_dict(self):
         base = super(InputItem, self).as_dict()
         base["required"] = self.required
@@ -50,10 +63,17 @@ class OutputItem(DataItem):
 
 
 class ItemSchema(object, metaclass=abc.ABCMeta):
-    def __init__(self, description, enum=None):
+    validator = DefaultValidator
+
+    def __init__(self, description, enum=None, validator_cls=None):
         self.type = self._type()
         self.description = description
         self.enum = enum or []
+        if validator_cls is not None:
+            self.validator = validator_cls
+
+    def validate(self, value):
+        self.validator(self).validate(value)
 
     def as_dict(self):
         return {"type": self.type, "description": self.description, "enum": self.enum}
@@ -68,30 +88,40 @@ class SimpleItemSchema(ItemSchema, metaclass=abc.ABCMeta):
 
 
 class IntItemSchema(SimpleItemSchema):
+    validator = IntValidator
+
     @classmethod
     def _type(cls):
         return "int"
 
 
 class StringItemSchema(SimpleItemSchema):
+    validator = StringValidator
+
     @classmethod
     def _type(cls):
         return "string"
 
 
 class FloatItemSchema(SimpleItemSchema):
+    validator = FloatValidator
+
     @classmethod
     def _type(cls):
         return "float"
 
 
 class BooleanItemSchema(SimpleItemSchema):
+    validator = BooleanValidator
+
     @classmethod
     def _type(cls):
         return "boolean"
 
 
 class ArrayItemSchema(ItemSchema):
+    validator = ArrayValidator
+
     def __init__(self, item_schema, *args, **kwargs):
         if not isinstance(item_schema, ItemSchema):
             raise TypeError("item_schema of ArrayItemSchema must be subclass of ItemSchema")
@@ -109,6 +139,8 @@ class ArrayItemSchema(ItemSchema):
 
 
 class ObjectItemSchema(ItemSchema):
+    validator = ObjectValidator
+
     def __init__(self, property_schemas, *args, **kwargs):
         if not isinstance(property_schemas, Mapping):
             raise TypeError("property_schemas of ObjectItemSchema must be Mapping type")
