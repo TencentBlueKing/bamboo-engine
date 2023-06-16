@@ -57,7 +57,7 @@ tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 
 [[package]]
 name = "bamboo-engine"
-version = "2.7.2"
+version = "2.7.3"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
@@ -735,7 +735,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 4"
-content-hash = "cf77a2d8f9c7fcafcc0813c84e04f0bfe213d40bfd599e72b522402e73bb5031"
+content-hash = "e9b5ade39d51f55d190eab471ce1bba126b0501cf0fa03004615b57aa369c8e0"
 
 [metadata.files]
 amqp = []
