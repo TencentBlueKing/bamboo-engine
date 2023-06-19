@@ -191,7 +191,7 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
 
             # execute
-            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version, name=self.node.name)
             service.setup_runtime_attributes(
                 id=self.node.id,
                 version=version,
@@ -199,7 +199,6 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_id=root_pipeline_id,
                 loop=loop,
                 inner_loop=inner_loop,
-                name=self.node.name,
             )
 
         # excute
@@ -421,7 +420,7 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_inputs,
             )
 
-            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version, name=self.node.name)
             service.setup_runtime_attributes(
                 id=self.node.id,
                 version=schedule.version,
@@ -429,7 +428,6 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_id=root_pipeline_id,
                 loop=loop,
                 inner_loop=inner_loop,
-                name=self.node.name,
             )
 
         # build_node_type: sleep_timer_legacy

@@ -23,7 +23,7 @@ from pipeline.eri.imp.variable import VariableWrapper
 
 
 class PipelinePluginManagerMixin:
-    def get_service(self, code: str, version: str) -> Service:
+    def get_service(self, code: str, version: str, name: str = None) -> Service:
         """
         根据代号与版本获取特定服务对象实例
 
@@ -31,11 +31,13 @@ class PipelinePluginManagerMixin:
         :type code: str
         :param version: 服务版本
         :type version: str
+        :param name: 服务名
+        :type version: str
         :return: 服务对象实例
         :rtype: Service
         """
         comp_cls = ComponentLibrary.get_component_class(code, version)
-        service = comp_cls.bound_service()
+        service = comp_cls.bound_service(name=name)
         return ServiceWrapper(service)
 
     def get_executable_end_event(self, code: str) -> ExecutableEvent:
