@@ -199,6 +199,7 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_id=root_pipeline_id,
                 loop=loop,
                 inner_loop=inner_loop,
+                name=self.node.name,
             )
 
         # excute
@@ -428,6 +429,7 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_id=root_pipeline_id,
                 loop=loop,
                 inner_loop=inner_loop,
+                name=self.node.name,
             )
 
         # build_node_type: sleep_timer_legacy

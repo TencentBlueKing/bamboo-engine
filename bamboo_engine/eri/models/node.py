@@ -49,6 +49,7 @@ class Node(Representable):
         parent_pipeline_id: str,
         can_skip: bool = True,
         can_retry: bool = True,
+        name: str = None
     ):
         """
 
@@ -80,6 +81,7 @@ class Node(Representable):
         self.parent_pipeline_id = parent_pipeline_id
         self.can_skip = can_skip
         self.can_retry = can_retry
+        self.name = name
 
 
 class EmptyStartEvent(Node):
@@ -201,7 +203,7 @@ class ServiceActivity(Node):
     服务节点
     """
 
-    def __init__(self, code: str, version: str, error_ignorable: bool, *args, **kwargs):
+    def __init__(self, code: str, version: str, error_ignorable: bool, name: str, *args, **kwargs):
         """
 
         :param code: Service Code

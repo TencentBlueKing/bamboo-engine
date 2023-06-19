@@ -45,6 +45,7 @@ class NodeMixin:
             root_pipeline_id=node_detail["root_pipeline_id"],
             parent_pipeline_id=node_detail["parent_pipeline_id"],
             can_skip=node_detail["can_skip"],
+            name=node_detail.get("name"),
             can_retry=node_detail["can_retry"],
         )
 
