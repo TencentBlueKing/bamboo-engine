@@ -161,6 +161,7 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in service.execute.call_args.kwargs["data"].outputs
@@ -233,6 +234,7 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     assert service.execute.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
@@ -367,6 +369,7 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     if recover_point and recover_point.handler_data.service_executed:
@@ -469,6 +472,7 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     if recover_point and recover_point.handler_data.service_executed:
         service.execute.assert_not_called()
@@ -566,6 +570,7 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     if recover_point and recover_point.handler_data.service_executed:
@@ -638,6 +643,7 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     assert service.schedule.call_args.kwargs["schedule"] == schedule
     assert service.schedule.call_args.kwargs["data"] == service_data
@@ -712,6 +718,7 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     assert service.schedule.call_args.kwargs["schedule"] == schedule
     assert service.schedule.call_args.kwargs["data"] == service_data
@@ -783,6 +790,7 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     if recover_point and recover_point.handler_data.service_scheduled:
@@ -876,6 +884,7 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     if recover_point and recover_point.handler_data.service_scheduled:
@@ -968,6 +977,7 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     if recover_point and recover_point.handler_data.service_scheduled:
         service.schedule.assert_not_called()
@@ -1047,6 +1057,7 @@ def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interr
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     if recover_point and recover_point.handler_data.service_scheduled:
         service.schedule.assert_not_called()
@@ -1140,6 +1151,7 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
     if recover_point and recover_point.handler_data.service_scheduled:
         service.schedule.assert_not_called()
@@ -1228,6 +1240,7 @@ def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point)
         top_pipeline_id=pi.top_pipeline_id,
         loop=1,
         inner_loop=1,
+        name=None,
     )
 
     if recover_point and recover_point.handler_data.service_scheduled:
