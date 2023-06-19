@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import abc
+
 try:
     from collections.abc import Mapping
 except ImportError:
@@ -19,8 +20,6 @@ except ImportError:
 
 from pipeline.core.flow.validator import StringValidator, IntValidator, FloatValidator, BooleanValidator, \
     ArrayValidator, ObjectValidator, DefaultValidator
-
-from pipeline.exceptions import ValidationError
 
 
 class DataItem(object, metaclass=abc.ABCMeta):
