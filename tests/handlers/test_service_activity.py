@@ -141,7 +141,7 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -212,7 +212,7 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -349,7 +349,7 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_not_called()
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -439,7 +439,7 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set(["${k4}"]))
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set(["${k4}", "${k6}"]))
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -542,7 +542,7 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -617,7 +617,7 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -690,7 +690,7 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -768,7 +768,7 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -850,7 +850,7 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -942,7 +942,7 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -1032,7 +1032,7 @@ def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interr
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -1114,7 +1114,7 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
@@ -1203,7 +1203,7 @@ def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point)
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
     runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
