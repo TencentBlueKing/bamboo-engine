@@ -203,7 +203,7 @@ class ServiceActivity(Node):
     服务节点
     """
 
-    def __init__(self, code: str, version: str, error_ignorable: bool, name: str, *args, **kwargs):
+    def __init__(self, code: str, version: str, error_ignorable: bool, *args, **kwargs):
         """
 
         :param code: Service Code
