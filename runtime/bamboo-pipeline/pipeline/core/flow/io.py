@@ -18,8 +18,15 @@ try:
 except ImportError:
     from collections import Mapping
 
-from pipeline.core.flow.validator import StringValidator, IntValidator, FloatValidator, BooleanValidator, \
-    ArrayValidator, ObjectValidator, DefaultValidator
+from pipeline.core.flow.validator import (
+    StringValidator,
+    IntValidator,
+    FloatValidator,
+    BooleanValidator,
+    ArrayValidator,
+    ObjectValidator,
+    DefaultValidator,
+)
 
 
 class DataItem(object, metaclass=abc.ABCMeta):

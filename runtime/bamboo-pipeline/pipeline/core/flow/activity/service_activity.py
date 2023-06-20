@@ -131,16 +131,16 @@ class ServiceActivity(Activity):
     ON_RETRY = "_on_retry"
 
     def __init__(
-            self,
-            id,
-            service,
-            name=None,
-            data=None,
-            error_ignorable=False,
-            failure_handler=None,
-            skippable=True,
-            retryable=True,
-            timeout=None,
+        self,
+        id,
+        service,
+        name=None,
+        data=None,
+        error_ignorable=False,
+        failure_handler=None,
+        skippable=True,
+        retryable=True,
+        timeout=None,
     ):
         super(ServiceActivity, self).__init__(id, name, data, failure_handler)
         self.service = service
@@ -279,13 +279,13 @@ class AbstractIntervalGenerator(object, metaclass=ABCMeta):
 class DefaultIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(DefaultIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class SquareIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(SquareIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class NullIntervalGenerator(AbstractIntervalGenerator):

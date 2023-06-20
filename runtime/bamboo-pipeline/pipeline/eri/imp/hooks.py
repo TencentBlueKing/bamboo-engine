@@ -21,8 +21,7 @@ from pipeline.exceptions import ValidationError
 
 class HooksMixin:
     def pre_prepare_run_pipeline(
-            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
-            **options
+        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
         """
         调用 pre_prepare_run_pipeline 前执行的钩子
@@ -58,8 +57,7 @@ class HooksMixin:
             raise ValidationError(errors)
 
     def post_prepare_run_pipeline(
-            self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict,
-            **options
+        self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
         """
         调用 pre_prepare_run_pipeline 后执行的钩子

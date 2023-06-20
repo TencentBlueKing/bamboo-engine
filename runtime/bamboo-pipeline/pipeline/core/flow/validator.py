@@ -18,7 +18,6 @@ class BaseValidator(metaclass=abc.ABCMeta):
 
 
 class DefaultValidator(BaseValidator):
-
     def validate(self, value):
         pass
 
@@ -44,12 +43,13 @@ class ObjectValidator(BaseValidator):
 
     def validate(self, value):
         if not isinstance(value, dict):
-            raise ValidationError("validate error，value must be {}".format(self.type))
+            raise TypeError("validate error，value must be {}".format(self.type))
         if self.schema.property_schemas:
             if set(value.keys()) != self.schema.property_schemas.keys():
                 # 判断字典的key是否和预期保持一致
                 raise ValidationError(
-                    "validate error，it must have this keys:{}".format(self.schema.property_schemas.keys()))
+                    "validate error，it must have this keys:{}".format(self.schema.property_schemas.keys())
+                )
             for key, v in value.items():
                 schema_cls = self.schema.property_schemas.get(key)
                 value_type = schema_cls.as_dict()["type"]
@@ -62,7 +62,7 @@ class ArrayValidator(BaseValidator):
 
     def validate(self, value):
         if not isinstance(value, list):
-            raise ValidationError("validate error，value must be {}".format(self.type))
+            raise TypeError("validate error，value must be {}".format(self.type))
 
         value_type = self.schema.item_schema.as_dict()["type"]
         if value_type in ["object", "array"]:
@@ -80,5 +80,5 @@ VALIDATOR_MAP = {
     "float": FloatValidator,
     "boolean": BooleanValidator,
     "array": ArrayValidator,
-    "object": ObjectValidator
+    "object": ObjectValidator,
 }
