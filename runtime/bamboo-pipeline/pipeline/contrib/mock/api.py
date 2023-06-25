@@ -33,9 +33,8 @@ def update_pipeline_context(pipeline_id, node_id, context_values):
 
     if pipeline_state.name != states.RUNNING:
         raise UpdatePipelineContextException(
-            "update context values failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
-                pipeline_id
-            )
+            "update context values failed: the task of non-running state is not allowed to roll back, pipeline_id={}".
+            format(pipeline_id)
         )
 
     node_state = State.objects.filter(node_id=node_id).first()
@@ -46,9 +45,8 @@ def update_pipeline_context(pipeline_id, node_id, context_values):
 
     if node_state.name != states.FAILED:
         raise UpdatePipelineContextException(
-            "update context values failed: the task of non-running state is not allowed to update, node_id={}".format(
-                node_id
-            )
+            "update context values failed: the task of non-running state is not allowed to update, node_id={}".
+            format( node_id)
         )
 
     if "${_system}" in context_values.keys():
