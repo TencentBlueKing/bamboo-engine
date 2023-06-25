@@ -15,7 +15,7 @@
 
 针对如下图的流程，蓝色框所标注的节点是允许回退的节点。
 
-![rollback.png](images%2Frollback.png)
+![rollback.png](..%2Fassets%2Fimg%2Frollback%2Frollback.png)
 
 ### 使用事例:
 
