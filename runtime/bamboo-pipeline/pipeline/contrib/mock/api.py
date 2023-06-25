@@ -28,22 +28,28 @@ def update_pipeline_context(pipeline_id, node_id, context_values):
     pipeline_state = State.objects.filter(node_id=pipeline_id).first()
     if not pipeline_state:
         raise UpdatePipelineContextException(
-            "update context values failed: pipeline state not exist, pipeline_id={}".format(pipeline_id))
+            "update context values failed: pipeline state not exist, pipeline_id={}".format(pipeline_id)
+        )
 
     if pipeline_state.name != states.RUNNING:
         raise UpdatePipelineContextException(
             "update context values failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
-                pipeline_id))
+                pipeline_id
+            )
+        )
 
     node_state = State.objects.filter(node_id=node_id).first()
     if not node_state:
         raise UpdatePipelineContextException(
-            "update context values failed: node state not exist, pipeline_id={}".format(pipeline_id))
+            "update context values failed: node state not exist, pipeline_id={}".format(pipeline_id)
+        )
 
     if node_state.name != states.FAILED:
         raise UpdatePipelineContextException(
             "update context values failed: the task of non-running state is not allowed to update, node_id={}".format(
-                node_id))
+                node_id
+            )
+        )
 
     if "${_system}" in context_values.keys():
         raise UpdatePipelineContextException("${_system} is built-in variable that is not allowed to be updated")
@@ -76,4 +82,5 @@ def update_pipeline_context(pipeline_id, node_id, context_values):
 
         except Exception as e:
             raise UpdatePipelineContextException(
-                "update node outputs value failed, please check it,outputs={}, error={}".format(outputs, e))
+                "update node outputs value failed, please check it,outputs={}, error={}".format(outputs, e)
+            )

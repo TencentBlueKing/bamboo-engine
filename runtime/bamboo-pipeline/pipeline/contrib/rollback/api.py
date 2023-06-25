@@ -53,17 +53,20 @@ def clean_engine_data(runtime, pipeline_id, target_state):
         result = api.forced_fail_activity(runtime, node_id=state.node_id, ex_data="")
         if not result.result:
             raise RollBackException(
-                "rollback failed: forced_fail_activity failed, node_id={}, message={}".format(target_state.node_id,
-                                                                                              result.message))
+                "rollback failed: forced_fail_activity failed, node_id={}, message={}".format(
+                    target_state.node_id, result.message
+                )
+            )
 
     # 之后清理多余的进程信息
     Process.objects.filter(root_pipeline_id=pipeline_id).exclude(parent_id=-1).delete()
 
     # 查询到所有在该节点之后创建的状态信息
-    need_clean_node_id_list = list(State.objects.filter(root_id=pipeline_id,
-                                                        created_time__gt=target_state.created_time).values_list(
-        "node_id",
-        flat=True))
+    need_clean_node_id_list = list(
+        State.objects.filter(root_id=pipeline_id, created_time__gt=target_state.created_time).values_list(
+            "node_id", flat=True
+        )
+    )
     # 同时清理掉目标节点的信息
     need_clean_node_id_list.append(target_state.node_id)
     clean_node_data(pipeline_id, node_ids=need_clean_node_id_list)
@@ -99,14 +102,16 @@ def rollback(pipeline_id: str, node_id: str):
     if pipeline_state.name != states.RUNNING:
         raise RollBackException(
             "rollback failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
-                pipeline_id))
+                pipeline_id
+            )
+        )
 
     node = Node.objects.filter(node_id=node_id).first()
     if node is None:
         raise RollBackException("rollback failed: node not exist, node={}".format(node_id))
 
     node_detail = json.loads(node.detail)
-    if node_detail["type"] != "ServiceActivity":
+    if node_detail["type"] not in [PE.ServiceActivity, PE.EmptyStartEvent]:
         raise RollBackException("rollback failed: only allows rollback to ServiceActivity type nodes")
 
     target_node_state = State.objects.filter(node_id=node_id).first()
@@ -118,12 +123,16 @@ def rollback(pipeline_id: str, node_id: str):
         raise RollBackException("rollback failed: only allows rollback to finished node")
 
     # 不需要遍历整颗树，获取到现在已经执行成功的所有列表
-    finished_node_id_list = State.objects.filter(root_id=pipeline_id, name="FINISHED").exclude(
-        node_id=pipeline_id).values_list("node_id", flat=True)
+    finished_node_id_list = (
+        State.objects.filter(root_id=pipeline_id, name="FINISHED")
+        .exclude(node_id=pipeline_id)
+        .values_list("node_id", flat=True)
+    )
 
     # 获取到除pipeline节点之外第一个被创建的节点
-    start_node_state = State.objects.filter(root_id=pipeline_id).exclude(node_id=pipeline_id).order_by(
-        "created_time").first()
+    start_node_state = (
+        State.objects.filter(root_id=pipeline_id).exclude(node_id=pipeline_id).order_by("created_time").first()
+    )
 
     # 获取到所有当前已经运行完节点的详情
     node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
