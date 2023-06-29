@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+"""
+Tencent is pleased to support the open source community by making 蓝鲸智云PaaS平台社区版 (BlueKing PaaS Community
+Edition) available.
+Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
+Licensed under the MIT License (the "License"); you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://opensource.org/licenses/MIT
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+"""
 import json
 
 import mock
@@ -11,6 +22,7 @@ from django.utils import timezone
 
 from pipeline.contrib.exceptions import RollBackException
 from pipeline.contrib.rollback import api
+from pipeline.contrib.rollback.handler import RollBackHandler
 from pipeline.core.constants import PE
 from pipeline.eri.models import Process, State, Node
 
@@ -140,176 +152,83 @@ class TestRollBackBase(TestCase):
 
     def test_compute_validate_nodes(self):
         node_map = {
-            "n45b0eef37e634a684ac7cf417cf2feb": {
-                "id": "n45b0eef37e634a684ac7cf417cf2feb",
+            "node_1": {
+                "id": "node_1",
                 "type": "EmptyStartEvent",
                 "targets": {
-                    "l0db60bacab93bc99da6c842c2bb6c19": "n824c6f1481f31778b7795c9b2d329a7"
+                    "n": "node_2"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "can_retry": True
             },
-            "n824c6f1481f31778b7795c9b2d329a7": {
-                "id": "n824c6f1481f31778b7795c9b2d329a7",
+            "node_2": {
+                "id": "node_2",
                 "type": "ServiceActivity",
                 "targets": {
-                    "lfc11465e7863f8280d07d3d79ffbf95": "n645b2d4ba5a372f88690171540d9bc0"
+                    "n": "node_3"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "code": "sleep_timer",
-                "name": "定时",
-                "version": "legacy",
-                "error_ignorable": False,
-                "can_retry": True
             },
-            "n645b2d4ba5a372f88690171540d9bc0": {
-                "id": "n645b2d4ba5a372f88690171540d9bc0",
+            "node_3": {
+                "id": "node_3",
                 "type": "ServiceActivity",
                 "targets": {
-                    "l5e4b91ad1d13b69b9bd6362a37ef761": "nabd285680da34d9ad1d93a0bc410bb8"
+                    "n": "node_4"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "code": "sleep_timer",
-                "name": "定时",
-                "version": "legacy",
-                "error_ignorable": False,
-                "can_retry": True
             },
-            "nabd285680da34d9ad1d93a0bc410bb8": {
-                "id": "nabd285680da34d9ad1d93a0bc410bb8",
+            "node_4": {
+                "id": "node_4",
                 "type": "ParallelGateway",
                 "targets": {
-                    "l0d97808ccf839b096597e1ea637e664": "n172ffe73fb13b02bc55002d9bb64d8c",
-                    "la7148ea129c3eeb8039fd2cc97a34b7": "n1d4cab0a47e371c96c6612d8fdd420b"
+                    "n": "node_5",
+                    "n1": "node_6"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_retry": True,
-                "can_skip": False,
-                "converge_gateway_id": "n4ce8a40ec573a779a7fbc6de7ae2195"
+                "converge_gateway_id": "node_7"
             },
-            "n172ffe73fb13b02bc55002d9bb64d8c": {
-                "id": "n172ffe73fb13b02bc55002d9bb64d8c",
+            "node_5": {
+                "id": "node_5",
                 "type": "ServiceActivity",
                 "targets": {
-                    "l4400f7d49793eb8b58125af1d42bfc4": "n4ce8a40ec573a779a7fbc6de7ae2195"
+                    "n": "node_7"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "code": "sleep_timer",
-                "name": "定时",
-                "version": "legacy",
-                "error_ignorable": False,
-                "can_retry": True
             },
-            "n1d4cab0a47e371c96c6612d8fdd420b": {
-                "id": "n1d4cab0a47e371c96c6612d8fdd420b",
+            "node_6": {
+                "id": "node_6",
                 "type": "ServiceActivity",
                 "targets": {
-                    "l8783d7d4bd03ab3a52cab9328fe928b": "n4ce8a40ec573a779a7fbc6de7ae2195"
+                    "n": "node_7"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "code": "sleep_timer",
-                "name": "定时",
-                "version": "legacy",
-                "error_ignorable": False,
-                "can_retry": True
             },
-            "n4ce8a40ec573a779a7fbc6de7ae2195": {
-                "id": "n4ce8a40ec573a779a7fbc6de7ae2195",
+            "node_7": {
+                "id": "node_7",
                 "type": "ConvergeGateway",
                 "targets": {
-                    "l15eb6c71a7f31bc9d4aa279144d94ac": "ne39d4687e2e3e9ba47ce8eb8e976c2f"
+                    "n": "node_8"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_retry": True,
-                "can_skip": False
             },
-            "ne39d4687e2e3e9ba47ce8eb8e976c2f": {
-                "id": "ne39d4687e2e3e9ba47ce8eb8e976c2f",
+            "node_8": {
+                "id": "node_8",
                 "type": "ExclusiveGateway",
                 "targets": {
-                    "l3e0f69e9c6b36bda6ae744a17502aa1": "n12b106ffe933abca84358a1e63b5070",
-                    "l0ace9150b303d5eb44a794c686acdab": "n38d3ad61db8324b993b023a530ad9e7",
-                    "l97d7bfe54303339a0a38524cd570cb8": "n645b2d4ba5a372f88690171540d9bc0"
+                    "n1": "node_13",
+                    "n2": "node_9",
+                    "n3": "node_3"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_retry": True,
-                "can_skip": True,
-                "conditions": [
-                    {
-                        "name": "l3e0f69e9c6b36bda6ae744a17502aa1",
-                        "evaluation": "1 == 0",
-                        "target_id": "n12b106ffe933abca84358a1e63b5070",
-                        "flow_id": "l3e0f69e9c6b36bda6ae744a17502aa1"
-                    },
-                    {
-                        "name": "l97d7bfe54303339a0a38524cd570cb8",
-                        "evaluation": "1 == 0",
-                        "target_id": "n645b2d4ba5a372f88690171540d9bc0",
-                        "flow_id": "l97d7bfe54303339a0a38524cd570cb8"
-                    }
-                ],
-                "default_condition": {
-                    "name": "l0ace9150b303d5eb44a794c686acdab",
-                    "target_id": "n38d3ad61db8324b993b023a530ad9e7",
-                    "flow_id": "l0ace9150b303d5eb44a794c686acdab"
-                }
             },
-            "n38d3ad61db8324b993b023a530ad9e7": {
-                "id": "n38d3ad61db8324b993b023a530ad9e7",
+            "node_9": {
+                "id": "node_9",
                 "type": "ServiceActivity",
                 "targets": {
-                    "lfe2be05f382367abc9743bc9f04333b": "ne41e573066735de8c0a963588057338"
+                    "n": "node_10"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_skip": True,
-                "code": "sleep_timer",
-                "name": "定时",
-                "version": "legacy",
-                "error_ignorable": False,
-                "can_retry": True
             },
-            "ne41e573066735de8c0a963588057338": {
-                "id": "ne41e573066735de8c0a963588057338",
+            "node_10": {
+                "id": "node_10",
                 "type": "ExclusiveGateway",
                 "targets": {
-                    "l23d85b970473ca99d7112833ab020c3": "ncd441991edd390eb5ce6cdb794c18b8",
-                    "le580aa1b9dc306fb9f80c06f770a793": "nba9359f99363e55b3e46923575d5113"
+                    "n": "node_11",
+                    "n2": "node_12"
                 },
-                "root_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "parent_pipeline_id": "nf6a5597182135fc91a937d0451d4cc2",
-                "can_retry": True,
-                "can_skip": True,
-                "conditions": [
-                    {
-                        "name": "l23d85b970473ca99d7112833ab020c3",
-                        "evaluation": "1 == 0",
-                        "target_id": "ncd441991edd390eb5ce6cdb794c18b8",
-                        "flow_id": "l23d85b970473ca99d7112833ab020c3"
-                    }
-                ],
-                "default_condition": {
-                    "name": "le580aa1b9dc306fb9f80c06f770a793",
-                    "target_id": "nba9359f99363e55b3e46923575d5113",
-                    "flow_id": "le580aa1b9dc306fb9f80c06f770a793"
-                }
             }
         }
-        node_id = 'n45b0eef37e634a684ac7cf417cf2feb'
+        node_id = 'node_1'
 
-        nodes = api.compute_validate_nodes(node_id, [], node_map)
-        self.assertListEqual(nodes, ['n824c6f1481f31778b7795c9b2d329a7', 'n645b2d4ba5a372f88690171540d9bc0',
-                                     'n38d3ad61db8324b993b023a530ad9e7'])
+        nodes = RollBackHandler("p", node_map).compute_validate_nodes(node_id, node_map)
+        self.assertListEqual(nodes, ['node_2', 'node_3', 'node_9'])

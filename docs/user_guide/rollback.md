@@ -24,9 +24,9 @@
 from pipeline.contrib.rollback import api
 
 try:
-	api.rollback(pipeline_id, node_id)
+    api.rollback(pipeline_id, node_id)
 except Exception as e:
-	paas
+    paas
 ```
 
 回滚失败将会抛出`RollBackException`异常

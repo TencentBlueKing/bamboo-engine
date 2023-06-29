@@ -18,7 +18,7 @@
 from pipeline.contrib.mock import api
 
 context_values = {
-	"${status_code}": 500
+    "${status_code}": 500
 }
 api.update_pipeline_context("pipeline_id", "node_id", context_values)
 ```
