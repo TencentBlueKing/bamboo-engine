@@ -71,7 +71,7 @@ class RollBackHandler:
 
         return nodes
 
-    def clean_engine_data(self, target_state):
+    def _clean_engine_data(self, target_state):
         """
         执行清理工作
         """
@@ -164,7 +164,7 @@ class RollBackHandler:
 
         with transaction.atomic():
             try:
-                self.clean_engine_data(target_node_state)
+                self._clean_engine_data(target_node_state)
             except Exception as e:
                 raise RollBackException("rollback failed: clean engine data error, error={}".format(str(e)))
 

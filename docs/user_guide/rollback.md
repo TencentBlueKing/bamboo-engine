@@ -23,10 +23,8 @@
 ```python
 from pipeline.contrib.rollback import api
 
-try:
-    api.rollback(pipeline_id, node_id)
-except Exception as e:
-    paas
-```
+result = api.rollback(pipeline_id, node_id)
 
-回滚失败将会抛出`RollBackException`异常
+if result.result:
+    pass
+```

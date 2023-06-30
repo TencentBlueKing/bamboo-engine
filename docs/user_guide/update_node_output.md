@@ -20,8 +20,8 @@ from pipeline.contrib.mock import api
 context_values = {
     "${status_code}": 500
 }
-api.update_pipeline_context("pipeline_id", "node_id", context_values)
+result = api.update_pipeline_context("pipeline_id", "node_id", context_values)
+if result.result:
+    pass
 ```
-
-当上下文更新失败时，将会抛出`UpdatePipelineContextException` 异常
 

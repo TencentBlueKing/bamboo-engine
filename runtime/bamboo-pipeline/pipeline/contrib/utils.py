@@ -32,8 +32,8 @@ def ensure_return_pipeline_contrib_api_result(func):
         except Exception as e:
             logger.exception("{} raise error.".format(func.__name__))
             trace = traceback.format_exc()
-            return EngineAPIResult(result=False, message="fail", exc=e, data=None, exc_trace=trace)
+            return PipelineContribAPIResult(result=False, message="fail", exc=e, data=None, exc_trace=trace)
 
-        return EngineAPIResult(result=True, message="success", exc=None, data=data, exc_trace=None)
+        return PipelineContribAPIResult(result=True, message="success", exc=None, data=data, exc_trace=None)
 
     return wrapper
