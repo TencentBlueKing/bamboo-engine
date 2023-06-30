@@ -34,7 +34,7 @@ class RollBackHandler:
         self.node_id = node_id
         self.runtime = BambooDjangoRuntime()
 
-    def compute_validate_nodes(self, node_id, node_map, nodes=None):
+    def _compute_validate_nodes(self, node_id, node_map, nodes=None):
         """
         计算并得到一个允许回调的节点列表。
         该方法的实现思路如下，从开始节点开始遍历，通过每个节点的 targets 获取到该节点的下一个节点
@@ -67,7 +67,7 @@ class RollBackHandler:
             # 如果目标节点已经出现在了node中，说明出现了环，跳过该分支
             if target in nodes:
                 continue
-            self.compute_validate_nodes(target, node_map, nodes)
+            self._compute_validate_nodes(target, node_map, nodes)
 
         return nodes
 
@@ -157,7 +157,7 @@ class RollBackHandler:
         # 获取node_id 到 node_detail的映射
         node_map = {n.node_id: json.loads(n.detail) for n in node_detail_list}
         # 计算当前允许跳过的合法的节点
-        validate_nodes_list = self.compute_validate_nodes(start_node_state.node_id, node_map)
+        validate_nodes_list = self._compute_validate_nodes(start_node_state.node_id, node_map)
 
         if self.node_id not in validate_nodes_list:
             raise RollBackException("rollback failed: node is not allow to rollback, node={}".format(self.node_id))

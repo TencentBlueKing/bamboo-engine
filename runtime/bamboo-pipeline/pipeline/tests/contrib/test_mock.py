@@ -24,10 +24,9 @@ from pipeline.contrib.mock import api
 class TestMockNodeOutPutDataBase(TestCase):
 
     def assert_exception(self, pipeline_id, node_id, context_values, message):
-        try:
-            api.update_node_outputs(pipeline_id, node_id, context_values=context_values)
-        except Exception as e:
-            self.assertEqual(str(e), message)
+        result = api.update_node_outputs(pipeline_id, node_id, context_values=context_values)
+        self.assertFalse(result.result)
+        self.assertEqual(str(result.exc), message)
 
     def test_update_node_data(self):
         pipeline_id = unique_id("n")

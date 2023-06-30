@@ -20,7 +20,6 @@ from bamboo_engine.utils.string import unique_id
 from django.test import TestCase
 from django.utils import timezone
 
-from pipeline.contrib.exceptions import RollBackException
 from pipeline.contrib.rollback import api
 from pipeline.contrib.rollback.handler import RollBackHandler
 from pipeline.core.constants import PE
@@ -115,21 +114,24 @@ class TestRollBackBase(TestCase):
         # pipeline_id 非running的情况下会异常
         message = "rollback failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
             pipeline_id)
-        with self.assertRaisesRegexp(RollBackException, message):
-            api.rollback(pipeline_id, pipeline_id)
+        result = api.rollback(pipeline_id, pipeline_id)
+        self.assertFalse(result.result)
+        self.assertEqual(str(result.exc), message)
 
         State.objects.filter(node_id=pipeline_id).update(name=states.RUNNING)
         # pipeline_id 非running的情况下会异常
         message = "rollback failed: only allows rollback to ServiceActivity type nodes"
-        with self.assertRaisesRegexp(RollBackException, message):
-            api.rollback(pipeline_id, node_id_1)
+        result = api.rollback(pipeline_id, node_id_1)
+        self.assertFalse(result.result)
+        self.assertEqual(str(result.exc), message)
 
         node_id_1_detail["type"] = PE.ServiceActivity
         Node.objects.filter(node_id=node_id_1).update(detail=json.dumps(node_id_1_detail))
 
         message = "rollback failed: only allows rollback to finished node"
-        with self.assertRaisesRegexp(RollBackException, message):
-            api.rollback(pipeline_id, node_id_1)
+        result = api.rollback(pipeline_id, node_id_1)
+        self.assertFalse(result.result)
+        self.assertEqual(str(result.exc), message)
         State.objects.filter(node_id=node_id_1).update(name=states.FINISHED)
 
         p = Process.objects.create(
@@ -140,7 +142,8 @@ class TestRollBackBase(TestCase):
             priority=1
         )
 
-        api.rollback(pipeline_id, node_id_1)
+        result = api.rollback(pipeline_id, node_id_1)
+        self.assertTrue(result.result)
 
         p.refresh_from_db()
         self.assertEqual(p.current_node_id, node_id_1)
@@ -230,5 +233,5 @@ class TestRollBackBase(TestCase):
         }
         node_id = 'node_1'
 
-        nodes = RollBackHandler("p", node_map).compute_validate_nodes(node_id, node_map)
+        nodes = RollBackHandler("p", node_map)._compute_validate_nodes(node_id, node_map)
         self.assertListEqual(nodes, ['node_2', 'node_3', 'node_9'])

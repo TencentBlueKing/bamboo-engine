@@ -10,18 +10,30 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from pipeline.contrib.rollback.handler import RollBackHandler
-from pipeline.contrib.utils import ensure_return_pipeline_contrib_api_result
+
+import functools
+import logging
+import traceback
+
+from bamboo_engine.api import EngineAPIResult
+
+logger = logging.getLogger("root")
 
 
-@ensure_return_pipeline_contrib_api_result
-def rollback(root_pipeline_id: str, node_id: str):
-    """
-    :param root_pipeline_id: pipeline id
-    :param node_id: 节点 id
-    :return: True or False
+class PipelineContribAPIResult(EngineAPIResult):
+    pass
 
-    回退的思路是，先搜索计算出来当前允许跳过的节点，在计算的过程中网关节点会合并成一个节点
-    只允许回退到已经执行过的节点
-    """
-    RollBackHandler(root_pipeline_id, node_id).rollback()
+
+def ensure_return_pipeline_contrib_api_result(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            data = func(*args, **kwargs)
+        except Exception as e:
+            logger.exception("{} raise error.".format(func.__name__))
+            trace = traceback.format_exc()
+            return EngineAPIResult(result=False, message="fail", exc=e, data=None, exc_trace=trace)
+
+        return EngineAPIResult(result=True, message="success", exc=None, data=data, exc_trace=None)
+
+    return wrapper
