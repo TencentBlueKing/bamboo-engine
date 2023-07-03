@@ -13,10 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
-
 from django.utils.translation import ugettext_lazy as _
 
 from pipeline.conf import settings
+from pipeline.exceptions import ValidationError as PipelineInputValidationError
 from pipeline.core.flow.activity.base import Activity
 from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
 from pipeline.utils.utils import convert_bytes_to_str
@@ -70,6 +70,20 @@ class Service(object, metaclass=ABCMeta):
     def execute(self, data, parent_data):
         # get params from data
         pass
+
+    def validate_input(self, data):
+        errors = {}
+        for item in self.inputs_format():
+            if item.required and item.key not in data:
+                errors[item.key] = "this field is required"
+                continue
+            try:
+                item.validate(data.get(item.key))
+            except Exception as e:
+                errors[item.key] = str(e)
+
+        if errors:
+            raise PipelineInputValidationError(errors)
 
     def outputs_format(self):
         return []
@@ -265,13 +279,13 @@ class AbstractIntervalGenerator(object, metaclass=ABCMeta):
 class DefaultIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(DefaultIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class SquareIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(SquareIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class NullIntervalGenerator(AbstractIntervalGenerator):

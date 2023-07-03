@@ -30,11 +30,15 @@ PIPELINE_TEMPLATE_CONTEXT = getattr(settings, "PIPELINE_TEMPLATE_CONTEXT", "")
 PIPELINE_INSTANCE_CONTEXT = getattr(settings, "PIPELINE_INSTANCE_CONTEXT", "")
 
 PIPELINE_ENGINE_ADAPTER_API = getattr(
-    settings, "PIPELINE_ENGINE_ADAPTER_API", "pipeline.service.pipeline_engine_adapter.adapter_api",
+    settings,
+    "PIPELINE_ENGINE_ADAPTER_API",
+    "pipeline.service.pipeline_engine_adapter.adapter_api",
 )
 
 PIPELINE_DATA_BACKEND = getattr(
-    settings, "PIPELINE_DATA_BACKEND", "pipeline.engine.core.data.mysql_backend.MySQLDataBackend",
+    settings,
+    "PIPELINE_DATA_BACKEND",
+    "pipeline.engine.core.data.mysql_backend.MySQLDataBackend",
 )
 PIPELINE_DATA_CANDIDATE_BACKEND = getattr(settings, "PIPELINE_DATA_CANDIDATE_BACKEND", None)
 PIPELINE_DATA_BACKEND_AUTO_EXPIRE = getattr(settings, "PIPELINE_DATA_BACKEND_AUTO_EXPIRE", False)
@@ -43,7 +47,9 @@ PIPELINE_DATA_BACKEND_AUTO_EXPIRE_SECONDS = int(
 )
 
 PIPELINE_END_HANDLER = getattr(
-    settings, "PIPELINE_END_HANDLER", "pipeline.engine.signals.handlers.pipeline_end_handler",
+    settings,
+    "PIPELINE_END_HANDLER",
+    "pipeline.engine.signals.handlers.pipeline_end_handler",
 )
 PIPELINE_WORKER_STATUS_CACHE_EXPIRES = getattr(settings, "PIPELINE_WORKER_STATUS_CACHE_EXPIRES", 30)
 PIPELINE_RERUN_MAX_TIMES = getattr(settings, "PIPELINE_RERUN_MAX_TIMES", 0)
@@ -95,3 +101,6 @@ MAKO_SAFETY_CHECK = getattr(settings, "MAKO_SAFETY_CHECK", True)
 # 开发者自定义插件和变量异常类
 PLUGIN_SPECIFIC_EXCEPTIONS = getattr(settings, "PLUGIN_SPECIFIC_EXCEPTIONS", ())
 VARIABLE_SPECIFIC_EXCEPTIONS = getattr(settings, "VARIABLE_SPECIFIC_EXCEPTIONS", ())
+
+# 是否开启输入输出校验
+PLUGIN_INPUT_VALIDATE_ENABLED = getattr(settings, "PLUGIN_INPUT_VALIDATE_ENABLED", False)

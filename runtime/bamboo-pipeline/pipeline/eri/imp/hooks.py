@@ -13,7 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from typing import Optional
 
+from pipeline.conf import settings
+from pipeline.component_framework.library import ComponentLibrary
 from pipeline.eri.models import LogEntry
+from pipeline.exceptions import ValidationError
 
 
 class HooksMixin:
@@ -32,6 +35,26 @@ class HooksMixin:
         :param subprocess_context 子流程预置流程上下文
         :type subprocess_context: dict
         """
+        if not settings.PLUGIN_INPUT_VALIDATE_ENABLED:
+            return
+
+        errors = {}
+
+        for activity_id, activity in pipeline["activities"].items():
+            code = activity["component"].get("code")
+            inputs = activity["component"].get("inputs", {})
+            version = activity["component"].get("version", "legacy")
+            data = {key: value["value"] for key, value in inputs.items()}
+            component_class = ComponentLibrary.get_component_class(component_code=code, version=version)
+            if not component_class:
+                raise ValidationError("not fond component by code={}, version={}".format(code, version))
+            try:
+                component_class.bound_service().validate_input(data)
+            except Exception as e:
+                errors.setdefault("{}({})".format(code, activity_id), []).append(str(e))
+
+        if errors:
+            raise ValidationError(errors)
 
     def post_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options

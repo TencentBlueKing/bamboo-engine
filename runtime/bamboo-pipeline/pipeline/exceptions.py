@@ -193,3 +193,10 @@ class InsufficientVariableError(ContextError):
 #
 class InvalidCrontabException(PipelineException):
     pass
+
+
+#
+# pipline input exception
+#
+class ValidationError(PipelineException):
+    pass
