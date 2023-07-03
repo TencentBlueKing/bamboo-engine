@@ -191,7 +191,7 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
 
             # execute
-            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version, name=self.node.name)
             service.setup_runtime_attributes(
                 id=self.node.id,
                 version=version,
@@ -420,7 +420,7 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_inputs,
             )
 
-            service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+            service = self.runtime.get_service(code=self.node.code, version=self.node.version, name=self.node.name)
             service.setup_runtime_attributes(
                 id=self.node.id,
                 version=schedule.version,

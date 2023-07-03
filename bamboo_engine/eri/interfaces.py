@@ -184,13 +184,15 @@ class PluginManagerMixin:
     """
 
     @abstractmethod
-    def get_service(self, code: str, version: str) -> Service:
+    def get_service(self, code: str, version: str, name: str = None) -> Service:
         """
         根据代号与版本获取特定服务对象实例
 
         :param code: 服务唯一代号
         :type code: str
         :param version: 服务版本
+        :type version: str
+        :param name: 服务名
         :type version: str
         :return: 服务对象实例
         :rtype: Service
