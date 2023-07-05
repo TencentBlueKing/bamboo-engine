@@ -234,7 +234,7 @@ def match_converge(
         if converge_id in converges:
             # this converge is shared by multiple gateway
             # only compare to the number of positive incoming
-            shared = converge_in_len[converge_id] > cur_to_converge or converge_id in converged
+            shared = converge_in_len[converge_id] >= cur_to_converge or converge_id in converged
     else:
         # for parallel gateway
 
