@@ -16,15 +16,13 @@ from mock import MagicMock, patch
 
 from bamboo_engine import states
 from bamboo_engine.eri import (
-    ProcessInfo,
-    NodeType,
-    ExclusiveGateway,
     Condition,
     DefaultCondition,
+    ExclusiveGateway,
+    NodeType,
+    ProcessInfo,
 )
-from bamboo_engine.handlers.exclusive_gateway import (
-    ExclusiveGatewayHandler,
-)
+from bamboo_engine.handlers.exclusive_gateway import ExclusiveGatewayHandler
 
 
 @pytest.mark.parametrize(
@@ -70,7 +68,7 @@ def test_exclusive_gateway__context_hydrate_raise(recover_point):
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
     with patch("bamboo_engine.handlers.exclusive_gateway.Context", MagicMock(return_value=raise_context)):
-        with patch("bamboo_engine.handlers.exclusive_gateway.BoolRule", MagicMock(side_effect=Exception)):
+        with patch("bamboo_engine.utils.expr.BoolRule", MagicMock(side_effect=Exception)):
             result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True

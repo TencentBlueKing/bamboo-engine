@@ -15,18 +15,18 @@ import pytest
 from mock import MagicMock, patch
 
 from bamboo_engine import states
-from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
 from bamboo_engine.eri import (
-    ProcessInfo,
-    NodeType,
-    ConditionalParallelGateway,
     Condition,
-    ExecuteInterruptPoint,
+    ConditionalParallelGateway,
     DefaultCondition,
+    ExecuteInterruptPoint,
+    NodeType,
+    ProcessInfo,
 )
 from bamboo_engine.handlers.conditional_parallel_gateway import (
     ConditionalParallelGatewayHandler,
 )
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
 
 
 @pytest.fixture
@@ -104,7 +104,7 @@ def test_exclusive_gateway__context_hydrate_raise(pi, node, interrupter, recover
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     with patch("bamboo_engine.handlers.conditional_parallel_gateway.Context", MagicMock(return_value=raise_context)):
-        with patch("bamboo_engine.handlers.conditional_parallel_gateway.BoolRule", MagicMock(side_effect=Exception)):
+        with patch("bamboo_engine.utils.expr.BoolRule", MagicMock(side_effect=Exception)):
             result = handler.execute(pi, 1, 1, "v1", recover_point)
 
     assert result.should_sleep == True
