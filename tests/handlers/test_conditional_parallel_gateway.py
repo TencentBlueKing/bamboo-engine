@@ -27,6 +27,7 @@ from bamboo_engine.handlers.conditional_parallel_gateway import (
     ConditionalParallelGatewayHandler,
 )
 from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint
+from bamboo_engine.utils.expr import default_expr_func
 
 
 @pytest.fixture
@@ -144,6 +145,7 @@ def test_conditional_parallel_gateway__execute_bool_rule_test_raise(pi, node, in
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -185,6 +187,7 @@ def test_conditional_parallel_gateway__execute_not_fork_targets(pi, node, interr
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -234,6 +237,7 @@ def test_conditional_parallel_gateway__execute_success(pi, node, interrupter, re
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.fork = MagicMock(return_value=dispatch_processes)
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -281,6 +285,7 @@ def test_conditional_parallel_gateway__recover_with_dispatch_processes(pi, node,
     runtime.get_context_key_references = MagicMock(return_value=additional_refs)
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -328,6 +333,7 @@ def test_conditional_parallel_gateway__no_meet_target_with_default_condition(pi,
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.fork = MagicMock(return_value=dispatch_processes)
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ConditionalParallelGatewayHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)

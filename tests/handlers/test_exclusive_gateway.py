@@ -23,6 +23,7 @@ from bamboo_engine.eri import (
     ProcessInfo,
 )
 from bamboo_engine.handlers.exclusive_gateway import ExclusiveGatewayHandler
+from bamboo_engine.utils.expr import default_expr_func
 
 
 @pytest.mark.parametrize(
@@ -62,6 +63,7 @@ def test_exclusive_gateway__context_hydrate_raise(recover_point):
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     raise_context = MagicMock()
     raise_context.hydrate = MagicMock(side_effect=Exception)
@@ -130,6 +132,7 @@ def test_exclusive_gateway__execute_bool_rule_test_raise(recover_point):
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -193,6 +196,7 @@ def test_exclusive_gateway__execute_not_meet_targets(recover_point):
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -260,6 +264,7 @@ def test_exclusive_gateway__execute_not_meet_targets_with_default(recover_point)
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -321,6 +326,7 @@ def test_exclusive_gateway__execute_mutiple_meet_targets(recover_point):
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock())
     result = handler.execute(pi, 1, 1, "v1", recover_point)
@@ -386,6 +392,7 @@ def test_exclusive_gateway__execute_success(recover_point):
     runtime.get_context_key_references = MagicMock(return_value=additional_refs)
     runtime.get_context_values = MagicMock(return_value=[])
     runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.get_config = MagicMock(return_value=default_expr_func)
 
     handler = ExclusiveGatewayHandler(node, runtime, MagicMock)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
