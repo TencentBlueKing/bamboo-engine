@@ -6,11 +6,11 @@ from bamboo_engine.utils.constants import RUNTIME_ALLOWED_CONFIG
 
 
 class ConfigMixin:
-    def get_config(self, config_name):
-        if config_name not in RUNTIME_ALLOWED_CONFIG:
-            raise ValueError("unsupported config, name={}".format(config_name))
+    def get_config(self, name):
+        if name not in RUNTIME_ALLOWED_CONFIG:
+            raise ValueError("unsupported config, name={}".format(name))
 
-        custom_config_value = getattr(settings, config_name, None)
+        custom_config_value = getattr(settings, name, None)
         if custom_config_value:
             return custom_config_value
-        return getattr(Settings, config_name)
+        return getattr(Settings, name)
