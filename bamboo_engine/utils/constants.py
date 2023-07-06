@@ -10,13 +10,36 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
+from enum import Enum
 
 from bamboo_engine.eri import ContextValueType
-
 
 VAR_CONTEXT_MAPPING = {
     "plain": ContextValueType.PLAIN,
     "splice": ContextValueType.SPLICE,
     "lazy": ContextValueType.COMPUTE,
 }
+
+
+class ExclusiveGatewayStrategy(Enum):
+    """
+    网关命中策略
+    """
+
+    # 唯一命中
+    ONLY = 1
+    # 优先命中第一个
+    FIRST = 2
+
+
+class RuntimeSettings(Enum):
+    EXCLUSIVE_GATEWAY_EXPR_FUNC = "EXCLUSIVE_GATEWAY_EXPR_FUNC"
+    CONDITIONAL_PARALLEL_GATEWAY_EXPR_FUNC = "CONDITIONAL_PARALLEL_GATEWAY_EXPR_FUNC"
+    EXCLUSIVE_GATEWAY_STRATEGY = "EXCLUSIVE_GATEWAY_STRATEGY"
+
+
+RUNTIME_ALLOWED_CONFIG = [
+    RuntimeSettings.EXCLUSIVE_GATEWAY_EXPR_FUNC.value,
+    RuntimeSettings.CONDITIONAL_PARALLEL_GATEWAY_EXPR_FUNC.value,
+    RuntimeSettings.EXCLUSIVE_GATEWAY_STRATEGY.value,
+]
