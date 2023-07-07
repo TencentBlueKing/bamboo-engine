@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 
 from typing import List, Optional
 
-from .runtime import ScheduleType, DispatchProcess
+from .runtime import DispatchProcess, ScheduleType
 
 
 class ExecuteResult:

@@ -15,37 +15,36 @@ import logging
 import traceback
 from typing import Optional
 
-from bamboo_engine import states, metrics
+from bamboo_engine import metrics, states
 from bamboo_engine.config import Settings
-
 from bamboo_engine.context import Context
-from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
-from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
-from bamboo_engine.metrics import (
-    ENGINE_SCHEDULE_FAILED_COUNT,
-    ENGINE_EXECUTE_FAILED_COUNT,
-    ENGINE_EXECUTE_EXCEPTION_COUNT,
-    ENGINE_SCHEDULE_EXCEPTION_COUNT,
-)
-from bamboo_engine.template import Template
 from bamboo_engine.eri import (
-    ProcessInfo,
+    CallbackData,
     ContextValue,
     ContextValueType,
-    ExecutionData,
-    CallbackData,
-    ScheduleType,
-    NodeType,
-    Schedule,
     ExecuteInterruptPoint,
+    ExecutionData,
     FancyDict,
+    NodeType,
+    ProcessInfo,
+    Schedule,
+    ScheduleType,
 )
+from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
 from bamboo_engine.handler import (
-    register_handler,
-    NodeHandler,
     ExecuteResult,
+    NodeHandler,
     ScheduleResult,
+    register_handler,
 )
+from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
+from bamboo_engine.metrics import (
+    ENGINE_EXECUTE_EXCEPTION_COUNT,
+    ENGINE_EXECUTE_FAILED_COUNT,
+    ENGINE_SCHEDULE_EXCEPTION_COUNT,
+    ENGINE_SCHEDULE_FAILED_COUNT,
+)
+from bamboo_engine.template import Template
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -559,4 +558,46 @@ class ServiceActivityHandler(NodeHandler):
                 error_ignored=True,
                 root_pipeline_inputs=root_pipeline_inputs,
                 recover_point=recover_point,
+            )
+
+    def rollback(self, root_pipeline_id: str, loop: int, version: str, rollback_data: Optional[CallbackData] = None):
+
+        service_data = self.runtime.get_execution_data(self.node.id)
+        root_pipeline_inputs = self._get_plain_inputs(root_pipeline_id)
+        root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
+        logger.info(
+            "root_pipeline[%s] node(%s) activity rollback data: %s, root inputs: %s",
+            root_pipeline_id,
+            self.node.id,
+            service_data,
+            root_pipeline_inputs,
+        )
+        service = self.runtime.get_service(code=self.node.code, version=self.node.version)
+        try:
+            rollback_success = service.rollback(
+                data=service_data,
+                root_pipeline_data=root_pipeline_data,
+                rollback_data=rollback_data,
+            )
+        except Exception as e:
+            logger.exception("node rollback failed, node_id={}, err={}".format(self.node.id, e))
+            service_data.outputs.ex_data = traceback.format_exc()
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_FAILED,
+            )
+            return
+
+        if rollback_success:
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_SUCCESS,
+            )
+        else:
+            self.runtime.set_state(
+                node_id=self.node.id,
+                version=version,
+                to_state=states.ROLLBACK_FAILED,
             )

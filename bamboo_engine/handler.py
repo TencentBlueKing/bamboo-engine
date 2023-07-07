@@ -13,26 +13,26 @@ specific language governing permissions and limitations under the License.
 
 # 节点处理器逻辑封装模块
 
-from typing import Optional
 from abc import ABCMeta, abstractmethod
+from typing import Optional
 
 from bamboo_engine import states
 
 from .eri import (
-    EngineRuntimeInterface,
-    Node,
-    Schedule,
     CallbackData,
-    ProcessInfo,
-    NodeType,
-    ExecuteResult,
-    ScheduleResult,
+    EngineRuntimeInterface,
     ExecuteInterruptPoint,
+    ExecuteResult,
+    Node,
+    NodeType,
+    ProcessInfo,
+    Schedule,
     ScheduleInterruptPoint,
+    ScheduleResult,
 )
-from .utils.host import get_hostname
+from .exceptions import InvalidOperationError, NotFoundError
 from .interrupt import Interrupter
-from .exceptions import NotFoundError, InvalidOperationError
+from .utils.host import get_hostname
 
 
 def register_handler(type: NodeType):
@@ -147,6 +147,9 @@ class NodeHandler(metaclass=ABCMeta):
 
     def _get_plain_inputs(self, node_id: str):
         return {key: di.value for key, di in self.runtime.get_data_inputs(node_id).items()}
+
+    def rollback(self, root_pipeline_id: str, loop: int, version: str, rollback_data: Optional[CallbackData] = None):
+        pass
 
 
 class HandlerFactory:

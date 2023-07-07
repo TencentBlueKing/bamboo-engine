@@ -11,7 +11,6 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-
 # 引擎内部状态及状态相关数据定义模块
 
 
@@ -29,6 +28,9 @@ class StateType(Enum):
     FINISHED = "FINISHED"
     FAILED = "FAILED"
     REVOKED = "REVOKED"
+    ROLLBACK_SUCCESS = "ROLLBACK_SUCCESS"
+    ROLLBACK_FAILED = "ROLLBACK_FAILED"
+    ROLL_BACKING = "ROLL_BACKING"
 
 
 CREATED = StateType.CREATED.value
@@ -39,8 +41,13 @@ BLOCKED = StateType.BLOCKED.value
 FINISHED = StateType.FINISHED.value
 FAILED = StateType.FAILED.value
 REVOKED = StateType.REVOKED.value
+ROLLBACK_SUCCESS = StateType.ROLLBACK_SUCCESS.value
+ROLLBACK_FAILED = StateType.ROLLBACK_FAILED.value
+ROLL_BACKING = StateType.ROLL_BACKING.value
 
-ALL_STATES = frozenset([READY, RUNNING, SUSPENDED, BLOCKED, FINISHED, FAILED, REVOKED])
+ALL_STATES = frozenset(
+    [READY, RUNNING, SUSPENDED, BLOCKED, FINISHED, FAILED, REVOKED, ROLLBACK_SUCCESS, ROLLBACK_FAILED]
+)
 
 ARCHIVED_STATES = frozenset([FINISHED, FAILED, REVOKED])
 SLEEP_STATES = frozenset([SUSPENDED, REVOKED])
@@ -54,15 +61,17 @@ TRANSITION = ConstantDict(
         RUNNING: frozenset([FINISHED, FAILED, REVOKED, SUSPENDED]),
         SUSPENDED: frozenset([READY, REVOKED, RUNNING]),
         BLOCKED: frozenset([]),
-        FINISHED: frozenset([RUNNING, FAILED]),
+        FINISHED: frozenset([RUNNING, FAILED, ROLL_BACKING]),
         FAILED: frozenset([READY, FINISHED]),
         REVOKED: frozenset([]),
+        ROLL_BACKING: frozenset([ROLLBACK_FAILED, ROLLBACK_SUCCESS]),
+        ROLLBACK_FAILED: frozenset([READY, FINISHED]),
+        ROLLBACK_SUCCESS: frozenset([READY, FINISHED]),
     }
 )
 
 
 def can_transit(from_state, to_state):
-
     if from_state in TRANSITION:
         if to_state in TRANSITION[from_state]:
             return True

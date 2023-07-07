@@ -10,29 +10,28 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-import time
 import logging
+import time
 from typing import Optional
 
 from celery import task
 from celery.decorators import periodic_task
 from celery.schedules import crontab
 from django.conf import settings
+from pipeline.eri.models import LogEntry
+from pipeline.eri.runtime import BambooDjangoRuntime
 
-from bamboo_engine import metrics
-from bamboo_engine.utils.host import get_hostname
-from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
+from bamboo_engine import metrics, states
 from bamboo_engine.engine import Engine
+from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
+from bamboo_engine.handler import HandlerFactory
 from bamboo_engine.interrupt import (
     ExecuteInterrupter,
     ExecuteKeyPoint,
     ScheduleInterrupter,
     ScheduleKeyPoint,
 )
-
-from pipeline.eri.models import LogEntry
-from pipeline.eri.runtime import BambooDjangoRuntime
-
+from bamboo_engine.utils.host import get_hostname
 
 logger = logging.getLogger(__name__)
 
@@ -135,3 +134,27 @@ def clean_expired_log():
 
     del_num = LogEntry.objects.delete_expired_log(expired_interval)
     logger.info("%s log entry are deleted" % del_num)
+
+
+@task(ignore_result=True)
+def rollback(node_id, version, rollback_data_id):
+    runtime = BambooDjangoRuntime()
+    # 设置节点状态为运行时
+    node = runtime.get_node(node_id)
+    state = runtime.get_state(node_id)
+    if not state:
+        logger.info("[rollback] not found state by node_id, node_id={}, version={}".format(node_id, version))
+        return
+
+    runtime.set_state(node_id=node_id, to_state=states.ROLL_BACKING, version=state.version)
+
+    # rollback 不需要中断逻辑，所以不传interrupter即可
+    handler = HandlerFactory.get_handler(node, runtime, None)
+    # get rollback_data
+    rollback_data = runtime.get_callback_data(rollback_data_id)
+    try:
+        # execute rollback
+        handler.rollback(root_pipeline_id=state.root_id, loop=state.loop, version=version, rollback_data=rollback_data)
+    except Exception as err:
+        logger.info("[rollback] rollback error, node_id={}, versio={}, error={}".format(node_id, version, err))
+        runtime.set_state(node_id=node_id, to_state=states.ROLLBACK_FAILED, version=state.version)

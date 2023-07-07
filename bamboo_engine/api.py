@@ -23,10 +23,10 @@ from .context import Context
 from .engine import Engine
 from .eri import ContextValue, EngineRuntimeInterface
 from .eri.models.node import NodeType
+from .exceptions import InvalidOperationError
 from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
 from .utils.object import Representable
-from .exceptions import InvalidOperationError
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -294,6 +294,21 @@ def callback(runtime: EngineRuntimeInterface, node_id: str, version: str, data: 
     :rtype: EngineAPIResult
     """
     Engine(runtime).callback(node_id, version, data)
+
+
+def rollback(runtime: EngineRuntimeInterface, node_id: str, version: str, data: dict) -> EngineAPIResult:
+    """
+    回滚某个节点
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param version: 节点执行版本
+    :param version: str
+    :param data: 节点 ID
+    :type data: dict
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+    Engine(runtime).rollback(node_id, version, data)
 
 
 @_ensure_return_api_result

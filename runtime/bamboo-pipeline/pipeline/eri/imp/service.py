@@ -13,13 +13,13 @@ specific language governing permissions and limitations under the License.
 
 from typing import Optional
 
-from bamboo_engine.eri import Service as ServiceInterface
-from bamboo_engine.eri import Schedule, ExecutionData, CallbackData, ScheduleType
-
-from pipeline.core.flow.activity import Service
 from pipeline.core.data.base import DataObject
+from pipeline.core.flow.activity import Service
 from pipeline.eri.log import get_logger
 from pipeline.eri.signals import pre_service_execute, pre_service_schedule
+
+from bamboo_engine.eri import CallbackData, ExecutionData, Schedule, ScheduleType
+from bamboo_engine.eri import Service as ServiceInterface
 
 
 class ServiceWrapper(ServiceInterface):
@@ -176,3 +176,33 @@ class ServiceWrapper(ServiceInterface):
 
         attrs["logger"] = get_logger(node_id=attrs["id"], loop=attrs["loop"], version=attrs["version"])
         self.service.setup_runtime_attrs(**attrs)
+
+    def rollback(
+        self, data: ExecutionData, root_pipeline_data: ExecutionData, rollback_data: Optional[CallbackData] = None
+    ):
+
+        """
+        回滚逻辑
+        @param data: 任务执行data
+        @param root_pipeline_data: 根流程执行数据
+        @param rollback_data: 回滚数据defaults to None
+        @return:
+        """
+
+        data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
+        parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
+
+        try:
+            rollback_res = self.service.rollback(
+                data_obj, parent_data_obj, rollback_data.data if rollback_data else None
+            )
+        except Exception as e:
+            raise e
+        finally:
+            data.inputs = data_obj.inputs
+            data.outputs = data_obj.outputs
+
+        if rollback_res is None:
+            rollback_res = True
+
+        return rollback_res

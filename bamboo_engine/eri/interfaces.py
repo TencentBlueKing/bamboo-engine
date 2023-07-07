@@ -11,29 +11,29 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from datetime import datetime
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional, Dict, Set, Any, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import (
-    ScheduleInterruptPoint,
-    State,
-    Node,
-    Schedule,
-    ScheduleType,
+    CallbackData,
+    ContextValue,
     Data,
     DataInput,
+    DispatchProcess,
+    ExecuteInterruptEvent,
+    ExecuteInterruptPoint,
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
-    CallbackData,
+    Node,
     ProcessInfo,
-    SuspendedProcessInfo,
-    DispatchProcess,
-    ContextValue,
-    ExecuteInterruptPoint,
-    ExecuteInterruptEvent,
+    Schedule,
     ScheduleInterruptEvent,
+    ScheduleInterruptPoint,
+    ScheduleType,
+    State,
+    SuspendedProcessInfo,
 )
 
 # plugin interface
@@ -83,6 +83,21 @@ class Service(metaclass=ABCMeta):
         :param callback_data: 回调数据, defaults to None
         :type callback_data: Optional[CallbackData], optional
         :return: [description]
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def rollback(
+        self, data: ExecutionData, root_pipeline_data: ExecutionData, callback_data: Optional[CallbackData] = None
+    ) -> bool:
+        """
+        rollback 逻辑
+
+        :param data: 节点执行数据
+        :type data: ExecutionData
+        :param root_pipeline_data: 根流程执行数据
+        :type root_pipeline_data: ExecutionData
+        :return: 是否执行成功
         :rtype: bool
         """
 
@@ -552,6 +567,17 @@ class TaskMixin:
         :type recover_point: Optional[ExecuteInterruptPoint]
         :param headers: 任务头部信息
         :type headers: Optional[dict]
+        """
+
+    def rollback(self, node_id: str, version: str, rollback_data_id: int):
+        """
+        执行回滚任务, 调度任务被拉起时执行时应该执行callback方法
+        @param node_id: 节点ID
+        @type node_id: str
+        @param version: 节点版本
+        @type version: str
+        @param rollback_data_id: 回滚数据ID
+        @type rollback_data_id: int
         """
 
     @abstractmethod
