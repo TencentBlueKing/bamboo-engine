@@ -39,6 +39,10 @@ class QueueResolver:
                 "queue": "er_schedule%s" % suffix,
                 "routing_key": "er_schedule%s" % suffix,
             },
+            "pipeline.eri.celery.tasks.rollback": {
+                "queue": "er_rollback",
+                "routing_key": "er_rollback",
+            },
         }
 
     def queues(self) -> List[Queue]:
