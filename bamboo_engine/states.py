@@ -65,7 +65,7 @@ TRANSITION = ConstantDict(
         FAILED: frozenset([READY, FINISHED]),
         REVOKED: frozenset([]),
         ROLL_BACKING: frozenset([ROLLBACK_FAILED, ROLLBACK_SUCCESS]),
-        ROLLBACK_FAILED: frozenset([READY, FINISHED]),
+        ROLLBACK_FAILED: frozenset([READY, FINISHED, ROLL_BACKING]),
         ROLLBACK_SUCCESS: frozenset([READY, FINISHED]),
     }
 )

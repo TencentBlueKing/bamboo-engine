@@ -27,7 +27,7 @@ class DebugNoScheduleService(Service):
 
 
 class DebugNoScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "debug_no_schedule_node"
     bound_service = DebugNoScheduleService
     form = "index.html"
@@ -62,7 +62,7 @@ class DebugService(Service):
 
 
 class DebugComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "debug_node"
     bound_service = DebugService
     form = "index.html"
@@ -100,7 +100,7 @@ class ScheduleService(Service):
 
 
 class ScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "schedule_node"
     bound_service = ScheduleService
     form = "index.html"
@@ -134,7 +134,7 @@ class SleepTimerService(Service):
             eta = timing
             t = "countdown"
         else:
-            message = u"输入参数%s不符合【秒(s) 或 时间(%%Y-%%m-%%d %%H:%%M:%%S)】格式" % timing
+            message = "输入参数%s不符合【秒(s) 或 时间(%%Y-%%m-%%d %%H:%%M:%%S)】格式" % timing
             data.set_outputs("ex_data", message)
             return False
         data.set_outputs("eta", eta)
@@ -162,7 +162,7 @@ class SleepTimerService(Service):
 
 
 class SleepTimerComponent(Component):
-    name = u"定时"
+    name = "定时"
     code = "sleep_timer"
     bound_service = SleepTimerService
     form = "form.html"
@@ -201,7 +201,7 @@ class LoopCountOutputScheduleService(Service):
 
 
 class LoopCountOutputScheduleComponent(Component):
-    name = u"loop count output component"
+    name = "loop count output component"
     code = "loop_count_s_node"
     bound_service = LoopCountOutputScheduleService
     form = "index.html"
@@ -221,7 +221,7 @@ class LoopCountOutputService(Service):
 
 
 class LoopCountOutputComponent(Component):
-    name = u"loop count output component"
+    name = "loop count output component"
     code = "loop_count_node"
     bound_service = LoopCountOutputService
     form = "index.html"
@@ -245,7 +245,7 @@ class FailAtSecondExecService(Service):
 
 
 class FailAtSecondExecComponent(Component):
-    name = u"fail at second execute component"
+    name = "fail at second execute component"
     code = "fail_at_second_node"
     bound_service = FailAtSecondExecService
     form = "index.html"
@@ -268,7 +268,7 @@ class FailCtrlService(Service):
 
 
 class FailCtrlComponent(Component):
-    name = u"fail control component"
+    name = "fail control component"
     code = "fail_ctrl_node"
     bound_service = FailCtrlService
     form = "index.html"
@@ -313,6 +313,30 @@ class CallbackComponent(Component):
     name = "callback component"
     code = "callback_node"
     bound_service = CallbackService
+    form = "index.html"
+
+
+class RollbackService(Service):
+    def execute(self, data, parent_data):
+        return True
+
+    def rollback(self, data, parent_data, rollback_data):
+        flag = rollback_data.get("bit", 0)
+        flag_map = {
+            0: False,
+            1: True,
+        }
+
+        return flag_map[flag]
+
+    def outputs_format(self):
+        return []
+
+
+class RollbackComponent(Component):
+    name = "rollback component"
+    code = "rollback_node"
+    bound_service = RollbackService
     form = "index.html"
 
 
@@ -396,7 +420,7 @@ class InterruptService(Service):
 
 
 class InterruptComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_test"
     bound_service = InterruptService
     form = "index.html"
@@ -440,7 +464,7 @@ class InterruptScheduleService(Service):
 
 
 class InterruptScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_schedule_test"
     bound_service = InterruptScheduleService
     form = "index.html"
@@ -499,7 +523,7 @@ class InterruptRaiseService(Service):
 
 
 class InterruptScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_raise_test"
     bound_service = InterruptRaiseService
     form = "index.html"
