@@ -69,6 +69,4 @@ class Settings:
 
     EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
 
-    CONDITIONAL_PARALLEL_GATEWAY_EXPR_FUNC = default_expr_func
-
     EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value
