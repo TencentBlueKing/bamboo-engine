@@ -457,9 +457,9 @@ def test_exclusive_gateway_first_strategy_success(recover_point):
     runtime.get_data_inputs = MagicMock(return_value={})
 
     def get_config(config_name):
-        if config_name == RuntimeSettings.EXCLUSIVE_GATEWAY_EXPR_FUNC.value:
+        if config_name == RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC.value:
             return default_expr_func
-        if config_name == RuntimeSettings.EXCLUSIVE_GATEWAY_STRATEGY.value:
+        if config_name == RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY.value:
             return ExclusiveGatewayStrategy.FIRST.value
 
     runtime.get_config = MagicMock(side_effect=get_config)
