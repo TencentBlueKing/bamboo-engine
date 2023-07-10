@@ -109,7 +109,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
             )
 
             try:
-                expr_func = self.runtime.get_config(RuntimeSettings.EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
+                expr_func = self.runtime.get_config(RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
                 result = expr_func(resolved_evaluate, hydrated_context)
                 logger.info(
                     "root_pipeline[%s] node(%s) %s test result: %s",

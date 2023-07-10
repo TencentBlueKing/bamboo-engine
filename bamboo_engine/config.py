@@ -67,6 +67,6 @@ class Settings:
 
     RERUN_INDEX_OFFSET = 0
 
-    EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
+    PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
 
-    EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value
+    PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value

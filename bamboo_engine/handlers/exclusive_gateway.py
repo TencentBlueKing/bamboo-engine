@@ -114,7 +114,7 @@ class ExclusiveGatewayHandler(NodeHandler):
                 hydrated_context,
             )
             try:
-                expr_func = self.runtime.get_config(RuntimeSettings.EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
+                expr_func = self.runtime.get_config(RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
                 result = expr_func(resolved_evaluate, hydrated_context)
                 logger.info(
                     "root_pipeline[%s] node(%s) %s test result: %s",
@@ -124,7 +124,7 @@ class ExclusiveGatewayHandler(NodeHandler):
                     result,
                 )
 
-                strategy = self.runtime.get_config(RuntimeSettings.EXCLUSIVE_GATEWAY_STRATEGY.value)
+                strategy = self.runtime.get_config(RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY.value)
                 # 如果策略是命中第一个，并且result为true, 则直接结束循环
                 if strategy == ExclusiveGatewayStrategy.FIRST.value and result:
                     meet_conditions.append(c.name)

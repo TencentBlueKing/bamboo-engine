@@ -8,7 +8,7 @@ from bamboo_engine.utils.constants import RUNTIME_ALLOWED_CONFIG
 class ConfigMixin:
     def get_config(self, name):
         if name not in RUNTIME_ALLOWED_CONFIG:
-            raise ValueError("unsupported config, name={}".format(name))
+            raise ValueError("unsupported pipeline config, name={}".format(name))
 
         custom_config_value = getattr(settings, name, None)
         if custom_config_value:
