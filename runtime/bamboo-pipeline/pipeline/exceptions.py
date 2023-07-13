@@ -150,6 +150,10 @@ class AttributeValidationError(TagError):
     pass
 
 
+class ConfigValidationError(PipelineError):
+    pass
+
+
 #
 # constant exception
 #
