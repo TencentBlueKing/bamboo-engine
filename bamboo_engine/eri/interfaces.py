@@ -11,29 +11,29 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from datetime import datetime
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional, Dict, Set, Any, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import (
-    ScheduleInterruptPoint,
-    State,
-    Node,
-    Schedule,
-    ScheduleType,
+    CallbackData,
+    ContextValue,
     Data,
     DataInput,
+    DispatchProcess,
+    ExecuteInterruptEvent,
+    ExecuteInterruptPoint,
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
-    CallbackData,
+    Node,
     ProcessInfo,
-    SuspendedProcessInfo,
-    DispatchProcess,
-    ContextValue,
-    ExecuteInterruptPoint,
-    ExecuteInterruptEvent,
+    Schedule,
     ScheduleInterruptEvent,
+    ScheduleInterruptPoint,
+    ScheduleType,
+    State,
+    SuspendedProcessInfo,
 )
 
 # plugin interface
@@ -318,6 +318,14 @@ class EngineAPIHooksMixin:
         :type pipeline_id: str
         """
 
+    def finish_pipeline(self, pipeline_id: str):
+        """
+        pipeline 结束执行的钩子
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        """
+
     def pre_resume_node(self, node_id: str):
         """
         继续节点后执行的钩子
@@ -491,6 +499,109 @@ class EngineAPIHooksMixin:
         子流程重试后执行的钩子
 
         :param node_id: 子流程节点 ID
+        :type node_id: str
+        """
+
+    def pre_execute_node(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
+    ):
+        """
+        节点execute方法执行之前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        """
+
+    def post_execute_node(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
+    ):
+        """
+        节点execute方法执行之后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        """
+
+    def node_execute_fail(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
+    ):
+        """
+        节点execute方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        :param ex_data: 节点异常信息
+        :type root_pipeline_data: str
+        """
+
+    def pre_schedule_node(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
+    ):
+        """
+        节点schedule方法执行之前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        """
+
+    def post_schedule_node(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
+    ):
+        """
+        节点schedule方法执行之后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        """
+
+    def node_schedule_fail(
+        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
+    ):
+        """
+        节点schedule方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param data: 写入节点执行数据的失败信息
+        :type data: ExecutionData
+        :param root_pipeline_data: 写入节点执行数据的失败信息
+        :type root_pipeline_data: ExecutionData
+        :param ex_data: 节点异常信息
+        :type root_pipeline_data: str
+        """
+
+    def leave_node(self, root_pipeline_id: str, node_id: str):
+        """
+        离开节点需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
         :type node_id: str
         """
 
