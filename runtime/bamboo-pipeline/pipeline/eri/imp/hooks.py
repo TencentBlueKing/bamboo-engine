@@ -17,8 +17,6 @@ from pipeline.conf import default_settings
 from pipeline.eri.models import LogEntry
 from pipeline.eri.signals import pipeline_event
 
-from bamboo_engine.eri import ExecutionData
-
 
 class PipelineEvent:
     def __init__(self, event_type, data):
@@ -388,169 +386,53 @@ class HooksMixin:
         """
         self._send_event(PipelineEvent(event_type="post_retry_subprocess", data={"node_id": node_id}))
 
-    def pre_execute_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点execute方法执行之前需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-        self._send_event(
-            PipelineEvent(
-                event_type="pre_execute_node",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                },
-            )
-        )
-
-    def post_execute_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点execute方法执行之后需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-        self._send_event(
-            PipelineEvent(
-                event_type="post_execute_node",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                },
-            )
-        )
-
-    def node_execute_fail(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
-    ):
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
         """
         节点execute方法异常需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
         :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        :param ex_data: 节点异常信息
-        :type root_pipeline_data: str
+        :param ex_data: 异常信息
+        :type ex_data: str
         """
         self._send_event(
             PipelineEvent(
                 event_type="node_execute_fail",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                    "ex_data": ex_data,
-                },
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
             )
         )
 
-    def pre_schedule_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点schedule方法执行之前需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-        self._send_event(
-            PipelineEvent(
-                event_type="pre_schedule_node",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                },
-            )
-        )
-
-    def post_schedule_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点schedule方法执行之后需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-        self._send_event(
-            PipelineEvent(
-                event_type="post_schedule_node",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                },
-            )
-        )
-
-    def node_schedule_fail(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
-    ):
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
         """
         节点schedule方法异常需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
         :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        :param ex_data: 节点异常信息
-        :type root_pipeline_data: str
+        :param ex_data: 异常信息
+        :type ex_data: str
         """
         self._send_event(
             PipelineEvent(
                 event_type="node_schedule_fail",
-                data={
-                    "root_pipeline_id": root_pipeline_id,
-                    "node_id": node_id,
-                    "data": data,
-                    "root_pipeline_data": root_pipeline_data,
-                    "ex_data": data,
-                },
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
             )
         )
 
-    def leave_node(self, root_pipeline_id: str, node_id: str):
+    def enter_node(self, root_pipeline_id: str, node_id: str):
+        """
+        进入节点前
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(event_type="enter_node", data={"root_pipeline_id": root_pipeline_id, "node_id": node_id})
+        )
+
+    def finish_node(self, root_pipeline_id: str, node_id: str):
         """
         离开节点需要执行的钩子
         :param root_pipeline_id: 任务ID
@@ -559,5 +441,5 @@ class HooksMixin:
         :type node_id: str
         """
         self._send_event(
-            PipelineEvent(event_type="leave_node", data={"root_pipeline_id": root_pipeline_id, "node_id": node_id})
+            PipelineEvent(event_type="finish_node", data={"root_pipeline_id": root_pipeline_id, "node_id": node_id})
         )

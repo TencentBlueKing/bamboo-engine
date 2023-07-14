@@ -40,16 +40,16 @@ from .interrupt import (
 )
 from .local import CurrentNodeInfo, clear_node_info, set_node_info
 from .metrics import (
+    ENGINE_EXECUTE_POST_PROCESS_DURATION,
+    ENGINE_EXECUTE_PRE_PROCESS_DURATION,
     ENGINE_NODE_EXECUTE_TIME,
     ENGINE_NODE_SCHEDULE_TIME,
     ENGINE_PROCESS_RUNNING_TIME,
     ENGINE_RUNNING_PROCESSES,
     ENGINE_RUNNING_SCHEDULES,
-    ENGINE_SCHEDULE_RUNNING_TIME,
-    ENGINE_EXECUTE_PRE_PROCESS_DURATION,
-    ENGINE_EXECUTE_POST_PROCESS_DURATION,
-    ENGINE_SCHEDULE_PRE_PROCESS_DURATION,
     ENGINE_SCHEDULE_POST_PROCESS_DURATION,
+    ENGINE_SCHEDULE_PRE_PROCESS_DURATION,
+    ENGINE_SCHEDULE_RUNNING_TIME,
     setup_gauge,
     setup_histogram,
 )
@@ -743,7 +743,9 @@ class Engine:
                         # 设置状态前检测
                         if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
                             logger.info(
-                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",  # noqa
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for"
+                                "exist state",
+                                # noqa
                                 process_info.root_pipeline_id,
                                 node_state.name,
                             )
@@ -808,6 +810,8 @@ class Engine:
                     ENGINE_EXECUTE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                         time.time() - engine_pre_execute_start_at
                     )
+                    # 进入节点
+                    self.runtime.enter_node(root_pipeline_id=root_pipeline_id, node_id=node_id)
                     execute_result = handler.execute(
                         process_info=process_info,
                         loop=loop,
@@ -829,6 +833,10 @@ class Engine:
                 ENGINE_NODE_EXECUTE_TIME.labels(type=type_label, hostname=self._hostname).observe(
                     time.time() - execute_start
                 )
+
+                # 节点运行成功并且不需要进行调度
+                if not execute_result.should_sleep and execute_result.next_node_id != node_id:
+                    self.runtime.finish_node(root_pipeline_id=root_pipeline_id, node_id=node_id)
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -996,7 +1004,9 @@ class Engine:
                 # only retry at multiple calback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type,"
+                        "will not retry to get lock",
+                        # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
@@ -1100,6 +1110,7 @@ class Engine:
 
             if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
+                self.runtime.finish_node(root_pipeline_id, node_id)
                 self.runtime.execute(
                     process_id=process_id,
                     node_id=schedule_result.next_node_id,

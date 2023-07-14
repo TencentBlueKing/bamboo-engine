@@ -233,6 +233,48 @@ class PluginManagerMixin:
         """
 
 
+class EngineRuntimeHooksMixin:
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点execute方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点schedule方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+
+    def enter_node(self, root_pipeline_id: str, node_id: str):
+        """
+        进入节点前
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+    def finish_node(self, root_pipeline_id: str, node_id: str):
+        """
+        离开节点需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+
 class EngineAPIHooksMixin:
     """
     引擎 API 执行时调用的钩子相关接口声明
@@ -499,109 +541,6 @@ class EngineAPIHooksMixin:
         子流程重试后执行的钩子
 
         :param node_id: 子流程节点 ID
-        :type node_id: str
-        """
-
-    def pre_execute_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点execute方法执行之前需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-
-    def post_execute_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点execute方法执行之后需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-
-    def node_execute_fail(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
-    ):
-        """
-        节点execute方法异常需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        :param ex_data: 节点异常信息
-        :type root_pipeline_data: str
-        """
-
-    def pre_schedule_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点schedule方法执行之前需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-
-    def post_schedule_node(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData
-    ):
-        """
-        节点schedule方法执行之后需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        """
-
-    def node_schedule_fail(
-        self, root_pipeline_id: str, node_id: str, data: ExecutionData, root_pipeline_data: ExecutionData, ex_data: str
-    ):
-        """
-        节点schedule方法异常需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
-        :type node_id: str
-        :param data: 写入节点执行数据的失败信息
-        :type data: ExecutionData
-        :param root_pipeline_data: 写入节点执行数据的失败信息
-        :type root_pipeline_data: ExecutionData
-        :param ex_data: 节点异常信息
-        :type root_pipeline_data: str
-        """
-
-    def leave_node(self, root_pipeline_id: str, node_id: str):
-        """
-        离开节点需要执行的钩子
-        :param root_pipeline_id: 任务ID
-        :type node_id: str
-        :param node_id: 节点ID
         :type node_id: str
         """
 
@@ -1585,6 +1524,7 @@ class EventMixin:
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
+    EngineRuntimeHooksMixin,
     TaskMixin,
     ProcessMixin,
     StateMixin,
