@@ -456,7 +456,7 @@ class ServiceActivityHandler(NodeHandler):
             except Exception:
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
-                self.runtime.node_execute_fail(root_pipeline_id, self.node.id, ex_data=traceback.format_exc())
+                self.runtime.node_schedule_fail(root_pipeline_id, self.node.id, ex_data=traceback.format_exc())
             else:
                 is_schedule_done = service.is_schedule_done()
 
