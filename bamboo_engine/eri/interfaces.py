@@ -274,6 +274,14 @@ class EngineRuntimeHooksMixin:
         :type node_id: str
         """
 
+    def finish_pipeline(self, pipeline_id: str):
+        """
+        pipeline 结束执行的钩子
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        """
+
 
 class EngineAPIHooksMixin:
     """
@@ -355,14 +363,6 @@ class EngineAPIHooksMixin:
     def post_resume_pipeline(self, pipeline_id: str):
         """
         继续 pipeline 后执行的钩子
-
-        :param pipeline_id: 流程 ID
-        :type pipeline_id: str
-        """
-
-    def finish_pipeline(self, pipeline_id: str):
-        """
-        pipeline 结束执行的钩子
 
         :param pipeline_id: 流程 ID
         :type pipeline_id: str

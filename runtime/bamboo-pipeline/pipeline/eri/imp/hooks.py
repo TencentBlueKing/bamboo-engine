@@ -100,6 +100,14 @@ class HooksMixin:
         """
         self._send_event(PipelineEvent(event_type="pre_pause_pipeline", data={"pipeline_id": pipeline_id}))
 
+    def finish_pipeline(self, pipeline_id: str):
+        """
+        finish_pipeline 前执行的钩子
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        """
+        self._send_event(PipelineEvent(event_type="finish_pipeline", data={"pipeline_id": pipeline_id}))
+
     def post_pause_pipeline(self, pipeline_id: str):
         """
         暂停 pipeline 后执行的钩子
