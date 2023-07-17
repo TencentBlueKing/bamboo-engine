@@ -11,29 +11,29 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from datetime import datetime
 from abc import ABCMeta, abstractmethod
-from typing import List, Optional, Dict, Set, Any, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import (
-    ScheduleInterruptPoint,
-    State,
-    Node,
-    Schedule,
-    ScheduleType,
+    CallbackData,
+    ContextValue,
     Data,
     DataInput,
+    DispatchProcess,
+    ExecuteInterruptEvent,
+    ExecuteInterruptPoint,
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
-    CallbackData,
+    Node,
     ProcessInfo,
-    SuspendedProcessInfo,
-    DispatchProcess,
-    ContextValue,
-    ExecuteInterruptPoint,
-    ExecuteInterruptEvent,
+    Schedule,
     ScheduleInterruptEvent,
+    ScheduleInterruptPoint,
+    ScheduleType,
+    State,
+    SuspendedProcessInfo,
 )
 
 # plugin interface
@@ -1471,6 +1471,14 @@ class EventMixin:
         """
 
 
+class ConfigMixin:
+    @abstractmethod
+    def get_config(self, name):
+        """
+        获取配置
+        """
+
+
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
@@ -1483,6 +1491,7 @@ class EngineRuntimeInterface(
     DataMixin,
     ExecutionHistoryMixin,
     InterruptMixin,
+    ConfigMixin,
     metaclass=ABCMeta,
 ):
     @abstractmethod

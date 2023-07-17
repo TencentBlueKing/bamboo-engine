@@ -12,35 +12,46 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 from django.conf import settings
 from django.db import transaction
-
-from kombu import Exchange, Queue, Connection
+from kombu import Connection, Exchange, Queue
+from pipeline.eri import codec
+from pipeline.eri.celery.queues import QueueResolver
+from pipeline.eri.imp.config import ConfigMixin
+from pipeline.eri.imp.context import ContextMixin
+from pipeline.eri.imp.data import DataMixin
+from pipeline.eri.imp.event import EventMixin
+from pipeline.eri.imp.execution_history import ExecutionHistoryMixin
+from pipeline.eri.imp.hooks import HooksMixin
+from pipeline.eri.imp.interrupt import InterruptMixin
+from pipeline.eri.imp.node import NodeMixin
+from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
+from pipeline.eri.imp.process import ProcessMixin
+from pipeline.eri.imp.schedule import ScheduleMixin
+from pipeline.eri.imp.state import StateMixin
+from pipeline.eri.imp.task import TaskMixin
+from pipeline.eri.models import (
+    ContextOutputs,
+    ContextValue,
+    Data,
+    ExecutionHistory,
+    LogEntry,
+    Node,
+    Process,
+    State,
+)
+from pipeline.eri.utils import CONTEXT_VALUE_TYPE_MAP, caculate_final_references
 
 from bamboo_engine import states
+from bamboo_engine.eri import (
+    ContextValueType,
+    EngineRuntimeInterface,
+    NodeType,
+    interfaces,
+)
 from bamboo_engine.template import Template
-from bamboo_engine.eri import interfaces
-from bamboo_engine.eri import EngineRuntimeInterface, NodeType, ContextValueType
-
-from pipeline.eri import codec
-from pipeline.eri.utils import caculate_final_references, CONTEXT_VALUE_TYPE_MAP
-from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
-from pipeline.eri.imp.hooks import HooksMixin
-from pipeline.eri.imp.process import ProcessMixin
-from pipeline.eri.imp.node import NodeMixin
-from pipeline.eri.imp.state import StateMixin
-from pipeline.eri.imp.schedule import ScheduleMixin
-from pipeline.eri.imp.data import DataMixin
-from pipeline.eri.imp.context import ContextMixin
-from pipeline.eri.imp.execution_history import ExecutionHistoryMixin
-from pipeline.eri.imp.task import TaskMixin
-from pipeline.eri.imp.interrupt import InterruptMixin
-from pipeline.eri.imp.event import EventMixin
-from pipeline.eri.celery.queues import QueueResolver
-
-from pipeline.eri.models import Node, Data, ContextValue, Process, ContextOutputs, LogEntry, ExecutionHistory, State
 
 
 class BambooDjangoRuntime(
@@ -56,6 +67,7 @@ class BambooDjangoRuntime(
     HooksMixin,
     InterruptMixin,
     EventMixin,
+    ConfigMixin,
     EngineRuntimeInterface,
 ):
 

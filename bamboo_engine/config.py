@@ -10,6 +10,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+from bamboo_engine.utils.constants import ExclusiveGatewayStrategy
+from bamboo_engine.utils.expr import default_expr_func
 
 # 引擎内部配置模块
 
@@ -64,3 +66,7 @@ class Settings:
     MAKO_SANDBOX_IMPORT_MODULES = {}
 
     RERUN_INDEX_OFFSET = 0
+
+    PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
+
+    PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value

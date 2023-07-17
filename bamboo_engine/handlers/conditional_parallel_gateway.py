@@ -17,13 +17,13 @@ from typing import Optional
 
 from pyparsing import ParseException
 
-from bamboo_engine.utils.boolrule import BoolRule
-from bamboo_engine.template.template import Template
-from bamboo_engine.interrupt import ExecuteKeyPoint
-from bamboo_engine import states, metrics
-from bamboo_engine.eri import NodeType, ProcessInfo, ExecuteInterruptPoint
+from bamboo_engine import metrics, states
 from bamboo_engine.context import Context
-from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
+from bamboo_engine.eri import ExecuteInterruptPoint, NodeType, ProcessInfo
+from bamboo_engine.handler import ExecuteResult, NodeHandler, register_handler
+from bamboo_engine.interrupt import ExecuteKeyPoint
+from bamboo_engine.template.template import Template
+from bamboo_engine.utils.constants import RuntimeSettings
 from bamboo_engine.utils.string import transform_escape_char
 
 logger = logging.getLogger("bamboo_engine")
@@ -109,7 +109,8 @@ class ConditionalParallelGatewayHandler(NodeHandler):
             )
 
             try:
-                result = BoolRule(resolved_evaluate).test()
+                expr_func = self.runtime.get_config(RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
+                result = expr_func(resolved_evaluate, hydrated_context)
                 logger.info(
                     "root_pipeline[%s] node(%s) %s test result: %s",
                     root_pipeline_id,
