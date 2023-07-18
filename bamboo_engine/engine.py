@@ -743,9 +743,7 @@ class Engine:
                         # 设置状态前检测
                         if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
                             logger.info(
-                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for"
-                                "exist state",
-                                # noqa
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",  # noqa
                                 process_info.root_pipeline_id,
                                 node_state.name,
                             )
@@ -1004,9 +1002,7 @@ class Engine:
                 # only retry at multiple calback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type,"
-                        "will not retry to get lock",
-                        # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
