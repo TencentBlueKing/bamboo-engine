@@ -256,7 +256,7 @@ class EngineRuntimeHooksMixin:
         :type ex_data: str
         """
 
-    def enter_node(self, root_pipeline_id: str, node_id: str):
+    def node_enter(self, root_pipeline_id: str, node_id: str):
         """
         进入节点前
         :param root_pipeline_id: 任务ID
@@ -265,7 +265,7 @@ class EngineRuntimeHooksMixin:
         :type node_id: str
         """
 
-    def finish_node(self, root_pipeline_id: str, node_id: str):
+    def node_finish(self, root_pipeline_id: str, node_id: str):
         """
         离开节点需要执行的钩子
         :param root_pipeline_id: 任务ID
@@ -274,7 +274,7 @@ class EngineRuntimeHooksMixin:
         :type node_id: str
         """
 
-    def finish_pipeline(self, pipeline_id: str):
+    def pipeline_finish(self, pipeline_id: str):
         """
         pipeline 结束执行的钩子
 

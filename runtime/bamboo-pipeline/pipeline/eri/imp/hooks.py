@@ -54,7 +54,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="pre_prepare_run_pipeline",
+                event_type=self.pre_prepare_run_pipeline.__name__,
                 data={
                     "pipeline": pipeline,
                     "root_pipeline_data": root_pipeline_data,
@@ -81,7 +81,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="post_prepare_run_pipeline",
+                event_type=self.post_prepare_run_pipeline.__name__,
                 data={
                     "pipeline": pipeline,
                     "root_pipeline_data": root_pipeline_data,
@@ -98,15 +98,15 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="pre_pause_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_pause_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
-    def finish_pipeline(self, pipeline_id: str):
+    def pipeline_finish(self, pipeline_id: str):
         """
         finish_pipeline 前执行的钩子
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="finish_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(PipelineEvent(event_type=self.pipeline_finish.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_pause_pipeline(self, pipeline_id: str):
         """
@@ -115,7 +115,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_pause_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(PipelineEvent(event_type=self.post_pause_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def pre_revoke_pipeline(self, pipeline_id: str):
         """
@@ -124,7 +124,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="pre_revoke_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_revoke_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_revoke_pipeline(self, pipeline_id: str):
         """
@@ -133,7 +133,9 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_revoke_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(
+            PipelineEvent(event_type=self.post_revoke_pipeline.__name__, data={"pipeline_id": pipeline_id})
+        )
 
     def pre_resume_pipeline(self, pipeline_id: str):
         """
@@ -142,7 +144,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="pre_resume_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_resume_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_resume_pipeline(self, pipeline_id: str):
         """
@@ -151,7 +153,9 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_resume_pipeline", data={"pipeline_id": pipeline_id}))
+        self._send_event(
+            PipelineEvent(event_type=self.post_resume_pipeline.__name__, data={"pipeline_id": pipeline_id})
+        )
 
     def pre_resume_node(self, node_id: str):
         """
@@ -160,7 +164,7 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_resume_pipeline", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_resume_node.__name__, data={"node_id": node_id}))
 
     def post_resume_node(self, node_id: str):
         """
@@ -169,7 +173,7 @@ class HooksMixin:
         :param node_id: [description]节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_resume_node", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.post_resume_node.__name__, data={"node_id": node_id}))
 
     def pre_pause_node(self, node_id: str):
         """
@@ -178,7 +182,7 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="pre_pause_node", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_pause_node.__name__, data={"node_id": node_id}))
 
     def post_pause_node(self, node_id: str):
         """
@@ -187,7 +191,7 @@ class HooksMixin:
         :param node_id: [description]节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_pause_node", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.post_pause_node.__name__, data={"node_id": node_id}))
 
     def pre_retry_node(self, node_id: str, data: Optional[dict]):
         """
@@ -198,7 +202,9 @@ class HooksMixin:
         :param data: 重试时使用的节点执行输入
         :type data: Optional[dict]
         """
-        self._send_event(PipelineEvent(event_type="pre_retry_node", data={"node_id": node_id}))
+        self._send_event(
+            PipelineEvent(event_type=self.pre_retry_node.__name__, data={"node_id": node_id, "data": data})
+        )
 
     def post_retry_node(self, node_id: str, data: Optional[dict]):
         """
@@ -209,7 +215,9 @@ class HooksMixin:
         :param data: 重试时使用的节点执行输入
         :type data: Optional[dict]
         """
-        self._send_event(PipelineEvent(event_type="post_retry_node", data={"node_id": node_id, "data": data}))
+        self._send_event(
+            PipelineEvent(event_type=self.post_retry_node.__name__, data={"node_id": node_id, "data": data})
+        )
 
     def pre_skip_node(self, node_id: str):
         """
@@ -220,7 +228,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="pre_skip_node",
+                event_type=self.pre_skip_node.__name__,
                 data={
                     "node_id": node_id,
                 },
@@ -236,7 +244,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="post_skip_node",
+                event_type=self.post_skip_node.__name__,
                 data={
                     "node_id": node_id,
                 },
@@ -253,7 +261,9 @@ class HooksMixin:
         :type flow_id: str
         """
         self._send_event(
-            PipelineEvent(event_type="pre_skip_exclusive_gateway", data={"node_id": node_id, "flow_id": flow_id})
+            PipelineEvent(
+                event_type=self.pre_skip_exclusive_gateway.__name__, data={"node_id": node_id, "flow_id": flow_id}
+            )
         )
 
     def post_skip_exclusive_gateway(self, node_id: str, flow_id: str):
@@ -266,7 +276,9 @@ class HooksMixin:
         :type flow_id: str
         """
         self._send_event(
-            PipelineEvent(event_type="post_skip_exclusive_gateway", data={"node_id": node_id, "flow_id": flow_id})
+            PipelineEvent(
+                event_type=self.post_skip_exclusive_gateway.__name__, data={"node_id": node_id, "flow_id": flow_id}
+            )
         )
 
     def pre_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
@@ -282,7 +294,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="pre_skip_conditional_parallel_gateway",
+                event_type=self.pre_skip_conditional_parallel_gateway.__name__,
                 data={"node_id": node_id, "flow_ids": flow_ids, "converge_gateway_id": converge_gateway_id},
             )
         )
@@ -300,7 +312,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="post_skip_conditional_parallel_gateway",
+                event_type=self.post_skip_conditional_parallel_gateway.__name__,
                 data={"node_id": node_id, "flow_ids": flow_ids, "converge_gateway_id": converge_gateway_id},
             )
         )
@@ -316,7 +328,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="pre_forced_fail_activity",
+                event_type=self.pre_forced_fail_activity.__name__,
                 data={
                     "node_id": node_id,
                     "ex_data": ex_data,
@@ -341,7 +353,7 @@ class HooksMixin:
         LogEntry.objects.filter(node_id=node_id, version=old_version).update(version=new_version)
         self._send_event(
             PipelineEvent(
-                event_type="post_forced_fail_activity",
+                event_type=self.post_forced_fail_activity.__name__,
                 data={"node_id": node_id, "ex_data": ex_data, "old_version": old_version, "new_version": new_version},
             )
         )
@@ -358,7 +370,9 @@ class HooksMixin:
         :type data: str
         """
         self._send_event(
-            PipelineEvent(event_type="pre_callback", data={"node_id": node_id, "version": version, "data": data})
+            PipelineEvent(
+                event_type=self.pre_callback.__name__, data={"node_id": node_id, "version": version, "data": data}
+            )
         )
 
     def post_callback(self, node_id: str, version: str, data: str):
@@ -373,7 +387,9 @@ class HooksMixin:
         :type data: str
         """
         self._send_event(
-            PipelineEvent(event_type="post_callback", data={"node_id": node_id, "version": version, "data": data})
+            PipelineEvent(
+                event_type=self.post_callback.__name__, data={"node_id": node_id, "version": version, "data": data}
+            )
         )
 
     def pre_retry_subprocess(self, node_id: str):
@@ -383,7 +399,7 @@ class HooksMixin:
         :param node_id: 子流程节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="pre_retry_subprocess", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.pre_retry_subprocess.__name__, data={"node_id": node_id}))
 
     def post_retry_subprocess(self, node_id: str):
         """
@@ -392,7 +408,7 @@ class HooksMixin:
         :param node_id: 子流程节点 ID
         :type node_id: str
         """
-        self._send_event(PipelineEvent(event_type="post_retry_subprocess", data={"node_id": node_id}))
+        self._send_event(PipelineEvent(event_type=self.post_retry_subprocess.__name__, data={"node_id": node_id}))
 
     def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
         """
@@ -406,7 +422,7 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="node_execute_fail",
+                event_type=self.node_execute_fail.__name__,
                 data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
             )
         )
@@ -423,12 +439,12 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type="node_schedule_fail",
+                event_type=self.node_schedule_fail.__name__,
                 data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
             )
         )
 
-    def enter_node(self, root_pipeline_id: str, node_id: str):
+    def node_enter(self, root_pipeline_id: str, node_id: str):
         """
         进入节点前
         :param root_pipeline_id: 任务ID
@@ -437,10 +453,12 @@ class HooksMixin:
         :type node_id: str
         """
         self._send_event(
-            PipelineEvent(event_type="enter_node", data={"root_pipeline_id": root_pipeline_id, "node_id": node_id})
+            PipelineEvent(
+                event_type=self.node_enter.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
         )
 
-    def finish_node(self, root_pipeline_id: str, node_id: str):
+    def node_finish(self, root_pipeline_id: str, node_id: str):
         """
         离开节点需要执行的钩子
         :param root_pipeline_id: 任务ID
@@ -449,5 +467,7 @@ class HooksMixin:
         :type node_id: str
         """
         self._send_event(
-            PipelineEvent(event_type="finish_node", data={"root_pipeline_id": root_pipeline_id, "node_id": node_id})
+            PipelineEvent(
+                event_type=self.node_finish.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
         )
