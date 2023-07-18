@@ -809,7 +809,7 @@ class Engine:
                         time.time() - engine_pre_execute_start_at
                     )
                     # 进入节点
-                    self.runtime.enter_node(root_pipeline_id=root_pipeline_id, node_id=node_id)
+                    self.runtime.node_enter(root_pipeline_id=root_pipeline_id, node_id=node.id)
                     execute_result = handler.execute(
                         process_info=process_info,
                         loop=loop,
@@ -833,8 +833,8 @@ class Engine:
                 )
 
                 # 节点运行成功并且不需要进行调度
-                if not execute_result.should_sleep and execute_result.next_node_id != node_id:
-                    self.runtime.finish_node(root_pipeline_id=root_pipeline_id, node_id=node_id)
+                if not execute_result.should_sleep and execute_result.next_node_id != node.id:
+                    self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -1106,7 +1106,7 @@ class Engine:
 
             if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
-                self.runtime.finish_node(root_pipeline_id, node_id)
+                self.runtime.node_finish(root_pipeline_id, node.id)
                 self.runtime.execute(
                     process_id=process_id,
                     node_id=schedule_result.next_node_id,

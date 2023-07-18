@@ -156,7 +156,7 @@ class EmptyEndEventHandler(NodeHandler):
 
             # root pipeline finish
             if root_pipeline_finished:
-                self.runtime.finish_pipeline(pipeline_id)
+                self.runtime.pipeline_finish(pipeline_id)
                 return ExecuteResult(
                     should_sleep=False,
                     schedule_ready=False,
