@@ -11,23 +11,22 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import sched
+
 import mock
-from py import process
 import pytest
 from mock import MagicMock
 
-from bamboo_engine.eri import (
-    ProcessInfo,
-    ServiceActivity,
-    State,
-    NodeType,
-    ScheduleType,
-    Schedule,
-    CallbackData,
-)
 from bamboo_engine import states
 from bamboo_engine.engine import Engine
+from bamboo_engine.eri import (
+    CallbackData,
+    NodeType,
+    ProcessInfo,
+    Schedule,
+    ScheduleType,
+    ServiceActivity,
+    State,
+)
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
 from bamboo_engine.handler import ScheduleResult
 from bamboo_engine.interrupt import ScheduleInterrupter, ScheduleKeyPoint
@@ -422,14 +421,13 @@ def test_schedule__has_next_schedule(node_id, state, pi, schedule, node, interru
 
 def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter):
     schedule.type = ScheduleType.POLL
-
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.apply_schedule_lock = MagicMock(return_value=True)
     runtime.get_schedule = MagicMock(return_value=schedule)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_node = MagicMock(return_value=node)
-
+    runtime.node_finish = MagicMock()
     handler = MagicMock()
     handler.schedule = MagicMock(
         return_value=ScheduleResult(
@@ -454,6 +452,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.apply_schedule_lock.assert_called_once_with(schedule.id)
     runtime.schedule.assert_not_called()
     runtime.get_schedule.assert_called_once_with(schedule.id)
+    runtime.node_finish.assert_called_once_with(pi.root_pipeline_id, node.id)
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_callback_data.assert_not_called()
