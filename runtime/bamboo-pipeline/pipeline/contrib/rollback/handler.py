@@ -173,7 +173,7 @@ class RollBackHandler:
         if target_node_state.name != states.FINISHED:
             raise RollBackException("rollback failed: only allows rollback to finished node")
 
-        validate_nodes_list = self.get_allow_rollback_node_id_list()
+        validate_nodes_list = self.get_allowed_rollback_node_id_list()
 
         if self.node_id not in validate_nodes_list:
             raise RollBackException("rollback failed: node is not allow to rollback, node={}".format(self.node_id))
