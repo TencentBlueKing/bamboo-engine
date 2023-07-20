@@ -23,6 +23,10 @@
 ```python
 from pipeline.contrib.rollback import api
 
+# 获取该pipeline允许回滚的节点列表
+# result = api.get_allowed_rollback_node_id_list(pipeline_id)
+# node_ids = result.data
+
 result = api.rollback(pipeline_id, node_id)
 
 if result.result:
