@@ -14,11 +14,11 @@ specific language governing permissions and limitations under the License.
 import logging
 from typing import Optional
 
-from bamboo_engine import states, metrics
+from bamboo_engine import metrics, states
 from bamboo_engine.config import Settings
-from bamboo_engine.eri import ProcessInfo, NodeType, ExecuteInterruptPoint
-from bamboo_engine.handler import register_handler, NodeHandler, ExecuteResult
 from bamboo_engine.context import Context
+from bamboo_engine.eri import ExecuteInterruptPoint, NodeType, ProcessInfo
+from bamboo_engine.handler import ExecuteResult, NodeHandler, register_handler
 from bamboo_engine.template.template import Template
 
 logger = logging.getLogger("bamboo_engine")
@@ -156,6 +156,7 @@ class EmptyEndEventHandler(NodeHandler):
 
             # root pipeline finish
             if root_pipeline_finished:
+                self.runtime.pipeline_finish(pipeline_id)
                 return ExecuteResult(
                     should_sleep=False,
                     schedule_ready=False,

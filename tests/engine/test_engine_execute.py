@@ -11,26 +11,28 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from py import process
-import pytest
 import mock
+import pytest
 from mock import MagicMock, call
 
+from bamboo_engine import states
+from bamboo_engine.engine import Engine
 from bamboo_engine.eri import (
+    DispatchProcess,
+    ExecutionData,
+    NodeType,
     ProcessInfo,
+    Schedule,
+    ScheduleType,
     ServiceActivity,
     State,
-    NodeType,
-    ExecutionData,
-    ScheduleType,
-    Schedule,
-    DispatchProcess,
 )
-from bamboo_engine import states
-from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteInterruptPoint, ExecuteKeyPoint
-from bamboo_engine.engine import Engine
-from bamboo_engine.exceptions import StateVersionNotMatchError
-from bamboo_engine.handler import HandlerFactory, ExecuteResult
+from bamboo_engine.handler import ExecuteResult
+from bamboo_engine.interrupt import (
+    ExecuteInterrupter,
+    ExecuteInterruptPoint,
+    ExecuteKeyPoint,
+)
 
 
 @pytest.fixture
@@ -254,7 +256,6 @@ def test_execute__node_has_suspended_appoint(node_id, pi, interrupter, node, sta
 
     engine = Engine(runtime=runtime)
     engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id, interrupter, {})
-
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
@@ -387,6 +388,7 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, node, state):
     runtime.get_state_or_none = MagicMock(return_value=None)
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_state = MagicMock(return_value=state.version)
+    runtime.node_enter = MagicMock(return_value=None)
 
     handler = MagicMock()
     handler.execute = MagicMock(
@@ -413,6 +415,7 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, node, state):
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
+    runtime.node_enter.assert_called_once_with(root_pipeline_id=pi.root_pipeline_id, node_id=node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
@@ -459,6 +462,7 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, node, state, sch
     runtime.get_state = MagicMock(return_value=state)
     runtime.set_schedule = MagicMock(return_value=schedule)
     runtime.set_state = MagicMock(return_value=state.version)
+    runtime.node_enter = MagicMock(return_value=None)
 
     handler = MagicMock()
     execute_result = ExecuteResult(
@@ -484,6 +488,7 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, node, state, sch
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
+    runtime.node_enter.assert_called_once_with(root_pipeline_id=pi.root_pipeline_id, node_id=node_id)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         to_state=states.RUNNING,

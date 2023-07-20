@@ -13,10 +13,30 @@ specific language governing permissions and limitations under the License.
 
 from typing import Optional
 
+from pipeline.conf import default_settings
 from pipeline.eri.models import LogEntry
+from pipeline.eri.signals import pipeline_event
+
+
+class PipelineEvent:
+    def __init__(self, event_type, data):
+        self.event_type = event_type
+        self.data = data
+
+    def as_dict(self):
+        return {
+            "event_type": self.event_type,
+            "data": self.data,
+        }
 
 
 class HooksMixin:
+    def _send_event(self, event: PipelineEvent):
+        if not default_settings.ENABLE_PIPELINE_EVENT_SIGNALS:
+            return
+
+        pipeline_event.send(sender=HooksMixin, event=event)
+
     def pre_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
     ):
@@ -32,6 +52,17 @@ class HooksMixin:
         :param subprocess_context 子流程预置流程上下文
         :type subprocess_context: dict
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_prepare_run_pipeline.__name__,
+                data={
+                    "pipeline": pipeline,
+                    "root_pipeline_data": root_pipeline_data,
+                    "root_pipeline_context": root_pipeline_context,
+                    "subprocess_context": subprocess_context,
+                },
+            )
+        )
 
     def post_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
@@ -48,6 +79,17 @@ class HooksMixin:
         :param subprocess_context 子流程预置流程上下文
         :type subprocess_context: dict
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_prepare_run_pipeline.__name__,
+                data={
+                    "pipeline": pipeline,
+                    "root_pipeline_data": root_pipeline_data,
+                    "root_pipeline_context": root_pipeline_context,
+                    "subprocess_context": subprocess_context,
+                },
+            )
+        )
 
     def pre_pause_pipeline(self, pipeline_id: str):
         """
@@ -56,6 +98,15 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_pause_pipeline.__name__, data={"pipeline_id": pipeline_id}))
+
+    def pipeline_finish(self, pipeline_id: str):
+        """
+        finish_pipeline 前执行的钩子
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        """
+        self._send_event(PipelineEvent(event_type=self.pipeline_finish.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_pause_pipeline(self, pipeline_id: str):
         """
@@ -64,6 +115,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.post_pause_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def pre_revoke_pipeline(self, pipeline_id: str):
         """
@@ -72,6 +124,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_revoke_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_revoke_pipeline(self, pipeline_id: str):
         """
@@ -80,6 +133,9 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(
+            PipelineEvent(event_type=self.post_revoke_pipeline.__name__, data={"pipeline_id": pipeline_id})
+        )
 
     def pre_resume_pipeline(self, pipeline_id: str):
         """
@@ -88,6 +144,7 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_resume_pipeline.__name__, data={"pipeline_id": pipeline_id}))
 
     def post_resume_pipeline(self, pipeline_id: str):
         """
@@ -96,6 +153,9 @@ class HooksMixin:
         :param pipeline_id: 流程 ID
         :type pipeline_id: str
         """
+        self._send_event(
+            PipelineEvent(event_type=self.post_resume_pipeline.__name__, data={"pipeline_id": pipeline_id})
+        )
 
     def pre_resume_node(self, node_id: str):
         """
@@ -104,6 +164,7 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_resume_node.__name__, data={"node_id": node_id}))
 
     def post_resume_node(self, node_id: str):
         """
@@ -112,6 +173,7 @@ class HooksMixin:
         :param node_id: [description]节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.post_resume_node.__name__, data={"node_id": node_id}))
 
     def pre_pause_node(self, node_id: str):
         """
@@ -120,6 +182,7 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_pause_node.__name__, data={"node_id": node_id}))
 
     def post_pause_node(self, node_id: str):
         """
@@ -128,6 +191,7 @@ class HooksMixin:
         :param node_id: [description]节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.post_pause_node.__name__, data={"node_id": node_id}))
 
     def pre_retry_node(self, node_id: str, data: Optional[dict]):
         """
@@ -138,6 +202,9 @@ class HooksMixin:
         :param data: 重试时使用的节点执行输入
         :type data: Optional[dict]
         """
+        self._send_event(
+            PipelineEvent(event_type=self.pre_retry_node.__name__, data={"node_id": node_id, "data": data})
+        )
 
     def post_retry_node(self, node_id: str, data: Optional[dict]):
         """
@@ -148,6 +215,9 @@ class HooksMixin:
         :param data: 重试时使用的节点执行输入
         :type data: Optional[dict]
         """
+        self._send_event(
+            PipelineEvent(event_type=self.post_retry_node.__name__, data={"node_id": node_id, "data": data})
+        )
 
     def pre_skip_node(self, node_id: str):
         """
@@ -156,6 +226,14 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_skip_node.__name__,
+                data={
+                    "node_id": node_id,
+                },
+            )
+        )
 
     def post_skip_node(self, node_id: str):
         """
@@ -164,6 +242,14 @@ class HooksMixin:
         :param node_id: 节点 ID
         :type node_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_skip_node.__name__,
+                data={
+                    "node_id": node_id,
+                },
+            )
+        )
 
     def pre_skip_exclusive_gateway(self, node_id: str, flow_id: str):
         """
@@ -174,6 +260,11 @@ class HooksMixin:
         :param flow_id: 跳过后选择的目标流 ID
         :type flow_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_skip_exclusive_gateway.__name__, data={"node_id": node_id, "flow_id": flow_id}
+            )
+        )
 
     def post_skip_exclusive_gateway(self, node_id: str, flow_id: str):
         """
@@ -184,6 +275,11 @@ class HooksMixin:
         :param flow_id: 跳过后选择的目标流 ID
         :type flow_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_skip_exclusive_gateway.__name__, data={"node_id": node_id, "flow_id": flow_id}
+            )
+        )
 
     def pre_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
         """
@@ -196,6 +292,12 @@ class HooksMixin:
         :param converge_gateway_id: 目标汇聚网关 ID
         :type converge_gateway_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_skip_conditional_parallel_gateway.__name__,
+                data={"node_id": node_id, "flow_ids": flow_ids, "converge_gateway_id": converge_gateway_id},
+            )
+        )
 
     def post_skip_conditional_parallel_gateway(self, node_id: str, flow_ids: list, converge_gateway_id: str):
         """
@@ -208,6 +310,12 @@ class HooksMixin:
         :param converge_gateway_id: 目标汇聚网关 ID
         :type converge_gateway_id: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_skip_conditional_parallel_gateway.__name__,
+                data={"node_id": node_id, "flow_ids": flow_ids, "converge_gateway_id": converge_gateway_id},
+            )
+        )
 
     def pre_forced_fail_activity(self, node_id: str, ex_data: str):
         """
@@ -218,6 +326,15 @@ class HooksMixin:
         :param ex_data: 写入节点执行数据的失败信息
         :type ex_data: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_forced_fail_activity.__name__,
+                data={
+                    "node_id": node_id,
+                    "ex_data": ex_data,
+                },
+            )
+        )
 
     def post_forced_fail_activity(self, node_id: str, ex_data: str, old_version: str, new_version: str):
         """
@@ -234,6 +351,12 @@ class HooksMixin:
         """
         # 在强制失败刷新版本后更新已经记录的日志的版本
         LogEntry.objects.filter(node_id=node_id, version=old_version).update(version=new_version)
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_forced_fail_activity.__name__,
+                data={"node_id": node_id, "ex_data": ex_data, "old_version": old_version, "new_version": new_version},
+            )
+        )
 
     def pre_callback(self, node_id: str, version: str, data: str):
         """
@@ -246,6 +369,11 @@ class HooksMixin:
         :param data: 回调数据
         :type data: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_callback.__name__, data={"node_id": node_id, "version": version, "data": data}
+            )
+        )
 
     def post_callback(self, node_id: str, version: str, data: str):
         """
@@ -258,6 +386,11 @@ class HooksMixin:
         :param data: 回调数据
         :type data: str
         """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_callback.__name__, data={"node_id": node_id, "version": version, "data": data}
+            )
+        )
 
     def pre_retry_subprocess(self, node_id: str):
         """
@@ -266,6 +399,7 @@ class HooksMixin:
         :param node_id: 子流程节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.pre_retry_subprocess.__name__, data={"node_id": node_id}))
 
     def post_retry_subprocess(self, node_id: str):
         """
@@ -274,3 +408,66 @@ class HooksMixin:
         :param node_id: 子流程节点 ID
         :type node_id: str
         """
+        self._send_event(PipelineEvent(event_type=self.post_retry_subprocess.__name__, data={"node_id": node_id}))
+
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点execute方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_execute_fail.__name__,
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
+            )
+        )
+
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点schedule方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_schedule_fail.__name__,
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
+            )
+        )
+
+    def node_enter(self, root_pipeline_id: str, node_id: str):
+        """
+        进入节点前
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_enter.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )
+
+    def node_finish(self, root_pipeline_id: str, node_id: str):
+        """
+        离开节点需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_finish.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )
