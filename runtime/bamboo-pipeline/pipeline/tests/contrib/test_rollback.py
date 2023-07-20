@@ -13,24 +13,22 @@ specific language governing permissions and limitations under the License.
 import json
 
 import mock
-from mock.mock import MagicMock
-
-from bamboo_engine import states
-from bamboo_engine.utils.string import unique_id
 from django.test import TestCase
 from django.utils import timezone
-
+from mock.mock import MagicMock
 from pipeline.contrib.rollback import api
 from pipeline.contrib.rollback.handler import RollBackHandler
 from pipeline.core.constants import PE
-from pipeline.eri.models import Process, State, Node
+from pipeline.eri.models import Node, Process, State
+
+from bamboo_engine import states
+from bamboo_engine.utils.string import unique_id
 
 forced_fail_activity_mock = MagicMock()
 forced_fail_activity_mock.result = True
 
 
 class TestRollBackBase(TestCase):
-
     def setUp(self) -> None:
         self.started_time = timezone.now()
         self.archived_time = timezone.now()
@@ -74,46 +72,37 @@ class TestRollBackBase(TestCase):
         node_id_1_detail = {
             "id": "n0be4eaa13413f9184863776255312f1",
             "type": PE.ParallelGateway,
-            "targets": {
-                "l7895e18cd7c33b198d56534ca332227": node_id_2
-            },
+            "targets": {"l7895e18cd7c33b198d56534ca332227": node_id_2},
             "root_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
             "parent_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
             "can_skip": True,
             "code": "bk_display",
             "version": "v1.0",
             "error_ignorable": True,
-            "can_retry": True
+            "can_retry": True,
         }
 
-        Node.objects.create(
-            node_id=node_id_1,
-            detail=json.dumps(node_id_1_detail)
-        )
+        Node.objects.create(node_id=node_id_1, detail=json.dumps(node_id_1_detail))
 
         node_id_2_detail = {
             "id": "n0be4eaa13413f9184863776255312f1",
             "type": PE.ParallelGateway,
-            "targets": {
-                "l7895e18cd7c33b198d56534ca332227": unique_id("n")
-            },
+            "targets": {"l7895e18cd7c33b198d56534ca332227": unique_id("n")},
             "root_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
             "parent_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
             "can_skip": True,
             "code": "bk_display",
             "version": "v1.0",
             "error_ignorable": True,
-            "can_retry": True
+            "can_retry": True,
         }
 
-        Node.objects.create(
-            node_id=node_id_2,
-            detail=json.dumps(node_id_2_detail)
-        )
+        Node.objects.create(node_id=node_id_2, detail=json.dumps(node_id_2_detail))
 
         # pipeline_id 非running的情况下会异常
         message = "rollback failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
-            pipeline_id)
+            pipeline_id
+        )
         result = api.rollback(pipeline_id, pipeline_id)
         self.assertFalse(result.result)
         self.assertEqual(str(result.exc), message)
@@ -139,7 +128,7 @@ class TestRollBackBase(TestCase):
             parent_id=-1,
             current_node_id=node_id_2,
             pipeline_stack=json.dumps([pipeline_id]),
-            priority=1
+            priority=1,
         )
 
         result = api.rollback(pipeline_id, node_id_1)
@@ -158,80 +147,125 @@ class TestRollBackBase(TestCase):
             "node_1": {
                 "id": "node_1",
                 "type": "EmptyStartEvent",
-                "targets": {
-                    "n": "node_2"
-                },
+                "targets": {"n": "node_2"},
             },
             "node_2": {
                 "id": "node_2",
                 "type": "ServiceActivity",
-                "targets": {
-                    "n": "node_3"
-                },
+                "targets": {"n": "node_3"},
             },
             "node_3": {
                 "id": "node_3",
                 "type": "ServiceActivity",
-                "targets": {
-                    "n": "node_4"
-                },
+                "targets": {"n": "node_4"},
             },
             "node_4": {
                 "id": "node_4",
                 "type": "ParallelGateway",
-                "targets": {
-                    "n": "node_5",
-                    "n1": "node_6"
-                },
-                "converge_gateway_id": "node_7"
+                "targets": {"n": "node_5", "n1": "node_6"},
+                "converge_gateway_id": "node_7",
             },
             "node_5": {
                 "id": "node_5",
                 "type": "ServiceActivity",
-                "targets": {
-                    "n": "node_7"
-                },
+                "targets": {"n": "node_7"},
             },
             "node_6": {
                 "id": "node_6",
                 "type": "ServiceActivity",
-                "targets": {
-                    "n": "node_7"
-                },
+                "targets": {"n": "node_7"},
             },
             "node_7": {
                 "id": "node_7",
                 "type": "ConvergeGateway",
-                "targets": {
-                    "n": "node_8"
-                },
+                "targets": {"n": "node_8"},
             },
             "node_8": {
                 "id": "node_8",
                 "type": "ExclusiveGateway",
-                "targets": {
-                    "n1": "node_13",
-                    "n2": "node_9",
-                    "n3": "node_3"
-                },
+                "targets": {"n1": "node_13", "n2": "node_9", "n3": "node_3"},
             },
             "node_9": {
                 "id": "node_9",
                 "type": "ServiceActivity",
-                "targets": {
-                    "n": "node_10"
-                },
+                "targets": {"n": "node_10"},
             },
             "node_10": {
                 "id": "node_10",
                 "type": "ExclusiveGateway",
-                "targets": {
-                    "n": "node_11",
-                    "n2": "node_12"
-                },
-            }
+                "targets": {"n": "node_11", "n2": "node_12"},
+            },
         }
-        node_id = 'node_1'
+        node_id = "node_1"
 
         nodes = RollBackHandler("p", node_map)._compute_validate_nodes(node_id, node_map)
-        self.assertListEqual(nodes, ['node_2', 'node_3', 'node_9'])
+        self.assertListEqual(nodes, ["node_2", "node_3", "node_9"])
+
+    def test_get_allowed_rollback_node_id_list(self):
+        pipeline_id = unique_id("n")
+
+        State.objects.create(
+            node_id=pipeline_id,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.RUNNING,
+            version=unique_id("v"),
+            started_time=self.started_time,
+            archived_time=self.archived_time,
+        )
+
+        node_id_1 = unique_id("n")
+        node_id_2 = unique_id("n")
+        State.objects.create(
+            node_id=node_id_1,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.FINISHED,
+            version=unique_id("v"),
+            started_time=self.started_time,
+            archived_time=self.archived_time,
+        )
+
+        State.objects.create(
+            node_id=node_id_2,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.RUNNING,
+            version=unique_id("v"),
+            started_time=self.started_time,
+            archived_time=self.archived_time,
+        )
+
+        node_id_1_detail = {
+            "id": "n0be4eaa13413f9184863776255312f1",
+            "type": PE.ServiceActivity,
+            "targets": {"l7895e18cd7c33b198d56534ca332227": node_id_2},
+            "root_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
+            "parent_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        Node.objects.create(node_id=node_id_1, detail=json.dumps(node_id_1_detail))
+
+        node_id_2_detail = {
+            "id": "n0be4eaa13413f9184863776255312f1",
+            "type": PE.ServiceActivity,
+            "targets": {"l7895e18cd7c33b198d56534ca332227": unique_id("n")},
+            "root_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
+            "parent_pipeline_id": "n3369d7ce884357f987af1631bda69cb",
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        Node.objects.create(node_id=node_id_2, detail=json.dumps(node_id_2_detail))
+
+        result = api.get_allowed_rollback_node_id_list(pipeline_id)
+        self.assertEqual(result.result, True)
+        self.assertEqual(result.data, [node_id_1])

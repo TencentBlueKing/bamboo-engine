@@ -14,21 +14,24 @@ specific language governing permissions and limitations under the License.
 import json
 
 from django.db import transaction
+from pipeline.contrib.exceptions import RollBackException
 from pipeline.core.constants import PE
-from pipeline.eri.models import Process, ExecutionHistory, ExecutionData, CallbackData
-from bamboo_engine import api
-from bamboo_engine import states
-from pipeline.eri.models import State
-from pipeline.eri.models import Node
-from pipeline.eri.models import Schedule
-from pipeline.eri.models import LogEntry
+from pipeline.eri.models import (
+    CallbackData,
+    ExecutionData,
+    ExecutionHistory,
+    LogEntry,
+    Node,
+    Process,
+    Schedule,
+    State,
+)
 from pipeline.eri.runtime import BambooDjangoRuntime
 
-from pipeline.contrib.exceptions import RollBackException
+from bamboo_engine import api, states
 
 
 class RollBackHandler:
-
     def __init__(self, root_pipeline_id, node_id):
         self.root_pipeline_id = root_pipeline_id
         self.node_id = node_id
@@ -77,7 +80,8 @@ class RollBackHandler:
         """
         # 获取当前正在运行的节点
         state_list = State.objects.filter(root_id=self.root_pipeline_id, name=states.RUNNING).exclude(
-            node_id=self.root_pipeline_id)
+            node_id=self.root_pipeline_id
+        )
         for state in state_list:
             # 强制失败这些节点
             result = api.forced_fail_activity(self.runtime, node_id=state.node_id, ex_data="")
@@ -110,11 +114,41 @@ class RollBackHandler:
         ExecutionData.objects.filter(node_id__in=need_clean_node_id_list).delete()
         CallbackData.objects.filter(node_id__in=need_clean_node_id_list).delete()
 
+    def get_allowed_rollback_node_id_list(self):
+        """
+        获取允许回退的节点id列表
+        """
+        # 不需要遍历整颗树，获取到现在已经执行成功的所有列表
+        finished_node_id_list = (
+            State.objects.filter(root_id=self.root_pipeline_id, name=states.FINISHED)
+            .exclude(node_id=self.root_pipeline_id)
+            .values_list("node_id", flat=True)
+        )
+
+        # 获取到除pipeline节点之外第一个被创建的节点，此时是开始节点
+        start_node_state = (
+            State.objects.filter(root_id=self.root_pipeline_id)
+            .exclude(node_id=self.root_pipeline_id)
+            .order_by("created_time")
+            .first()
+        )
+
+        # 获取到所有当前已经运行完节点的详情
+        node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
+        # 获取node_id 到 node_detail的映射
+        node_map = {n.node_id: json.loads(n.detail) for n in node_detail_list}
+
+        # 计算当前允许跳过的合法的节点
+        validate_nodes_list = self._compute_validate_nodes(start_node_state.node_id, node_map)
+
+        return validate_nodes_list
+
     def rollback(self):
         pipeline_state = State.objects.filter(node_id=self.root_pipeline_id).first()
         if not pipeline_state:
             raise RollBackException(
-                "rollback failed: pipeline state not exist, pipeline_id={}".format(self.root_pipeline_id))
+                "rollback failed: pipeline state not exist, pipeline_id={}".format(self.root_pipeline_id)
+            )
 
         if pipeline_state.name != states.RUNNING:
             raise RollBackException(
@@ -139,25 +173,7 @@ class RollBackHandler:
         if target_node_state.name != states.FINISHED:
             raise RollBackException("rollback failed: only allows rollback to finished node")
 
-        # 不需要遍历整颗树，获取到现在已经执行成功的所有列表
-        finished_node_id_list = (
-            State.objects.filter(root_id=self.root_pipeline_id, name="FINISHED")
-            .exclude(node_id=self.root_pipeline_id)
-            .values_list("node_id", flat=True)
-        )
-
-        # 获取到除pipeline节点之外第一个被创建的节点，此时是开始节点
-        start_node_state = (
-            State.objects.filter(root_id=self.root_pipeline_id).exclude(node_id=self.root_pipeline_id).order_by(
-                "created_time").first()
-        )
-
-        # 获取到所有当前已经运行完节点的详情
-        node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
-        # 获取node_id 到 node_detail的映射
-        node_map = {n.node_id: json.loads(n.detail) for n in node_detail_list}
-        # 计算当前允许跳过的合法的节点
-        validate_nodes_list = self._compute_validate_nodes(start_node_state.node_id, node_map)
+        validate_nodes_list = self.get_allow_rollback_node_id_list()
 
         if self.node_id not in validate_nodes_list:
             raise RollBackException("rollback failed: node is not allow to rollback, node={}".format(self.node_id))
