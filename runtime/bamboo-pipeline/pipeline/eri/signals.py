@@ -18,3 +18,5 @@ execute_interrupt = Signal(providing_args=["event"])
 schedule_interrupt = Signal(providing_args=["event"])
 pre_service_execute = Signal(providing_args=["service", "data", "parent_data"])
 pre_service_schedule = Signal(providing_args=["service", "data", "parent_data", "callback_data"])
+
+pipeline_event = Signal(providing_args=["event"])

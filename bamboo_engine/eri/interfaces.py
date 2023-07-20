@@ -233,6 +233,56 @@ class PluginManagerMixin:
         """
 
 
+class EngineRuntimeHooksMixin:
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点execute方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点schedule方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+
+    def node_enter(self, root_pipeline_id: str, node_id: str):
+        """
+        进入节点前
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+    def node_finish(self, root_pipeline_id: str, node_id: str):
+        """
+        离开节点需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+    def pipeline_finish(self, pipeline_id: str):
+        """
+        pipeline 结束执行的钩子
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        """
+
+
 class EngineAPIHooksMixin:
     """
     引擎 API 执行时调用的钩子相关接口声明
@@ -1482,6 +1532,7 @@ class ConfigMixin:
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
+    EngineRuntimeHooksMixin,
     TaskMixin,
     ProcessMixin,
     StateMixin,

@@ -15,37 +15,36 @@ import logging
 import traceback
 from typing import Optional
 
-from bamboo_engine import states, metrics
+from bamboo_engine import metrics, states
 from bamboo_engine.config import Settings
-
 from bamboo_engine.context import Context
-from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
-from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
-from bamboo_engine.metrics import (
-    ENGINE_SCHEDULE_FAILED_COUNT,
-    ENGINE_EXECUTE_FAILED_COUNT,
-    ENGINE_EXECUTE_EXCEPTION_COUNT,
-    ENGINE_SCHEDULE_EXCEPTION_COUNT,
-)
-from bamboo_engine.template import Template
 from bamboo_engine.eri import (
-    ProcessInfo,
+    CallbackData,
     ContextValue,
     ContextValueType,
-    ExecutionData,
-    CallbackData,
-    ScheduleType,
-    NodeType,
-    Schedule,
     ExecuteInterruptPoint,
+    ExecutionData,
     FancyDict,
+    NodeType,
+    ProcessInfo,
+    Schedule,
+    ScheduleType,
 )
+from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
 from bamboo_engine.handler import (
-    register_handler,
-    NodeHandler,
     ExecuteResult,
+    NodeHandler,
     ScheduleResult,
+    register_handler,
 )
+from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
+from bamboo_engine.metrics import (
+    ENGINE_EXECUTE_EXCEPTION_COUNT,
+    ENGINE_EXECUTE_FAILED_COUNT,
+    ENGINE_SCHEDULE_EXCEPTION_COUNT,
+    ENGINE_SCHEDULE_FAILED_COUNT,
+)
+from bamboo_engine.template import Template
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -234,6 +233,7 @@ class ServiceActivityHandler(NodeHandler):
                 ex_data = traceback.format_exc()
                 service_data.outputs.ex_data = ex_data
                 logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
+                self.runtime.node_execute_fail(root_pipeline_id, self.node.id, ex_data=ex_data)
             logger.debug("root_pipeline[%s] service data after execute: %s", root_pipeline_id, service_data)
 
         if not execute_success:
@@ -456,6 +456,7 @@ class ServiceActivityHandler(NodeHandler):
             except Exception:
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
+                self.runtime.node_schedule_fail(root_pipeline_id, self.node.id, ex_data=traceback.format_exc())
             else:
                 is_schedule_done = service.is_schedule_done()
 
