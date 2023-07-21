@@ -37,7 +37,7 @@ class ERIConfig(AppConfig):
 
             # 是否校验
             pipeline_exclusive_gateway_expr_func_check = getattr(
-                settings, "PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC_CHECK", False
+                settings, "PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC_CHECK", True
             )
             if not pipeline_exclusive_gateway_expr_func_check:
                 # 获取校验文本
