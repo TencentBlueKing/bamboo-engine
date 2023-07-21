@@ -19,6 +19,15 @@
 
 ### 使用事例:
 
+查询可以回退的节点列表:
+```python
+from pipeline.contrib.rollback import api
+
+# 获取该pipeline允许回滚的节点列表
+result = api.get_allowed_rollback_node_id_list(pipeline_id)
+node_ids = result.data
+```
+
 节点的回退使用非常简单，只需要指定pipeline_id和node_id即可，如下所示:
 ```python
 from pipeline.contrib.rollback import api

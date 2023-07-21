@@ -25,3 +25,8 @@ def rollback(root_pipeline_id: str, node_id: str):
     只允许回退到已经执行过的节点
     """
     RollBackHandler(root_pipeline_id, node_id).rollback()
+
+
+@ensure_return_pipeline_contrib_api_result
+def get_allowed_rollback_node_id_list(root_pipeline_id: str):
+    return RollBackHandler(root_pipeline_id, None).get_allowed_rollback_node_id_list()
