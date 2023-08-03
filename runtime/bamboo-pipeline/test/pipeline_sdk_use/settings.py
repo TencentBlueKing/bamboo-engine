@@ -59,6 +59,7 @@ INSTALLED_APPS = (
     "pipeline.variable_framework",
     "pipeline.django_signal_valve",
     "pipeline.contrib.periodic_task",
+    "pipeline.contrib.node_timeout",
     "django_celery_beat",
     "pipeline_test_use",
     "variable_app",

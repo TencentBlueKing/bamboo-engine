@@ -43,6 +43,7 @@ bamboo-engine 是一个通用的流程引擎，他可以解析，执行，调度
     - [流程回退](./docs/user_guide/rollback.md)
     - [重置某个异常节点的输出](./docs/user_guide/update_node_output.md)
     - [设置](./docs/user_guide/settings.md)
+    - [增强包 - 节点超时功能](./docs/user_guide/node_timeout_introduction.md)
 
 
 ## 整体设计
