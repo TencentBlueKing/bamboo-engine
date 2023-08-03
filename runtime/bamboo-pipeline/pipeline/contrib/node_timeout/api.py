@@ -25,4 +25,10 @@ def apply_node_timout_configs(pipeline_tree: dict, configs: dict):
 
 
 def batch_create_node_timeout_config(root_pipeline_id: str, pipeline_tree: dict):
+    """
+    批量创建节点超时配置
+    :param root_pipeline_id: pipeline root ID
+    :param pipeline_tree: pipeline_tree
+    :return: 节点超时配置数据插入结果，e.g. {"result": True, "data": objs, "message": ""}
+    """
     return TimeoutNodeConfig.objects.batch_create_node_timeout_config(root_pipeline_id, pipeline_tree)
