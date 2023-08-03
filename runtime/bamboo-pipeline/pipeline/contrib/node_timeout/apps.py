@@ -19,7 +19,7 @@ class NodeTimeoutConfig(AppConfig):
     verbose_name = "PipelineNodeTimeout"
 
     def ready(self):
-        from pipeline.contrib.node_timeout.tasks import dispatch_timeout_nodes, execute_node_timeout_strategy # noqa
+        from pipeline.contrib.node_timeout.tasks import dispatch_timeout_nodes, execute_node_timeout_strategy  # noqa
 
         if not hasattr(settings, "redis_inst"):
             raise Exception("Django Settings should have redis_inst attribute")

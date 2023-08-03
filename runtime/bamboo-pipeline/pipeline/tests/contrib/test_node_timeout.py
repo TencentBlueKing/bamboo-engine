@@ -14,6 +14,8 @@ import json
 from mock import patch, MagicMock, call
 
 from django.test import TestCase
+
+from pipeline.contrib.node_timeout.handlers import node_timeout_handler
 from pipeline.eri.models import Process, State
 
 from pipeline.contrib.node_timeout.tasks import dispatch_timeout_nodes, execute_node_timeout_strategy
@@ -29,6 +31,11 @@ class NodeTimeoutTaskTestCase(TestCase):
         self.mock_handler = MagicMock()
         self.mock_handler.deal_with_timeout_node = MagicMock(return_value={"result": True, "message": "success"})
         self.node_timeout_settings = {self.action: self.mock_handler}
+        self.pipeline_tree = {}
+        self.parsed_configs = [
+            {"action": "forced_fail", "node_id": "act_1", "timeout": 2},
+            {"action": "forced_fail_and_skip", "node_id": "act_2", "timeout": 2},
+        ]
 
     def test_dispatch_timeout_nodes(self):
         mock_node_timeout_executor = MagicMock()
@@ -118,6 +125,60 @@ class NodeTimeoutTaskTestCase(TestCase):
             }
         }
         parse_configs = [{"action": "forced_fail_and_skip", "node_id": "act_2", "timeout": 2}]
-        parse_result =  TimeoutNodeConfig.objects.parse_node_timeout_configs(pipeline_tree)
+        parse_result = TimeoutNodeConfig.objects.parse_node_timeout_configs(pipeline_tree)
         self.assertEqual(parse_result["result"], True)
         self.assertEqual(parse_result["data"], parse_configs)
+
+    def test_batch_create_node_time_config_success(self):
+        config_parse_result = {"result": True, "data": self.parsed_configs, "message": ""}
+        with patch(
+            "pipeline.contrib.node_timeout.models.TimeoutNodeConfig.objects.parse_node_timeout_configs",
+            MagicMock(return_value=config_parse_result),
+        ):
+            TimeoutNodeConfig.objects.batch_create_node_timeout_config(self.root_pipeline_id, self.pipeline_tree)
+            config_count = len(TimeoutNodeConfig.objects.all())
+            self.assertEqual(config_count, 2)
+
+    def test_batch_create_node_time_config_fail(self):
+        config_parse_result = {"result": False, "data": "", "message": "test fail"}
+        with patch(
+            "pipeline.contrib.node_timeout.models.TimeoutNodeConfig.objects.parse_node_timeout_configs",
+            MagicMock(return_value=config_parse_result),
+        ):
+            TimeoutNodeConfig.objects.batch_create_node_timeout_config(self.root_pipeline_id, self.pipeline_tree)
+            config_count = TimeoutNodeConfig.objects.count()
+            self.assertEqual(config_count, 0)
+
+    def test_forced_fail_strategy(self):
+        bamboo_engine_api = MagicMock()
+        result = MagicMock()
+        result.result = True
+        bamboo_engine_api.forced_fail_activity = MagicMock(return_value=result)
+        node_id = "node_id"
+        handler = node_timeout_handler["forced_fail"]
+        with patch("pipeline.contrib.node_timeout.handlers.bamboo_engine_api", bamboo_engine_api):
+            result = handler.deal_with_timeout_node(node_id)
+            self.assertEqual(result["result"], True)
+
+    def test_forced_fail_and_skip_strategy_failed(self):
+        bamboo_engine_api = MagicMock()
+        result = MagicMock()
+        result.result = False
+        bamboo_engine_api.forced_fail_activity = MagicMock(return_value=result)
+        node_id = "node_id"
+        handler = node_timeout_handler["forced_fail_and_skip"]
+        with patch("pipeline.contrib.node_timeout.handlers.bamboo_engine_api", bamboo_engine_api):
+            result = handler.deal_with_timeout_node(node_id)
+            self.assertEqual(result["result"], False)
+
+    def test_forced_fail_and_skip_strategy_success(self):
+        bamboo_engine_api = MagicMock()
+        result = MagicMock()
+        result.result = True
+        bamboo_engine_api.forced_fail_activity = MagicMock(return_value=result)
+        bamboo_engine_api.skip_node = MagicMock(return_value=result)
+        node_id = "node_id"
+        handler = node_timeout_handler["forced_fail_and_skip"]
+        with patch("pipeline.contrib.node_timeout.handlers.bamboo_engine_api", bamboo_engine_api):
+            result = handler.deal_with_timeout_node(node_id)
+            self.assertEqual(result["result"], True)

@@ -16,7 +16,6 @@ from django.contrib import admin
 from pipeline.contrib.node_timeout import models
 
 
-
 @admin.register(models.TimeoutNodeConfig)
 class TimeoutNodeConfigAdmin(admin.ModelAdmin):
     list_display = ["root_pipeline_id", "node_id", "timeout"]

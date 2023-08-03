@@ -47,7 +47,6 @@ class TimeoutNodeConfigManager(models.Manager):
                 configs.append({"action": action, "node_id": act_id, "timeout": timeout_seconds})
         return {"result": True, "data": configs, "message": ""}
 
-
     def batch_create_node_timeout_config(self, root_pipeline_id: str, pipeline_tree: dict):
         """批量创建节点超时配置"""
 
@@ -70,6 +69,7 @@ class TimeoutNodeConfigManager(models.Manager):
         ]
         objs = self.bulk_create(config_objs, batch_size=1000)
         return {"result": True, "data": objs, "message": ""}
+
 
 class TimeoutNodeConfig(models.Model):
     root_pipeline_id = models.CharField(verbose_name="root pipeline id", max_length=64)
