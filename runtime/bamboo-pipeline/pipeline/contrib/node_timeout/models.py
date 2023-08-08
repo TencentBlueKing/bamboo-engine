@@ -38,10 +38,10 @@ class TimeoutNodeConfigManager(models.Manager):
                 timeout_seconds = timeout_config.get("seconds")
                 action = timeout_config.get("action")
                 if not timeout_seconds or not isinstance(timeout_seconds, int):
-                    message = _(
-                        f"节点执行失败: 节点[ID: {act_id}]配置了非法的超时时间: {timeout_seconds}, 请修改配置后重试 | parse_node_timeout_configs"
+                    logger.error(
+                        f"[parse_node_timeout_configs] node [{act_id}] timeout "
+                        f"config seconds [{timeout_seconds}] is invalid"
                     )
-                    logger.error(message)
                     # 对于不符合格式要求的情况，则不设置对应超时时间
                     continue
                 configs.append({"action": action, "node_id": act_id, "timeout": timeout_seconds})

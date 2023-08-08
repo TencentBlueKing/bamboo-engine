@@ -27,7 +27,7 @@
         :return: 插入了节点超时配置的新 pipeline_tree
         """
     ```
-    例如，创建一个超时时间为 10 分钟，超时处理方式为强制失败节点的超时配置，可以这样写：
+    例如，创建一个超时时间为 10 秒钟，超时处理方式为强制失败节点的超时配置，可以这样写：
     ```python
     pipeline_tree = {}  # 此处省略 pipeline_tree 的创建过程
     configs = {"node_id": {"enable": True, "action": "forced_fail", "seconds": 10}}
@@ -68,7 +68,7 @@ from pipeline.contrib.node_timeout.handlers import node_timeout_handler
 PIPELINE_NODE_TIMEOUT_HANDLER = node_timeout_handler  # 节点超时处理器配置字典，key 为对应的配置 action，value 为对应的处理器，需继承 NodeTimeoutStrategy 并实现接口
 PIPELINE_NODE_TIMEOUT_HANDLE_QUEUE = None  # 节点超时处理队列名称, 用于处理超时节点， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
 PIPELINE_NODE_TIMEOUT_DISPATCH_QUEUE = None  # 节点超时记录分发队列名称, 用于记录超时节点， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
-PIPELINE_NODE_TIMEOUT_EXECUTING_POOL = "executing_node_pool"  # 执行节点池名称，用于记录正在执行的节点，需要保证 Redis key 唯一
+PIPELINE_NODE_TIMEOUT_EXECUTING_POOL = "executing_node_pool"  # 执行节点池名称，用于记录正在执行的节点，需要保证 Redis key 唯一，命名示例: {app_code}:{app_env}:{module}:executing_node_pool
 ```
 
 ## 使用样例

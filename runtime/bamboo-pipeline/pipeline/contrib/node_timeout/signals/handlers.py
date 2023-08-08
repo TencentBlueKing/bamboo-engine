@@ -28,10 +28,10 @@ def _node_timeout_info_update(redis_inst, to_state, node_id, version):
     key = f"{node_id}_{version}"
     if to_state == bamboo_engine_states.RUNNING:
         now = datetime.datetime.now()
-        timeout_qs = TimeoutNodeConfig.objects.filter(node_id=node_id).only("timeout")
-        if not timeout_qs:
+        timeout_node_config = TimeoutNodeConfig.objects.filter(node_id=node_id).only("timeout").first()
+        if not timeout_node_config:
             return
-        timeout_time = (now + datetime.timedelta(seconds=timeout_qs[0].timeout)).timestamp()
+        timeout_time = (now + datetime.timedelta(seconds=timeout_node_config.timeout)).timestamp()
         redis_inst.zadd(node_timeout_settings.executing_pool, mapping={key: timeout_time}, nx=True)
     elif to_state in [bamboo_engine_states.FAILED, bamboo_engine_states.FINISHED, bamboo_engine_states.SUSPENDED]:
         redis_inst.zrem(node_timeout_settings.executing_pool, key)
