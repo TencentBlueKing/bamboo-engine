@@ -23,10 +23,10 @@ from .context import Context
 from .engine import Engine
 from .eri import ContextValue, EngineRuntimeInterface
 from .eri.models.node import NodeType
+from .exceptions import InvalidOperationError
 from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
 from .utils.object import Representable
-from .exceptions import InvalidOperationError
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -657,6 +657,35 @@ def preview_node_inputs(
     hydrated_context = context.hydrate(deformat=True)
     inputs = Template(raw_inputs).render(hydrated_context)
     return inputs
+
+
+@_ensure_return_api_result
+def get_execution_time(runtime: EngineRuntimeInterface, entity_id: str):
+    """
+    获取节点或者流程的运行时间信息，
+    当entity_id 为节点id时，返回的是节点的运行时间信息，
+    当entity_id 为 root_pipeline_id 时, 返回的是pipeline任务实例的运行时间信息
+
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param entity_id: 实例id，node_id or pipeline_id
+    :type entity_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+
+    state = runtime.get_state(entity_id)
+
+    execution_time = None
+    if state.archived_time:
+        execution_time = (state.archived_time - state.started_time).total_seconds()
+
+    return {
+        "state": state.name,
+        "start_time": state.started_time,
+        "archived_time": state.archived_time,
+        "execution_time": execution_time,
+    }
 
 
 @_ensure_return_api_result
