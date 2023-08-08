@@ -1505,4 +1505,4 @@ def test_get_execution_time_node_running():
 
     result = api.get_execution_time(runtime, entity_id)
     assert result.result
-    assert result.data["execution_time"] is None
+    assert result.data["execution_time"] > 0

@@ -10,10 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
-# API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
-
-
+import datetime
 import functools
 import logging
 import traceback
@@ -27,6 +24,9 @@ from .exceptions import InvalidOperationError
 from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
 from .utils.object import Representable
+
+# API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
+
 
 logger = logging.getLogger("bamboo_engine")
 
@@ -676,15 +676,13 @@ def get_execution_time(runtime: EngineRuntimeInterface, entity_id: str):
 
     state = runtime.get_state(entity_id)
 
-    execution_time = None
-    if state.archived_time:
-        execution_time = (state.archived_time - state.started_time).total_seconds()
+    final_time = state.archived_time or datetime.datetime.now()
 
     return {
         "state": state.name,
         "start_time": state.started_time,
         "archived_time": state.archived_time,
-        "execution_time": execution_time,
+        "execution_time": (final_time - state.started_time).total_seconds(),
     }
 
 
