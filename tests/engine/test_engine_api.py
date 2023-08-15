@@ -1487,7 +1487,7 @@ def test_get_execution_time_node_finished():
     runtime = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
 
-    result = api.get_execution_time(runtime, entity_id)
+    result = api.get_node_execution_time(runtime, entity_id)
     assert result.result
     assert result.data["execution_time"] == 10.0
 
@@ -1503,6 +1503,6 @@ def test_get_execution_time_node_running():
     runtime = MagicMock()
     runtime.get_state = MagicMock(return_value=state)
 
-    result = api.get_execution_time(runtime, entity_id)
+    result = api.get_node_execution_time(runtime, entity_id)
     assert result.result
     assert result.data["execution_time"] > 0

@@ -25,7 +25,7 @@ from .template import Template
 from .utils.constants import VAR_CONTEXT_MAPPING
 from .utils.object import Representable
 
-# API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engien 进行交互
+# API 模块用于向外暴露接口，bamboo-engine 的使用者应该永远只用这个模块与 bamboo-engine 进行交互
 
 
 logger = logging.getLogger("bamboo_engine")
@@ -660,7 +660,7 @@ def preview_node_inputs(
 
 
 @_ensure_return_api_result
-def get_execution_time(runtime: EngineRuntimeInterface, entity_id: str):
+def get_pipeline_execution_time(runtime: EngineRuntimeInterface, pipeline_id: str):
     """
     获取节点或者流程的运行时间信息，
     当entity_id 为节点id时，返回的是节点的运行时间信息，
@@ -668,15 +668,42 @@ def get_execution_time(runtime: EngineRuntimeInterface, entity_id: str):
 
     :param runtime: 引擎运行时实例
     :type runtime: EngineRuntimeInterface
-    :param entity_id: 实例id，node_id or pipeline_id
-    :type entity_id: str
+    :param pipeline_id: 实例id，node_id or pipeline_id
+    :type pipeline_id: str
     :return: 执行结果
     :rtype: EngineAPIResult
     """
 
-    state = runtime.get_state(entity_id)
+    state = runtime.get_state(pipeline_id)
 
-    final_time = state.archived_time or datetime.datetime.now()
+    final_time = state.archived_time or datetime.datetime.now(tz=state.started_time.tzinfo)
+
+    return {
+        "state": state.name,
+        "start_time": state.started_time,
+        "archived_time": state.archived_time,
+        "execution_time": (final_time - state.started_time).total_seconds(),
+    }
+
+
+@_ensure_return_api_result
+def get_node_execution_time(runtime: EngineRuntimeInterface, node_id: str):
+    """
+    获取节点或者流程的运行时间信息，
+    当entity_id 为节点id时，返回的是节点的运行时间信息，
+    当entity_id 为 root_pipeline_id 时, 返回的是pipeline任务实例的运行时间信息
+
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param node_id: 实例id，node_id or pipeline_id
+    :type node_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+
+    state = runtime.get_state(node_id)
+
+    final_time = state.archived_time or datetime.datetime.now(tz=state.started_time.tzinfo)
 
     return {
         "state": state.name,
