@@ -16,7 +16,6 @@ from typing import List, Optional, Tuple
 
 from django.conf import settings
 from django.db import transaction
-from eri.imp.rollback import RollbackMixin
 from kombu import Connection, Exchange, Queue
 from pipeline.eri import codec
 from pipeline.eri.celery.queues import QueueResolver
@@ -30,6 +29,7 @@ from pipeline.eri.imp.interrupt import InterruptMixin
 from pipeline.eri.imp.node import NodeMixin
 from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
 from pipeline.eri.imp.process import ProcessMixin
+from pipeline.eri.imp.rollback import RollbackMixin
 from pipeline.eri.imp.schedule import ScheduleMixin
 from pipeline.eri.imp.state import StateMixin
 from pipeline.eri.imp.task import TaskMixin
