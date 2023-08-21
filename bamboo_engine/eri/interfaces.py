@@ -1529,6 +1529,14 @@ class ConfigMixin:
         """
 
 
+class RollbackMixin:
+    @abstractmethod
+    def set_pipeline_token(self, pipeline_tree: dict):
+        """
+        设置pipeline token
+        """
+
+
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
@@ -1543,6 +1551,7 @@ class EngineRuntimeInterface(
     ExecutionHistoryMixin,
     InterruptMixin,
     ConfigMixin,
+    RollbackMixin,
     metaclass=ABCMeta,
 ):
     @abstractmethod

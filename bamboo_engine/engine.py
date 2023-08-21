@@ -53,6 +53,7 @@ from .metrics import (
     setup_gauge,
     setup_histogram,
 )
+from .utils.constants import RuntimeSettings
 from .utils.host import get_hostname
 from .utils.string import get_lower_case_name
 
@@ -118,6 +119,10 @@ class Engine:
         process_id = self.runtime.prepare_run_pipeline(
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
         )
+
+        if self.runtime.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value):
+            self.runtime.set_pipeline_token(pipeline)
+
         # execute from start event
         self.runtime.execute(
             process_id=process_id,

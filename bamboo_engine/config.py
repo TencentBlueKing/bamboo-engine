@@ -70,3 +70,5 @@ class Settings:
     PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
 
     PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value
+
+    PIPELINE_ENABLE_ROLLBACK = False

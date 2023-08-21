@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple
 
 from django.conf import settings
 from django.db import transaction
+from eri.imp.rollback import RollbackMixin
 from kombu import Connection, Exchange, Queue
 from pipeline.eri import codec
 from pipeline.eri.celery.queues import QueueResolver
@@ -68,9 +69,9 @@ class BambooDjangoRuntime(
     InterruptMixin,
     EventMixin,
     ConfigMixin,
+    RollbackMixin,
     EngineRuntimeInterface,
 ):
-
     ERI_SUPPORT_VERSION = 7
 
     def __init__(self):

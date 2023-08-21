@@ -19,8 +19,9 @@ from bamboo_engine.utils.string import unique_id
 from .flow.data import Data, Params
 from .flow.event import ExecutableEndEvent
 
-
 __all__ = ["build_tree"]
+
+from ..validator.connection import validate_graph_without_circle
 
 __skeleton = {
     "id": None,
@@ -92,6 +93,178 @@ def build_tree(start_elem, id=None, data=None):
     user_data = data.to_dict() if isinstance(data, Data) else data
     tree["data"] = user_data or tree["data"]
     return tree
+
+
+def _get_next_node(node, pipeline_tree):
+    """
+    获取当前节点的下一个节点
+    """
+
+    out_goings = node["outgoing"]
+
+    # 当只有一个输出时,
+    if not isinstance(out_goings, list):
+        out_goings = [out_goings]
+
+    next_nodes = []
+    for out_going in out_goings:
+        target_id = pipeline_tree["flows"][out_going]["target"]
+        if target_id in pipeline_tree["activities"]:
+            next_nodes.append(pipeline_tree["activities"][target_id])
+        elif target_id in pipeline_tree["gateways"]:
+            next_nodes.append(pipeline_tree["gateways"][target_id])
+        elif target_id == pipeline_tree["end_event"]["id"]:
+            next_nodes.append(pipeline_tree["end_event"])
+
+    return next_nodes
+
+
+def _get_converge_gateway(pipeline_tree, converge_id):
+    return pipeline_tree["gateways"][converge_id]
+
+
+def _get_all_nodes(pipeline_tree: dict, with_subprocess: bool = False) -> dict:
+    """
+    获取 pipeline_tree 中所有 activity 的信息
+
+    :param pipeline_tree: pipeline web tree
+    :param with_subprocess: 是否是子流程的 tree
+    :return: 包含 pipeline_tree 中所有 activity 的字典（包括子流程的 acitivity）
+    """
+    all_nodes = {}
+    all_nodes.update(pipeline_tree["activities"])
+    all_nodes.update(pipeline_tree["gateways"])
+    all_nodes.update(
+        {
+            pipeline_tree["start_event"]["id"]: pipeline_tree["start_event"],
+            pipeline_tree["end_event"]["id"]: pipeline_tree["end_event"],
+        }
+    )
+    if with_subprocess:
+        for act in pipeline_tree["activities"].values():
+            if act["type"] == "SubProcess":
+                all_nodes.update(_get_all_nodes(act["pipeline"], with_subprocess=True))
+    return all_nodes
+
+
+def _delete_flow_id_from_node_io(node, flow_id, io_type):
+    if node[io_type] == flow_id:
+        node[io_type] = ""
+    elif isinstance(node[io_type], list):
+        if len(node[io_type]) == 1 and node[io_type][0] == flow_id:
+            node[io_type] = (
+                "" if node["type"] not in ["ExclusiveGateway", "ParallelGateway", "ConditionalParallelGateway"] else []
+            )
+        else:
+            node[io_type].pop(node[io_type].index(flow_id))
+
+            # recover to original format
+            if (
+                len(node[io_type]) == 1
+                and io_type == "outgoing"
+                and node["type"] in ["EmptyStartEvent", "ServiceActivity", "ConvergeGateway"]
+            ):
+                node[io_type] = node[io_type][0]
+
+
+def _acyclic(pipeline):
+    """
+    @summary: 逆转反向边
+    @return:
+    """
+
+    pipeline["all_nodes"] = _get_all_nodes(pipeline, with_subprocess=True)
+
+    deformed_flows = {
+        "{}.{}".format(flow["source"], flow["target"]): flow_id for flow_id, flow in pipeline["flows"].items()
+    }
+    while True:
+        no_circle = validate_graph_without_circle(pipeline)
+        if no_circle["result"]:
+            break
+        source = no_circle["error_data"][-2]
+        target = no_circle["error_data"][-1]
+        circle_flow_key = "{}.{}".format(source, target)
+        flow_id = deformed_flows[circle_flow_key]
+        pipeline["flows"][flow_id].update({"source": target, "target": source})
+
+        source_node = pipeline["all_nodes"][source]
+        _delete_flow_id_from_node_io(source_node, flow_id, "outgoing")
+
+        target_node = pipeline["all_nodes"][target]
+        _delete_flow_id_from_node_io(target_node, flow_id, "incoming")
+
+
+def generate_pipeline_token(pipeline_tree):
+    tree = copy.deepcopy(pipeline_tree)
+    # 去环
+    _acyclic(tree)
+
+    start_node = tree["start_event"]
+    token = unique_id("t")
+    node_token_map = {start_node["id"]: token}
+    inject_pipeline_token(start_node, tree, node_token_map, token)
+    return node_token_map
+
+
+# 需要处理子流程的问题
+def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
+    # 如果是网关
+    if node["type"] in ["ParallelGateway", "ExclusiveGateway", "ConditionalParallelGateway"]:
+        next_nodes = _get_next_node(node, pipeline_tree)
+        node_token = unique_id("t")
+        target_node = None
+        for next_node in next_nodes:
+            # 分支网关各个分支token相同
+            node_token_map[next_node["id"]] = node_token
+            # 并行网关token不同
+            if node["type"] in ["ParallelGateway", "ConditionalParallelGateway"]:
+                node_token = unique_id("t")
+                node_token_map[next_node["id"]] = node_token
+
+            # 如果是网关，沿着路径向内搜索，最终遇到对应的分支网关会返回
+            target_node = inject_pipeline_token(next_node, pipeline_tree, node_token_map, node_token)
+
+        if target_node is None:
+            return
+
+        # 汇聚网关可以直连结束节点，所以可能会存在找不到对应的汇聚网关的情况
+        if target_node["type"] == "EmptyEndEvent":
+            node_token_map[target_node["id"]] = token
+            return
+        # 汇聚网关的token等于对应的网关的token
+        node_token_map[target_node["id"]] = token
+        # 到汇聚网关之后，此时继续向下遍历
+        next_node = _get_next_node(target_node, pipeline_tree)[0]
+        # 汇聚网关只会有一个出度
+        node_token_map[next_node["id"]] = token
+        return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
+
+    # 如果是汇聚网关，并且id等于converge_id，说明此时遍历在某个单元
+    if node["type"] == "ConvergeGateway":
+        return node
+
+    # 如果是普通的节点，说明只有一个出度，此时直接向下遍历就好
+    if node["type"] in ["ServiceActivity", "EmptyStartEvent"]:
+        next_node = _get_next_node(node, pipeline_tree)[0]
+        node_token_map[next_node["id"]] = token
+        return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
+
+    # 如果遇到结束节点，直接返回
+    if node["type"] == "EmptyEndEvent":
+        return node
+
+    if node["type"] == "SubProcess":
+        subprocess_pipeline_tree = node["pipeline"]
+        subprocess_start_node = subprocess_pipeline_tree["start_event"]
+        subprocess_start_node_token = unique_id("t")
+        node_token_map[subprocess_start_node["id"]] = subprocess_start_node_token
+        inject_pipeline_token(
+            subprocess_start_node, subprocess_pipeline_tree, node_token_map, subprocess_start_node_token
+        )
+        next_node = _get_next_node(node, pipeline_tree)[0]
+        node_token_map[next_node["id"]] = token
+        return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
 
 
 def __update(tree, elem):
