@@ -10,16 +10,16 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import datetime
 
-from bamboo_engine.eri.models import ProcessInfo
-from os import pipe
 import pytest
 from mock import MagicMock, call, patch
 
+from bamboo_engine import api, exceptions, states
 from bamboo_engine.api import preview_node_inputs
-from bamboo_engine.eri import SuspendedProcessInfo, NodeType, Variable
-from bamboo_engine import states, exceptions
 from bamboo_engine.engine import Engine
+from bamboo_engine.eri import NodeType, SuspendedProcessInfo, Variable
+from bamboo_engine.eri.models import ProcessInfo
 
 
 def test_run_pipeline():
@@ -167,7 +167,6 @@ def test_resume_pipeline():
 
 def test_resume_pipeline__state_not_match():
     pipeline_id = "pid"
-    suspended_process_info = []
     state = MagicMock()
     state.name = "RUNNING"
 
@@ -399,7 +398,6 @@ def test_retry_node__state_is_not_failed():
 
 def test_retry_node__can_retry_is_false():
     node_id = "nid"
-    process_id = "pid"
     data = {}
 
     state = MagicMock()
@@ -561,7 +559,6 @@ def test_skip_node():
 
 def test_skip_node__node_can_not_skip():
     node_id = "nid"
-    process_id = "pid"
 
     node = MagicMock()
     node.type = NodeType.ServiceActivity
@@ -579,7 +576,6 @@ def test_skip_node__node_can_not_skip():
 
 def test_skip_node__node_type_not_fit():
     node_id = "nid"
-    process_id = "pid"
 
     node = MagicMock()
     node.type = NodeType.SubProcess
@@ -597,7 +593,6 @@ def test_skip_node__node_type_not_fit():
 
 def test_skip_node__state_is_not_failed():
     node_id = "nid"
-    process_id = "pid"
 
     node = MagicMock()
     node.type = NodeType.ServiceActivity
@@ -731,7 +726,6 @@ def test_skip_exclusive_gateway__node_type_not_fit():
 
 def test_skip_exclusive_gateway__node_is_not_failed():
     node_id = "nid"
-    process_id = "pid"
     flow_id = "flow_1"
 
     node = MagicMock()
@@ -1128,7 +1122,6 @@ def test_callback__version_not_match():
     state.version = "v2"
 
     schedule = MagicMock()
-    schedule_id = 2
 
     runtime = MagicMock()
     runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_id)
@@ -1153,7 +1146,6 @@ def test_callback__schedule_finished():
     state.version = version
 
     schedule = MagicMock()
-    schedule_id = 2
     schedule.finished = True
     schedule.expired = False
 
@@ -1181,7 +1173,6 @@ def test_callback__schedule_expired():
     state.version = version
 
     schedule = MagicMock()
-    schedule_id = 2
     schedule.finished = False
     schedule.expired = True
 
@@ -1482,3 +1473,36 @@ def test_retry_subprocess__success():
         process_id=process_id, node_id=node_id, root_pipeline_id="p", parent_pipeline_id="p"
     )
     runtime.post_retry_subprocess.assert_called_once_with(node_id)
+
+
+def test_get_execution_time_node_finished():
+    entity_id = "nid"
+    now = datetime.datetime.now()
+
+    state = MagicMock()
+    state.name = states.FINISHED
+    state.started_time = now
+    state.archived_time = now + datetime.timedelta(seconds=10)
+
+    runtime = MagicMock()
+    runtime.get_state = MagicMock(return_value=state)
+
+    result = api.get_node_execution_time(runtime, entity_id)
+    assert result.result
+    assert result.data["execution_time"] == 10.0
+
+
+def test_get_execution_time_node_running():
+    entity_id = "nid"
+
+    state = MagicMock()
+    state.name = states.RUNNING
+    state.started_time = datetime.datetime.now()
+    state.archived_time = None
+
+    runtime = MagicMock()
+    runtime.get_state = MagicMock(return_value=state)
+
+    result = api.get_node_execution_time(runtime, entity_id)
+    assert result.result
+    assert result.data["execution_time"] > 0
