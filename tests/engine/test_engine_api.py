@@ -1506,3 +1506,36 @@ def test_get_execution_time_node_running():
     result = api.get_node_execution_time(runtime, entity_id)
     assert result.result
     assert result.data["execution_time"] > 0
+
+
+def test_get_execution_time_pipeline_finished():
+    entity_id = "nid"
+    now = datetime.datetime.now()
+
+    state = MagicMock()
+    state.name = states.FINISHED
+    state.started_time = now
+    state.archived_time = now + datetime.timedelta(seconds=10)
+
+    runtime = MagicMock()
+    runtime.get_state = MagicMock(return_value=state)
+
+    result = api.get_pipeline_execution_time(runtime, entity_id)
+    assert result.result
+    assert result.data["execution_time"] == 10.0
+
+
+def test_get_execution_time_pipeline_running():
+    entity_id = "nid"
+
+    state = MagicMock()
+    state.name = states.RUNNING
+    state.started_time = datetime.datetime.now()
+    state.archived_time = None
+
+    runtime = MagicMock()
+    runtime.get_state = MagicMock(return_value=state)
+
+    result = api.get_pipeline_execution_time(runtime, entity_id)
+    assert result.result
+    assert result.data["execution_time"] > 0
