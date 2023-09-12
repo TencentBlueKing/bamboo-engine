@@ -128,7 +128,7 @@ class RollbackHandler:
 
         nodes = []
         for node_id, token in tokens.items():
-            if start_token == token:
+            if start_token == token and node_id != start_node_id:
                 nodes.append(node_id)
 
         return nodes

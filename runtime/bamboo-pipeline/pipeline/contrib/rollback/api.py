@@ -21,11 +21,18 @@ def rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
     :param start_node_id: 开始的 id
     :param target_node_id: 开始的 id
     :return: True or False
-
-    回退的思路是，先搜索计算出来当前允许跳过的节点，在计算的过程中网关节点会合并成一个节点
-    只允许回退到已经执行过的节点
     """
-    RollbackHandler(root_pipeline_id, start_node_id, target_node_id).rollback()
+    RollbackHandler(root_pipeline_id).rollback(start_node_id, target_node_id)
+
+
+@ensure_return_pipeline_contrib_api_result
+def reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
+    RollbackHandler(root_pipeline_id).reserve_rollback(start_node_id, target_node_id)
+
+
+@ensure_return_pipeline_contrib_api_result
+def cancel_reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
+    RollbackHandler(root_pipeline_id).cancel_reserved_rollback(start_node_id, target_node_id)
 
 
 @ensure_return_pipeline_contrib_api_result
