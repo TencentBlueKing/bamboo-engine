@@ -15,10 +15,14 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
 from django.utils.translation import ugettext_lazy as _
-
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
-from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
+from pipeline.core.flow.io import (
+    BooleanItemSchema,
+    InputItem,
+    IntItemSchema,
+    OutputItem,
+)
 from pipeline.utils.utils import convert_bytes_to_str
 
 
@@ -109,6 +113,9 @@ class Service(object, metaclass=ABCMeta):
         if "_runtime_attrs" not in self.__dict__:
             self._runtime_attrs = {}
         self._runtime_attrs.update(**kwargs)
+
+    def rollback(self, data, parent_data, rollback_data=None):
+        return True
 
 
 class ServiceActivity(Activity):
@@ -265,13 +272,13 @@ class AbstractIntervalGenerator(object, metaclass=ABCMeta):
 class DefaultIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(DefaultIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class SquareIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(SquareIntervalGenerator, self).next()
-        return self.count ** 2
+        return self.count**2
 
 
 class NullIntervalGenerator(AbstractIntervalGenerator):

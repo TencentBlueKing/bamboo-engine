@@ -74,12 +74,18 @@ class RollbackGraphHandler:
         self.graph.add_node(target_id)
         # 去除自环边
         self.node_map = CycleHandler(node_map).remove_cycle()
+        # 其他不参与回滚，但是需要被清理的节点，主要是网关节点和子流程节点
+        self.others_nodes = []
 
     def build(self, node_id, source_id=None):
         node_detail = self.node_map.get(node_id)
         if node_detail is None:
             return
         node_type = node_detail["type"]
+
+        if node_type in [PE.ExclusiveGateway, PE.ParallelGateway, PE.ConditionalParallelGateway, PE.ConvergeGateway]:
+            self.others_nodes.append(node_id)
+
         if node_type == PE.ServiceActivity:
             next_node_id = node_detail.get("id")
             self.graph.add_node(next_node_id)
@@ -110,4 +116,5 @@ class RollbackGraphHandler:
         self.graph.add_node(constants.START_FLAG)
         self.graph.add_edge(self.start_id, constants.START_FLAG)
         self.build(self.target_id, self.target_id)
-        return self.graph.reverse()
+
+        return self.graph.reverse(), self.others_nodes

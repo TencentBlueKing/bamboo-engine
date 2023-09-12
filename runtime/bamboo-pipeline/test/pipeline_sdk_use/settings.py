@@ -160,9 +160,9 @@ ENABLE_EXAMPLE_COMPONENTS = True
 
 BROKER_VHOST = "/"
 
-BROKER_URL = "amqp://guest:guest@localhost:5672//"
+# BROKER_URL = "amqp://guest:guest@localhost:5672//"
 
-# BROKER_URL = 'redis://localhost:6379/0'
+BROKER_URL = "redis://localhost:6379/0"
 
 PIPELINE_DATA_BACKEND = "pipeline.engine.core.data.redis_backend.RedisDataBackend"
 
@@ -180,3 +180,6 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 #         }
 #     }
 # ]
+
+
+PIPELINE_ENABLE_ROLLBACK = bool(int(os.getenv("PIPELINE_ENABLE_ROLLBACK", 0)))

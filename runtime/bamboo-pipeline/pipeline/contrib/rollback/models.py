@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from pipeline.contrib.rollback.constants import TOKEN
 
 
 class RollbackToken(models.Model):
@@ -22,6 +23,7 @@ class RollbackSnapshot(models.Model):
     graph = models.TextField(verbose_name="rollback graph", null=False)
     node_access_record = models.TextField(verbose_name="node access record")
     skip_rollback_nodes = models.TextField(verbose_name="skip rollback nodes")
+    other_nodes = models.TextField(verbose_name="other nodes")
     start_node_id = models.CharField(verbose_name="start node id", max_length=64)
     target_node_id = models.CharField(verbose_name="target_node_id", max_length=64)
     is_expired = models.BooleanField(verbose_name="is expired", default=False)
@@ -46,4 +48,5 @@ class RollbackPlan(models.Model):
     root_pipeline_id = models.CharField(verbose_name="root pipeline id", max_length=64)
     start_node_id = models.CharField(verbose_name="start node id", max_length=64)
     target_node_id = models.CharField(verbose_name="target_node_id", max_length=64)
+    mode = models.CharField(verbose_name="rollback mode", max_length=32, default=TOKEN)
     is_expired = models.BooleanField(verbose_name="is expired", default=False)

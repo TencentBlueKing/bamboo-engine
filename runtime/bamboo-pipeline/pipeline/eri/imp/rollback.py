@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import json
+import logging
 
 from django.core.serializers.json import DjangoJSONEncoder
 
 from bamboo_engine.builder.builder import generate_pipeline_token
+
+logger = logging.getLogger("bamboo_engine")
 
 
 class RollbackMixin:
@@ -14,7 +17,11 @@ class RollbackMixin:
         try:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
             from pipeline.contrib.rollback.models import RollbackToken
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "[RollbackMixin][set_pipeline_token] import RollbackToken error, "
+                "Please check whether the  rollback app is installed correctly, err={}".format(e)
+            )
             return
 
         root_pipeline_id = pipeline_tree["id"]
@@ -29,8 +36,13 @@ class RollbackMixin:
         try:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
             from pipeline.contrib.rollback.models import RollbackNodeSnapshot
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "[RollbackMixin][set_node_snapshot] import RollbackNodeSnapshot error, "
+                "Please check whether the rollback app is installed correctly, err={}".format(e)
+            )
             return
+
         RollbackNodeSnapshot.objects.create(
             root_pipeline_id=root_pipeline_id,
             node_id=node_id,
@@ -49,14 +61,19 @@ class RollbackMixin:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
             from pipeline.contrib.rollback.handler import RollbackHandler
             from pipeline.contrib.rollback.models import RollbackPlan
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "[RollbackMixin][set_pipeline_token] import RollbackHandler or RollbackPlan error, "
+                "Please check whether the rollback app is installed correctly, err={}".format(e)
+            )
             return
 
         try:
             rollback_plan = RollbackPlan.objects.get(
                 root_pipeline_id=root_pipeline_id, start_node_id=node_id, is_expired=False
             )
-            handler = RollbackHandler(root_pipeline_id=root_pipeline_id)
+            handler = RollbackHandler(root_pipeline_id=root_pipeline_id, mode=rollback_plan.mode)
             handler.rollback(rollback_plan.start_node_id, rollback_plan.target_node_id)
-        except Exception:
+        except Exception as e:
+            logger.error("[RollbackMixin][start_rollback] start a rollback task error, err={}".format(e))
             return

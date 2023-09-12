@@ -10,31 +10,33 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+from pipeline.contrib.rollback.constants import TOKEN
 from pipeline.contrib.rollback.handler import RollbackHandler
 from pipeline.contrib.utils import ensure_return_pipeline_contrib_api_result
 
 
 @ensure_return_pipeline_contrib_api_result
-def rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
+def rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
     """
     :param root_pipeline_id: pipeline id
     :param start_node_id: 开始的 id
     :param target_node_id: 开始的 id
+    :param mode 回滚模式
     :return: True or False
     """
-    RollbackHandler(root_pipeline_id).rollback(start_node_id, target_node_id)
+    RollbackHandler(root_pipeline_id, mode).rollback(start_node_id, target_node_id)
 
 
 @ensure_return_pipeline_contrib_api_result
-def reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
-    RollbackHandler(root_pipeline_id).reserve_rollback(start_node_id, target_node_id)
+def reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
+    RollbackHandler(root_pipeline_id, mode).reserve_rollback(start_node_id, target_node_id)
 
 
 @ensure_return_pipeline_contrib_api_result
-def cancel_reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str):
-    RollbackHandler(root_pipeline_id).cancel_reserved_rollback(start_node_id, target_node_id)
+def cancel_reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
+    RollbackHandler(root_pipeline_id, mode).cancel_reserved_rollback(start_node_id, target_node_id)
 
 
 @ensure_return_pipeline_contrib_api_result
-def get_allowed_rollback_node_id_list(root_pipeline_id: str, start_node_id: str):
-    return RollbackHandler(root_pipeline_id).get_allowed_rollback_node_id_list(start_node_id)
+def get_allowed_rollback_node_id_list(root_pipeline_id: str, start_node_id: str, mode: str = TOKEN):
+    return RollbackHandler(root_pipeline_id, mode).get_allowed_rollback_node_id_list(start_node_id)
