@@ -33,6 +33,11 @@ def reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: 
 
 
 @ensure_return_pipeline_contrib_api_result
+def retry_rollback_failed_node(root_pipeline_id: str, node_id: str, retry_data: dict = None, mode: str = TOKEN):
+    RollbackHandler(root_pipeline_id, mode).retry_rollback_failed_node(node_id, retry_data)
+
+
+@ensure_return_pipeline_contrib_api_result
 def cancel_reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
     RollbackHandler(root_pipeline_id, mode).cancel_reserved_rollback(start_node_id, target_node_id)
 
