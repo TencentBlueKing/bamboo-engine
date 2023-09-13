@@ -174,17 +174,19 @@ class RollbackHandler:
                 "rollback failed: only retry the failed node, current_status={}".format(node_state.name)
             )
 
+        # 获取镜像
+        try:
+            rollback_snapshot = RollbackSnapshot.objects.get(root_pipeline_id=self.root_pipeline_id, is_expired=False)
+        except RollbackSnapshot.DoesNotExist:
+            raise RollBackException("rollback failed: the rollback snapshot is not exists, please check")
+        except RollbackSnapshot.MultipleObjectsReturned:
+            raise RollBackException("rollback failed: found multi not expired rollback snapshot, please check")
+
         # 重置pipeline的状态为回滚中
         self.runtime.set_state(
             node_id=self.root_pipeline_id,
             to_state=states.ROLLING_BACK,
         )
-
-        # 获取镜像
-        try:
-            rollback_snapshot = RollbackSnapshot.objects.get(root_pipeline_id=self.root_pipeline_id, is_expired=False)
-        except RollbackSnapshot.DoesNotExist:
-            raise RollBackException("rollback failed: found multi not expired rollback snapshot, please check")
 
         # 驱动这个任务
         token_rollback.apply_async(
