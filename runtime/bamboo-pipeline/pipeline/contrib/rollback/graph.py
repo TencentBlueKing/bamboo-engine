@@ -83,7 +83,7 @@ class RollbackGraphHandler:
             return
         node_type = node_detail["type"]
 
-        if node_type in [PE.ExclusiveGateway, PE.ParallelGateway, PE.ConditionalParallelGateway, PE.ConvergeGateway]:
+        if node_type not in [PE.ServiceActivity]:
             self.others_nodes.append(node_id)
 
         if node_type == PE.ServiceActivity:
@@ -95,8 +95,11 @@ class RollbackGraphHandler:
             # 如果遍历到目标节点，则返回
             if node_id == self.start_id:
                 return
-
             source_id = next_node_id
+            targets = node_detail.get("targets", {}).values()
+        elif node_type == PE.SubProcess:
+            # 处理子流程
+            source_id = self.build(node_detail["start_event_id"], source_id)
             targets = node_detail.get("targets", {}).values()
         elif node_type == PE.ExclusiveGateway:
             targets = [target for target in node_detail.get("targets", {}).values() if target in self.node_map.keys()]
@@ -104,7 +107,9 @@ class RollbackGraphHandler:
             targets = node_detail.get("targets", {}).values()
 
         for target in targets:
-            self.build(target, source_id)
+            source_id = self.build(target, source_id)
+
+        return source_id
 
     def build_rollback_graph(self):
         """
