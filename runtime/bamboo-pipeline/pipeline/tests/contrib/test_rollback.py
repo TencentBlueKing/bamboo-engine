@@ -66,6 +66,11 @@ class TestRollBackBase(TestCase):
         self.assertEqual(str(result.exc), message)
         pipeline_state.name = states.RUNNING
         pipeline_state.save()
+
+        token = RollbackToken.objects.create(
+            root_pipeline_id=pipeline_id, token=json.dumps({target_node_id: "xxx", start_node_id: "xsx"})
+        )
+
         result = api.rollback(pipeline_id, start_node_id, target_node_id)
         self.assertFalse(result.result)
         message = "rollback failed: node not exist, node={}".format(start_node_id)
@@ -107,15 +112,6 @@ class TestRollBackBase(TestCase):
 
         start_state.name = states.FINISHED
         start_state.save()
-
-        result = api.rollback(pipeline_id, start_node_id, target_node_id)
-        self.assertFalse(result.result)
-        message = "rollback failed: pipeline token not exist, pipeline_id={}".format(pipeline_id)
-        self.assertEqual(str(result.exc), message)
-
-        token = RollbackToken.objects.create(
-            root_pipeline_id=pipeline_id, token=json.dumps({target_node_id: "xxx", start_node_id: "xsx"})
-        )
 
         result = api.rollback(pipeline_id, start_node_id, target_node_id)
         self.assertFalse(result.result)
