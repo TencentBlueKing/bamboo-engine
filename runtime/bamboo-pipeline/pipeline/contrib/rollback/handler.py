@@ -127,7 +127,11 @@ class RollbackValidator:
         """
         使用any模式下的回滚，相同token的节点不允许有正在运行的节点
         """
-        if State.objects.filter(root_id=root_pipeline_id, name=states.RUNNING).exists():
+        if (
+            State.objects.filter(root_id=root_pipeline_id, name=states.RUNNING)
+            .exclude(node_id=root_pipeline_id)
+            .exists()
+        ):
             raise RollBackException("rollback failed: there is currently the some node is running")
 
 
@@ -250,6 +254,7 @@ class AnyRollbackHandler(BaseRollbackHandler):
         self._reserve(start_node_id, target_node_id, reserve_rollback=False)
 
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
+        RollbackValidator.validate_node_state_by_any_mode(self.root_pipeline_id)
         # 回滚的开始节点运行失败的情况
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
@@ -369,7 +374,7 @@ class TokenRollbackHandler(BaseRollbackHandler):
             skip_rollback_nodes = []
 
         # 相同token回滚时，不允许有正在运行的节点
-
+        RollbackValidator.validate_node_state_by_token_mode(self.root_pipeline_id, start_node_id)
         # 回滚的开始节点运行失败的情况
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)

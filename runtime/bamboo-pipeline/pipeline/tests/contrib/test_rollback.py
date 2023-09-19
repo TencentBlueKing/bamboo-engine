@@ -206,7 +206,7 @@ class TestRollBackBase(TestCase):
         Node.objects.create(node_id=target_node_id, detail=json.dumps(target_node_detail))
         Node.objects.create(node_id=start_node_id, detail=json.dumps(start_node_detail))
 
-        result = api.reserved_rollback(pipeline_id, start_node_id, target_node_id)
+        result = api.reserve_rollback(pipeline_id, start_node_id, target_node_id)
         self.assertFalse(result.result)
         message = "reserve rollback failed, the node state is not Running, current state=FINISHED,  node_id={}".format(
             # noqa
@@ -225,7 +225,7 @@ class TestRollBackBase(TestCase):
         self.assertEqual(plan.start_node_id, start_node_id)
         self.assertEqual(plan.target_node_id, target_node_id)
 
-        result = api.cancel_reserve_rollback(pipeline_id, start_node_id, target_node_id)
+        result = api.cancel_reserved_rollback(pipeline_id, start_node_id, target_node_id)
         self.assertTrue(result.result)
 
     def test_allowed_rollback_node_id_list(self):

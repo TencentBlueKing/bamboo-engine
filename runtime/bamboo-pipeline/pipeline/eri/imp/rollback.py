@@ -59,7 +59,7 @@ class RollbackMixin:
         """
         try:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
-            from pipeline.contrib.rollback.handler import RollbackHandler
+            from pipeline.contrib.rollback.handler import RollbackDispatcher
             from pipeline.contrib.rollback.models import RollbackPlan
         except Exception as e:
             logger.error(
@@ -72,7 +72,7 @@ class RollbackMixin:
             rollback_plan = RollbackPlan.objects.get(
                 root_pipeline_id=root_pipeline_id, start_node_id=node_id, is_expired=False
             )
-            handler = RollbackHandler(root_pipeline_id=root_pipeline_id, mode=rollback_plan.mode)
+            handler = RollbackDispatcher(root_pipeline_id=root_pipeline_id, mode=rollback_plan.mode)
             handler.rollback(rollback_plan.start_node_id, rollback_plan.target_node_id)
         except Exception as e:
             logger.error("[RollbackMixin][start_rollback] start a rollback task error, err={}".format(e))
