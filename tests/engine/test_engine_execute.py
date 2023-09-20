@@ -415,7 +415,6 @@ def test_execute__have_to_sleep(node_id, pi, interrupter, node, state):
     runtime.beat.assert_called_once_with(pi.process_id)
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
-    runtime.node_enter.assert_called_once_with(root_pipeline_id=pi.root_pipeline_id, node_id=node_id)
     runtime.node_rerun_limit.assert_not_called()
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
@@ -488,7 +487,6 @@ def test_execute__poll_schedule_ready(node_id, pi, interrupter, node, state, sch
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state_or_none.assert_called_once_with(node_id)
     runtime.node_rerun_limit.assert_not_called()
-    runtime.node_enter.assert_called_once_with(root_pipeline_id=pi.root_pipeline_id, node_id=node_id)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         to_state=states.RUNNING,

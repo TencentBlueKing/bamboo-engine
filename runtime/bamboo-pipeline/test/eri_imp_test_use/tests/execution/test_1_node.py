@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from pipeline.eri.runtime import BambooDjangoRuntime
+
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
-from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
 
@@ -19,7 +20,6 @@ def test_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
     assert_all_finish([start.id, act_1.id, end.id, pipeline["id"]])
     assert_exec_data_equal(
         {

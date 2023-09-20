@@ -15,22 +15,30 @@ import pytest
 from mock import MagicMock, call, patch
 
 from bamboo_engine import states
-from bamboo_engine.eri.models.interrupt import HandlerExecuteData, HandlerScheduleData, ScheduleInterruptPoint
-from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint
 from bamboo_engine.eri import (
-    ProcessInfo,
-    NodeType,
-    ServiceActivity,
-    ContextValue,
-    ContextValueType,
     Data,
     DataInput,
-    ScheduleType,
-    Schedule,
-    ExecutionData,
     ExecuteInterruptPoint,
+    ExecutionData,
+    HookType,
+    NodeType,
+    ProcessInfo,
+    Schedule,
+    ScheduleType,
+    ServiceActivity,
+)
+from bamboo_engine.eri.models.interrupt import (
+    HandlerExecuteData,
+    HandlerScheduleData,
+    ScheduleInterruptPoint,
 )
 from bamboo_engine.handlers.service_activity import ServiceActivityHandler
+from bamboo_engine.interrupt import (
+    ExecuteInterrupter,
+    ExecuteKeyPoint,
+    ScheduleInterrupter,
+    ScheduleKeyPoint,
+)
 from tests.engine.test_engine_execute import recover_point
 
 
@@ -118,6 +126,8 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
     service = MagicMock()
     service.execute = MagicMock(side_effect=Exception)
     service.need_schedule = MagicMock(return_value=False)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -149,10 +159,14 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-    runtime.set_execution_data.assert_called_once()
+    assert runtime.set_execution_data.call_count == 4
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
+    assert service.dispatch.call_count == 3
+    assert service.dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
+    assert service.dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
+    assert service.dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -189,6 +203,8 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     service = MagicMock()
     service.execute = MagicMock(side_effect=Exception)
     service.need_schedule = MagicMock(return_value=True)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -221,10 +237,13 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
         error_ignored=True,
         ignore_boring_set=recover_point is not None,
     )
-    runtime.set_execution_data.assert_called_once()
+    assert runtime.set_execution_data.call_count == 3
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
+    assert service.dispatch.call_count == 2
+    assert service.dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
+    assert service.dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -326,6 +345,8 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     service.schedule_type = MagicMock(return_value=ScheduleType.POLL)
     service.schedule_after = MagicMock(return_value=5)
     service.execute = MagicMock(return_value=True)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -351,7 +372,6 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.set_state.assert_not_called()
-    runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -376,6 +396,12 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
         assert service.execute.call_args.kwargs["data"].outputs == {"_result": True, "_loop": 1, "_inner_loop": 1}
         assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
+
+    if recover_point and recover_point.handler_data.service_executed:
+        service.dispatch.assert_not_called()
+    else:
+        service.dispatch.assert_called_once()
+        assert service.dispatch.call_args.kwargs["hook"] == HookType.NODE_ENTER
 
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
@@ -416,6 +442,8 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
     service.schedule_type = MagicMock(return_value=None)
     service.schedule_after = MagicMock(return_value=-1)
     service.execute = MagicMock(return_value=True)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -447,7 +475,6 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-    runtime.set_execution_data.assert_called_once()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {
         "k1": "${k4}",
@@ -484,6 +511,14 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point):
         assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
+    if recover_point and recover_point.handler_data.service_executed:
+        service.dispatch.assert_not_called()
+        assert runtime.set_execution_data.call_count == 1
+    else:
+        service.dispatch.assert_called_once()
+        assert service.dispatch.call_args.kwargs["hook"] == HookType.NODE_ENTER
+        assert runtime.set_execution_data.call_count == 2
+
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
     assert interrupter.check_point.handler_data.service_execute_fail is False
@@ -519,6 +554,8 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     service.need_schedule = MagicMock(return_value=True)
     service.schedule_type = MagicMock(return_value=ScheduleType.POLL)
     service.schedule_after = MagicMock(return_value=5)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data = MagicMock(return_value=data)
@@ -550,7 +587,10 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-    runtime.set_execution_data.assert_called_once()
+    if recover_point and recover_point.handler_data.service_executed:
+        assert runtime.set_execution_data.call_count == 2
+    else:
+        assert runtime.set_execution_data.call_count == 3
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -576,6 +616,14 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
         assert service.execute.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.execute.call_args.kwargs["root_pipeline_data"].outputs == {}
 
+    if recover_point and recover_point.handler_data.service_executed:
+        service.dispatch.assert_called_once()
+        assert service.dispatch.call_args.kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
+    else:
+        assert service.dispatch.call_count == 2
+        assert service.dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
+        assert service.dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
+
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
     assert interrupter.check_point.handler_data.service_execute_fail is True
@@ -597,6 +645,8 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
 
     service = MagicMock()
     service.schedule = MagicMock(side_effect=Exception)
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data_outputs = MagicMock(return_value=data_outputs)
@@ -619,7 +669,8 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    assert runtime.set_execution_data.call_count == 3
+    runtime.set_execution_data.assert_has_calls(calls=[call(node_id=node.id, data=service_data)] * 3)
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
@@ -630,6 +681,12 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
+    assert service.dispatch.call_count == 2
+
+    assert service.dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_SCHEDULE_EXCEPTION
+    assert service.dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_SCHEDULE_FAIL
+    assert service.dispatch.call_args_list[0].kwargs["data"] == service_data
+    assert service.dispatch.call_args_list[1].kwargs["data"] == service_data
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -670,6 +727,8 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
 
     service = MagicMock()
     service.schedule = MagicMock(side_effect=Exception)
+    service.need_run_hook = MagicMock(return_value=False)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_data_outputs = MagicMock(return_value=data_outputs)
@@ -713,6 +772,7 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
         loop=1,
         inner_loop=1,
     )
+    service.dispatch.assert_not_called()
     assert service.schedule.call_args.kwargs["schedule"] == schedule
     assert service.schedule.call_args.kwargs["data"] == service_data
     assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
@@ -1183,6 +1243,7 @@ def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point)
     service = MagicMock()
     service.schedule = MagicMock(return_value=False)
     service.is_schedule_done = MagicMock(return_value=False)
+    service.need_run_hook = MagicMock(return_value=False)
 
     runtime = MagicMock()
     runtime.get_data_outputs = MagicMock(return_value=data_outputs)

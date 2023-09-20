@@ -18,7 +18,7 @@ from mock import MagicMock, call, patch
 from bamboo_engine import api, exceptions, states
 from bamboo_engine.api import preview_node_inputs
 from bamboo_engine.engine import Engine
-from bamboo_engine.eri import NodeType, SuspendedProcessInfo, Variable
+from bamboo_engine.eri import ExecutionData, NodeType, SuspendedProcessInfo, Variable
 from bamboo_engine.eri.models import ProcessInfo
 
 
@@ -500,6 +500,9 @@ def test_skip_node():
     node = MagicMock()
     node.type = NodeType.ServiceActivity
     node.can_skip = True
+    node.code = "code"
+    node.version = "1.0.0"
+    node.name = "name"
     node.target_nodes = ["target_node"]
 
     state = MagicMock()
@@ -520,11 +523,15 @@ def test_skip_node():
     execution_data.inputs = "inputs"
     execution_data.outputs = "outputs"
 
+    service = MagicMock()
+    service.need_run_hook = MagicMock(return_value=False)
+
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=process_info)
     runtime.get_execution_data = MagicMock(return_value=execution_data)
+    runtime.get_service = MagicMock(return_value=service)
 
     engine = Engine(runtime=runtime)
     engine.skip_node(node_id)
@@ -927,13 +934,29 @@ def test_forced_fail_activity():
     node_id = "nid"
     ex_data = "ex_msg"
     process_id = "pid"
+    root_pipeline_id = "r_pid"
+    top_pipeline_id = "t_pid"
+    pipeline_stack = "p_stack"
+
+    process_info = MagicMock()
+    process_info.process_id = process_id
+    process_info.root_pipeline_id = root_pipeline_id
+    process_info.pipeline_stack = pipeline_stack
+    process_info.top_pipeline_id = top_pipeline_id
 
     node = MagicMock()
+    node.id = node_id
     node.type = NodeType.ServiceActivity
+    node.code = "code"
+    node.version = "1.0.0"
+    node.name = "name"
 
     state = MagicMock()
     state.name = states.RUNNING
     state.version = "old_version"
+
+    service = MagicMock()
+    service.need_run_hook = MagicMock(return_value=False)
 
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
@@ -941,12 +964,16 @@ def test_forced_fail_activity():
     runtime.get_process_id_with_current_node_id = MagicMock(return_value=process_id)
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.set_state = MagicMock(return_value="new_version")
+    runtime.get_process_info = MagicMock(return_value=process_info)
+    runtime.get_service = MagicMock(return_value=service)
 
     engine = Engine(runtime=runtime)
     engine.forced_fail_activity(node_id, ex_data)
 
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_process_info.assert_called_once_with(process_id)
+    runtime.get_service.assert_has_calls(calls=[call(code=node.code, version=node.version, name=node.name)] * 2)
     runtime.get_process_id_with_current_node_id.assert_called_once_with(node_id)
     runtime.pre_forced_fail_activity.assert_called_once_with(node_id, ex_data)
     runtime.get_execution_data_outputs.assert_called_once_with(node_id)
@@ -962,17 +989,35 @@ def test_forced_fail_activity():
     runtime.post_forced_fail_activity.assert_called_once_with(node_id, ex_data, "old_version", "new_version")
 
 
-def test_forced_fail_activity_not_send_post_set_state_signal():
+def test_forced_fail_activity_call_hook():
     node_id = "nid"
     ex_data = "ex_msg"
     process_id = "pid"
+    root_pipeline_id = "r_pid"
+    top_pipeline_id = "t_pid"
+    pipeline_stack = "p_stack"
+    execution_data = ExecutionData({}, {})
+
+    process_info = MagicMock()
+    process_info.process_id = process_id
+    process_info.root_pipeline_id = root_pipeline_id
+    process_info.pipeline_stack = pipeline_stack
+    process_info.top_pipeline_id = top_pipeline_id
 
     node = MagicMock()
+    node.id = node_id
     node.type = NodeType.ServiceActivity
+    node.code = "code"
+    node.version = "1.0.0"
+    node.name = "name"
 
     state = MagicMock()
     state.name = states.RUNNING
     state.version = "old_version"
+
+    service = MagicMock()
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)
@@ -980,6 +1025,69 @@ def test_forced_fail_activity_not_send_post_set_state_signal():
     runtime.get_process_id_with_current_node_id = MagicMock(return_value=process_id)
     runtime.get_execution_data_outputs = MagicMock(return_value={})
     runtime.set_state = MagicMock(return_value="new_version")
+    runtime.get_process_info = MagicMock(return_value=process_info)
+    runtime.get_service = MagicMock(return_value=service)
+    runtime.get_execution_data = MagicMock(return_value=execution_data)
+    runtime.set_execution_data = MagicMock()
+
+    engine = Engine(runtime=runtime)
+    engine.forced_fail_activity(node_id, ex_data)
+
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_state.assert_has_calls(calls=[call(node_id)] * 3)
+    runtime.get_process_info.assert_called_once_with(process_id)
+    runtime.get_service.assert_has_calls(calls=[call(code=node.code, version=node.version, name=node.name)] * 2)
+    runtime.get_process_id_with_current_node_id.assert_called_once_with(node_id)
+    runtime.pre_forced_fail_activity.assert_called_once_with(node_id, ex_data)
+    runtime.get_execution_data_outputs.assert_called_once_with(node_id)
+    runtime.set_state.assert_called_once_with(
+        node_id=node_id,
+        to_state=states.FAILED,
+        refresh_version=True,
+        set_archive_time=True,
+        send_post_set_state_signal=True,
+    )
+    runtime.set_execution_data.assert_not_called()
+    runtime.set_execution_data_outputs.assert_called_once_with(node_id, {"ex_data": ex_data, "_forced_failed": True})
+    runtime.kill.assert_called_once_with(process_id)
+    runtime.post_forced_fail_activity.assert_called_once_with(node_id, ex_data, "old_version", "new_version")
+
+
+def test_forced_fail_activity_not_send_post_set_state_signal():
+    node_id = "nid"
+    ex_data = "ex_msg"
+    process_id = "pid"
+    root_pipeline_id = "r_pid"
+    top_pipeline_id = "t_pid"
+    pipeline_stack = "p_stack"
+
+    process_info = MagicMock()
+    process_info.process_id = process_id
+    process_info.root_pipeline_id = root_pipeline_id
+    process_info.pipeline_stack = pipeline_stack
+    process_info.top_pipeline_id = top_pipeline_id
+
+    node = MagicMock()
+    node.type = NodeType.ServiceActivity
+    node.code = "code"
+    node.version = "1.0.0"
+    node.name = "name"
+
+    state = MagicMock()
+    state.name = states.RUNNING
+    state.version = "old_version"
+
+    service = MagicMock()
+    service.need_run_hook = MagicMock(return_value=False)
+
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_process_id_with_current_node_id = MagicMock(return_value=process_id)
+    runtime.get_execution_data_outputs = MagicMock(return_value={})
+    runtime.set_state = MagicMock(return_value="new_version")
+    runtime.get_process_info = MagicMock(return_value=process_info)
+    runtime.get_service = MagicMock(return_value=service)
 
     engine = Engine(runtime=runtime)
     engine.forced_fail_activity(node_id, ex_data, send_post_set_state_signal=False)

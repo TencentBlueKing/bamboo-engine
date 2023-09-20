@@ -14,12 +14,13 @@ specific language governing permissions and limitations under the License.
 
 import mock
 import pytest
-from mock import MagicMock
+from mock import MagicMock, call
 
 from bamboo_engine import states
 from bamboo_engine.engine import Engine
 from bamboo_engine.eri import (
     CallbackData,
+    ExecutionData,
     NodeType,
     ProcessInfo,
     Schedule,
@@ -108,7 +109,7 @@ def interrupter(pi, node_id, schedule_id):
 @pytest.fixture
 def node():
     return ServiceActivity(
-        id=node_id,
+        id="nid",
         type=NodeType.ServiceActivity,
         target_flows=["f1"],
         target_nodes=["t1"],
@@ -421,13 +422,25 @@ def test_schedule__has_next_schedule(node_id, state, pi, schedule, node, interru
 
 def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter):
     schedule.type = ScheduleType.POLL
+    execution_data = ExecutionData({"key": "value"}, {})
+
+    service = MagicMock()
+    service.need_run_hook = MagicMock(return_value=True)
+    service.dispatch = MagicMock(return_value=True)
+
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.get_execution_data_outputs = MagicMock(return_value={})
+
     runtime.apply_schedule_lock = MagicMock(return_value=True)
     runtime.get_schedule = MagicMock(return_value=schedule)
     runtime.get_state = MagicMock(return_value=state)
     runtime.get_node = MagicMock(return_value=node)
     runtime.node_finish = MagicMock()
+    runtime.get_service = MagicMock(return_value=service)
+    runtime.get_execution_data = MagicMock(return_value=execution_data)
+    runtime.get_data_inputs = MagicMock(return_value={})
+    runtime.set_execution_data = MagicMock()
     handler = MagicMock()
     handler.schedule = MagicMock(
         return_value=ScheduleResult(
@@ -453,9 +466,13 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.schedule.assert_not_called()
     runtime.get_schedule.assert_called_once_with(schedule.id)
     runtime.node_finish.assert_called_once_with(pi.root_pipeline_id, node.id)
-    runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_state.assert_has_calls(calls=[call(node_id)] * 2)
     runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_execution_data.assert_called_once_with(node_id)
+    runtime.set_execution_data.assert_called_once_with(node_id=node.id, data=execution_data)
+    runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_callback_data.assert_not_called()
+    service.dispatch.assert_called_once()
     handler.schedule.assert_called_once_with(
         process_info=pi,
         loop=state.loop,
@@ -469,6 +486,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.execute.assert_called_once_with(
         process_id=pi.process_id, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root", headers={}
     )
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=node.name)
 
     assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
     assert interrupter.check_point.version_mismatch is False
