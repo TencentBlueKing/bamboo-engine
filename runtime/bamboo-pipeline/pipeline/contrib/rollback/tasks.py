@@ -3,6 +3,7 @@ import json
 import logging
 
 from celery import task
+from django.conf import settings
 from django.db import transaction
 from pipeline.conf.default_settings import ROLLBACK_QUEUE
 from pipeline.contrib.rollback import constants
@@ -42,32 +43,32 @@ class RollbackCleaner:
         node.save()
 
     def clear_data(self):
-        try:
-            # 节点快照需要全部删除，可能会有下一次的回滚
-            RollbackNodeSnapshot.objects.filter(root_pipeline_id=self.snapshot.root_pipeline_id).delete()
-            # 回滚快照需要置为已过期
-            RollbackSnapshot.objects.filter(root_pipeline_id=self.snapshot.root_pipeline_id).update(is_expired=True)
-            # 预约计划需要修改为已过期
-            RollbackPlan.objects.filter(
-                root_pipeline_id=self.snapshot.root_pipeline_id, start_node_id=self.snapshot.start_node_id
-            ).update(is_expired=True)
-            # 节点的预约信息需要清理掉
-            self._clear_node_reserve_flag(self.snapshot.start_node_id)
+        # 节点快照需要全部删除，可能会有下一次的回滚
+        RollbackNodeSnapshot.objects.filter(root_pipeline_id=self.snapshot.root_pipeline_id).delete()
+        # 回滚快照需要置为已过期
+        RollbackSnapshot.objects.filter(root_pipeline_id=self.snapshot.root_pipeline_id).update(is_expired=True)
+        # 预约计划需要修改为已过期
+        RollbackPlan.objects.filter(
+            root_pipeline_id=self.snapshot.root_pipeline_id, start_node_id=self.snapshot.start_node_id
+        ).update(is_expired=True)
+        # 节点的预约信息需要清理掉
+        self._clear_node_reserve_flag(self.snapshot.start_node_id)
+        # 需要删除该节点的进程信息/非主进程的，防止网关再分支处回滚时，仍然有正在运行的process得不到清理
+        Process.objects.filter(
+            root_pipeline_id=self.snapshot.root_pipeline_id, current_node_id=self.snapshot.start_node_id
+        ).exclude(parent_id=-1).delete()
 
-            graph = json.loads(self.snapshot.graph)
-            need_clean_node_id_list = graph["nodes"] + json.loads(self.snapshot.other_nodes)
-            # 清理状态信息
-            State.objects.filter(root_id=self.snapshot.root_pipeline_id, node_id__in=need_clean_node_id_list).delete()
-            # 清理Schedule 信息
-            Schedule.objects.filter(node_id__in=need_clean_node_id_list).delete()
-            # 清理日志信息
-            LogEntry.objects.filter(node_id__in=need_clean_node_id_list).delete()
-            ExecutionHistory.objects.filter(node_id__in=need_clean_node_id_list).delete()
-            DBExecutionData.objects.filter(node_id__in=need_clean_node_id_list).delete()
-            CallbackData.objects.filter(node_id__in=need_clean_node_id_list).delete()
-        except Exception as e:
-            logger.error("[RollbackCleaner] clear_data error, snapshot_id={}, err={}".format(self.snapshot.id, e))
-            raise e
+        graph = json.loads(self.snapshot.graph)
+        need_clean_node_id_list = graph["nodes"] + json.loads(self.snapshot.other_nodes)
+        # 清理状态信息
+        State.objects.filter(root_id=self.snapshot.root_pipeline_id, node_id__in=need_clean_node_id_list).delete()
+        # 清理Schedule 信息
+        Schedule.objects.filter(node_id__in=need_clean_node_id_list).delete()
+        # 清理日志信息
+        LogEntry.objects.filter(node_id__in=need_clean_node_id_list).delete()
+        ExecutionHistory.objects.filter(node_id__in=need_clean_node_id_list).delete()
+        DBExecutionData.objects.filter(node_id__in=need_clean_node_id_list).delete()
+        CallbackData.objects.filter(node_id__in=need_clean_node_id_list).delete()
 
 
 class TokenRollbackTaskHandler:
@@ -95,22 +96,17 @@ class TokenRollbackTaskHandler:
         if self.node_id in [constants.END_FLAG, constants.START_FLAG]:
             return True
 
-        try:
-            # 获取节点快照，可能会有多多份快照，需要多次回滚
-            node_snapshots = RollbackNodeSnapshot.objects.filter(node_id=self.node_id, rolled_back=False).order_by(
-                "-id"
-            )
-            for node_snapshot in node_snapshots:
-                service = self.runtime.get_service(code=node_snapshot.code, version=node_snapshot.version)
-                data = ExecutionData(inputs=json.loads(node_snapshot.inputs), outputs=json.loads(node_snapshot.outputs))
-                parent_data = ExecutionData(inputs=json.loads(node_snapshot.context_values), outputs={})
-                result = service.service.rollback(data, parent_data, self.retry_data)
-                node_snapshot.rolled_back = True
-                node_snapshot.save()
-                if not result:
-                    return False
-        except Exception:
-            return False
+        # 获取节点快照，可能会有多多份快照，需要多次回滚
+        node_snapshots = RollbackNodeSnapshot.objects.filter(node_id=self.node_id, rolled_back=False).order_by("-id")
+        for node_snapshot in node_snapshots:
+            service = self.runtime.get_service(code=node_snapshot.code, version=node_snapshot.version)
+            data = ExecutionData(inputs=json.loads(node_snapshot.inputs), outputs=json.loads(node_snapshot.outputs))
+            parent_data = ExecutionData(inputs=json.loads(node_snapshot.context_values), outputs={})
+            result = service.service.rollback(data, parent_data, self.retry_data)
+            node_snapshot.rolled_back = True
+            node_snapshot.save()
+            if not result:
+                return False
 
         return True
 
@@ -118,39 +114,47 @@ class TokenRollbackTaskHandler:
         """
         启动pipeline
         """
-        try:
-            # 将当前住进程的正在运行的节点指向目标ID
-            main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
-            main_process.current_node_id = target_node_id
-            main_process.save()
+        # 将当前住进程的正在运行的节点指向目标ID
+        main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
+        main_process.current_node_id = target_node_id
+        main_process.save()
 
-            # 重置该节点的状态信息
-            self.runtime.set_state(
-                node_id=target_node_id,
-                to_state=states.READY,
-                is_retry=True,
-                refresh_version=True,
-                clear_started_time=True,
-                clear_archived_time=True,
-            )
-            process_info = self.runtime.get_process_info(main_process.id)
-            self.runtime.execute(
-                process_id=process_info.process_id,
-                node_id=target_node_id,
-                root_pipeline_id=process_info.root_pipeline_id,
-                parent_pipeline_id=process_info.top_pipeline_id,
-            )
-            # 设置pipeline的状态
-            self.runtime.set_state(
-                node_id=root_pipeline_id,
-                to_state=states.READY,
-            )
+        # 重置该节点的状态信息
+        self.runtime.set_state(
+            node_id=target_node_id,
+            to_state=states.READY,
+            is_retry=True,
+            refresh_version=True,
+            clear_started_time=True,
+            clear_archived_time=True,
+        )
+
+        process_info = self.runtime.get_process_info(main_process.id)
+        # 设置pipeline的状态
+        self.runtime.set_state(
+            node_id=root_pipeline_id,
+            to_state=states.READY,
+        )
+
+        # 如果开启了流程自动回滚，则会开启到目标节点之后自动开始
+        if getattr(settings, "PIPELINE_ENABLE_AUTO_ROLLBACK", True):
             self.runtime.set_state(
                 node_id=root_pipeline_id,
                 to_state=states.RUNNING,
             )
-        except Exception as e:
-            raise Exception("rollback failed: rollback to node error, error={}".format(str(e)))
+        else:
+            # 流程设置为暂停状态，需要用户点击才可以继续开始
+            self.runtime.set_state(
+                node_id=root_pipeline_id,
+                to_state=states.SUSPENDED,
+            )
+
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=target_node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
     def rollback(self):
         with transaction.atomic():
@@ -205,8 +209,14 @@ class TokenRollbackTaskHandler:
             next_node = rollback_graph.next(self.node_id)
             if list(next_node)[0] == constants.END_FLAG:
                 self.set_state(rollback_snapshot.root_pipeline_id, states.ROLL_BACK_SUCCESS)
-                clearner.clear_data()
-                self.start_pipeline(root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=target_node_id)
+                try:
+                    clearner.clear_data()
+                    self.start_pipeline(
+                        root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=target_node_id
+                    )
+                except Exception as e:
+                    logger.error("[TokenRollbackTaskHandler][rollback] start_pipeline failed, err={}".format(e))
+                    return
                 return
 
             for node in next_node:
@@ -228,43 +238,59 @@ class AnyRollbackHandler:
         """
         启动pipeline
         """
-        try:
-            main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
-            main_process.current_node_id = target_node_id
-            main_process.save()
 
-            # 重置该节点的状态信息
+        main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
+        main_process.current_node_id = target_node_id
+        main_process.save()
+
+        # 重置该节点的状态信息
+        self.runtime.set_state(
+            node_id=target_node_id,
+            to_state=states.READY,
+            is_retry=True,
+            refresh_version=True,
+            clear_started_time=True,
+            clear_archived_time=True,
+        )
+
+        process_info = self.runtime.get_process_info(main_process.id)
+
+        # 如果开启了流程自动回滚，则会开启到目标节点之后自动开始
+        if getattr(settings, "PIPELINE_ENABLE_AUTO_ROLLBACK", True):
             self.runtime.set_state(
-                node_id=target_node_id,
-                to_state=states.READY,
-                is_retry=True,
-                refresh_version=True,
-                clear_started_time=True,
-                clear_archived_time=True,
+                node_id=root_pipeline_id,
+                to_state=states.RUNNING,
             )
-            process_info = self.runtime.get_process_info(main_process.id)
-            self.runtime.execute(
-                process_id=process_info.process_id,
-                node_id=target_node_id,
-                root_pipeline_id=process_info.root_pipeline_id,
-                parent_pipeline_id=process_info.top_pipeline_id,
+        else:
+            # 流程设置为暂停状态，需要用户点击才可以继续开始
+            self.runtime.set_state(
+                node_id=root_pipeline_id,
+                to_state=states.SUSPENDED,
             )
-        except Exception as e:
-            logger.error(
-                "rollback failed: start pipeline, pipeline_id={}, target_node_id={}, error={}".format(
-                    root_pipeline_id, target_node_id, str(e)
-                )
-            )
-            raise e
+
+        self.runtime.execute(
+            process_id=process_info.process_id,
+            node_id=target_node_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            parent_pipeline_id=process_info.top_pipeline_id,
+        )
 
     def rollback(self):
         with transaction.atomic():
             rollback_snapshot = RollbackSnapshot.objects.get(id=self.snapshot_id)
             clearner = RollbackCleaner(rollback_snapshot)
-            clearner.clear_data()
-            self.start_pipeline(
-                root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=rollback_snapshot.target_node_id
-            )
+            try:
+                clearner.clear_data()
+                self.start_pipeline(
+                    root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=rollback_snapshot.target_node_id
+                )
+            except Exception as e:
+                logger.error(
+                    "rollback failed: start pipeline, pipeline_id={}, target_node_id={}, error={}".format(
+                        rollback_snapshot.root_pipeline_id, rollback_snapshot.target_node_id, str(e)
+                    )
+                )
+                raise e
 
 
 @task

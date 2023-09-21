@@ -27,7 +27,7 @@ from pipeline.contrib.rollback.models import (
 )
 from pipeline.contrib.rollback.tasks import any_rollback, token_rollback
 from pipeline.core.constants import PE
-from pipeline.eri.models import Node, State
+from pipeline.eri.models import Node, Process, State
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from bamboo_engine import states
@@ -108,7 +108,7 @@ class RollbackValidator:
         tokens = json.loads(rollback_token.token)
         start_token = tokens.get(start_node_id)
         if start_token is None:
-            raise RollBackException("rollback failed: can't find the not token, node_id={}".format(start_token))
+            raise RollBackException("rollback failed: can't find the not token, node_id={}".format(start_node_id))
 
         node_id_list = []
         for node_id, token in node_id_list:
@@ -118,7 +118,7 @@ class RollbackValidator:
         if State.objects.filter(node_id__in=node_id_list, name=states.RUNNING).exists():
             raise RollBackException(
                 "rollback failed: there is currently the same node that the same token is running, node_id={}".format(
-                    start_token
+                    start_node_id
                 )
             )
 
@@ -133,6 +133,14 @@ class RollbackValidator:
             .exists()
         ):
             raise RollBackException("rollback failed: there is currently the some node is running")
+
+    @staticmethod
+    def validate_start_node_id(root_pipeline_id, start_node_id):
+        """
+        回滚的开始节点必须是流程的末尾节点
+        """
+        if not Process.objects.filter(root_pipeline_id=root_pipeline_id, current_node_id=start_node_id).exists():
+            raise RollBackException("rollback failed: The node to be rolled back must be the current node!")
 
 
 class BaseRollbackHandler:
@@ -160,6 +168,7 @@ class BaseRollbackHandler:
 
     def _reserve(self, start_node_id, target_node_id, reserve_rollback=True):
         # 节点预约 需要在 Node 里面 插入 reserve_rollback = True, 为 True的节点执行完将暂停
+        RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
         RollbackValidator.validate_node(target_node_id)
         node = Node.objects.filter(node_id=start_node_id).first()
         if node is None:
@@ -256,6 +265,7 @@ class AnyRollbackHandler(BaseRollbackHandler):
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
         RollbackValidator.validate_node_state_by_any_mode(self.root_pipeline_id)
         # 回滚的开始节点运行失败的情况
+        RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
 
