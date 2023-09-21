@@ -14,6 +14,9 @@ from pipeline.core.flow.activity import Service
 
 
 class CustomService(Service):
+    
+    __need_run_hook__ = True
+    
     def node_execute_exception(self, data, parent_data):
         """节点 execute 异常后"""
         return True
@@ -49,7 +52,7 @@ class CustomService(Service):
 | post_skip_node            | 节点跳过后                               | ✅    |
 | pre_forced_fail_activity  | 强制失败节点前                             | ✅    |
 | post_forced_fail_activity | 强制失败节点后                             | ✅    |
-| pre_callback              | 回调节点前                               |      |
+| pre_callback              | 回调节点前                               | ✅    |
 | node_execute_fail         | 节点 execute 失败后，如果节点配置忽略失败，该钩子不会触发   |      |
 | node_schedule_fail        | 节点 schedule 失败后， 如果节点配置忽略失败，该钩子不会触发 |      |
 | node_execute_exception    | 节点 execute 异常后                      |      |
