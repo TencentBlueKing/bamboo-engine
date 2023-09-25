@@ -22,7 +22,7 @@ from pipeline.contrib.rollback.models import (
     RollbackToken,
 )
 from pipeline.core.constants import PE
-from pipeline.eri.models import Node, State
+from pipeline.eri.models import Node, Process, State
 
 from bamboo_engine import states
 from bamboo_engine.utils.string import unique_id
@@ -159,6 +159,7 @@ class TestRollBackBase(TestCase):
             version=unique_id("v"),
         )
 
+        Process.objects.create(root_pipeline_id=pipeline_id, current_node_id=start_node_id, priority=1)
         result = api.reserve_rollback(pipeline_id, start_node_id, target_node_id)
         self.assertFalse(result.result)
         message = "rollback failed: pipeline token not exist, pipeline_id={}".format(pipeline_id)
