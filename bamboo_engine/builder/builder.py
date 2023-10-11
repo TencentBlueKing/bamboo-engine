@@ -119,10 +119,6 @@ def _get_next_node(node, pipeline_tree):
     return next_nodes
 
 
-def _get_converge_gateway(pipeline_tree, converge_id):
-    return pipeline_tree["gateways"][converge_id]
-
-
 def _get_all_nodes(pipeline_tree: dict, with_subprocess: bool = False) -> dict:
     """
     获取 pipeline_tree 中所有 activity 的信息
