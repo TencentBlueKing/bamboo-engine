@@ -88,7 +88,7 @@ class Service(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def dispatch(
+    def hook_dispatch(
         self,
         hook: HookType,
         data: ExecutionData,

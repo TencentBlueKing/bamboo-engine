@@ -1017,7 +1017,7 @@ def test_forced_fail_activity_call_hook():
 
     service = MagicMock()
     service.need_run_hook = MagicMock(return_value=True)
-    service.dispatch = MagicMock(return_value=True)
+    service.hook_dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_node = MagicMock(return_value=node)

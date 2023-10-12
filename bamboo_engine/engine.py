@@ -16,9 +16,8 @@ specific language governing permissions and limitations under the License.
 import logging
 import random
 import time
-import typing
 from functools import wraps
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from . import states, validator
 from .eri import (
@@ -210,13 +209,13 @@ class Engine:
             raise InvalidOperationError("can not use pause_node_appoint api for {}".format(node.type))
 
         process_id = self.runtime.get_process_id_with_current_node_id(node_id)
-        process_info: typing.Optional[ProcessInfo] = None
+        process_info: Optional[ProcessInfo] = None
         if process_id:
             process_info = self.runtime.get_process_info(process_id)
 
         self.runtime.pre_pause_node(node_id)
         if process_info:
-            self.dispatch(
+            self.hook_dispatch(
                 top_pipeline_id=process_info.top_pipeline_id,
                 root_pipeline_id=process_info.root_pipeline_id,
                 node_id=node.id,
@@ -228,7 +227,7 @@ class Engine:
 
         self.runtime.post_pause_node(node_id)
         if process_info:
-            self.dispatch(
+            self.hook_dispatch(
                 top_pipeline_id=process_info.top_pipeline_id,
                 root_pipeline_id=process_info.root_pipeline_id,
                 node_id=node.id,
@@ -297,7 +296,7 @@ class Engine:
         self._add_history(node_id, state)
 
         self.runtime.pre_retry_node(node_id, data)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -322,7 +321,7 @@ class Engine:
         )
 
         self.runtime.post_retry_node(node_id, data)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -395,7 +394,7 @@ class Engine:
         process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_skip_node(node_id)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -426,7 +425,7 @@ class Engine:
         )
 
         self.runtime.post_skip_node(node_id)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -563,7 +562,7 @@ class Engine:
         process_info: ProcessInfo = self.runtime.get_process_info(process_id)
 
         self.runtime.pre_forced_fail_activity(node_id, ex_data)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -590,7 +589,7 @@ class Engine:
         self.runtime.kill(process_id)
 
         self.runtime.post_forced_fail_activity(node_id, ex_data, old_ver, new_ver)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node.id,
@@ -637,7 +636,7 @@ class Engine:
         callback_data: CallbackData = self.runtime.get_callback_data(data_id)
 
         self.runtime.pre_callback(node_id, version, data)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node_id,
@@ -648,7 +647,7 @@ class Engine:
         self.runtime.schedule(process_info.process_id, node_id, schedule.id, data_id)
 
         self.runtime.post_callback(node_id, version, data)
-        self.dispatch(
+        self.hook_dispatch(
             top_pipeline_id=process_info.top_pipeline_id,
             root_pipeline_id=process_info.root_pipeline_id,
             node_id=node_id,
@@ -656,15 +655,17 @@ class Engine:
             callback_data=callback_data,
         )
 
-    def dispatch(
+    def hook_dispatch(
         self,
         top_pipeline_id: str,
         root_pipeline_id: str,
         node_id: str,
         hook: HookType,
-        node: typing.Optional[Node] = None,
-        service: typing.Optional[Service] = None,
-        callback_data: typing.Optional[CallbackData] = None,
+        node: Optional[Node] = None,
+        service: Optional[Service] = None,
+        callback_data: Optional[CallbackData] = None,
+        *args,
+        **kwargs
     ):
         """
         Hook 分发
@@ -717,12 +718,12 @@ class Engine:
         )
 
         service_data: ExecutionData = self.runtime.get_execution_data(node.id)
-        root_pipeline_inputs: typing.Dict[str, typing.Any] = {
+        root_pipeline_inputs: Dict[str, Any] = {
             key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()
         }
         root_pipeline_data: ExecutionData = ExecutionData(inputs=root_pipeline_inputs, outputs={})
         try:
-            dispatch_success: bool = service.dispatch(
+            dispatch_success: bool = service.hook_dispatch(
                 hook=hook, data=service_data, root_pipeline_data=root_pipeline_data, callback_data=callback_data
             )
             # 只有处于执行主逻辑并且钩子执行成功，才允许保存上下文
@@ -1002,7 +1003,7 @@ class Engine:
                 if not execute_result.should_sleep and execute_result.next_node_id != node.id:
                     self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
                     if process_info.pipeline_stack:
-                        self.dispatch(
+                        self.hook_dispatch(
                             top_pipeline_id=process_info.top_pipeline_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             node_id=node.id,
@@ -1281,7 +1282,7 @@ class Engine:
             if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
                 self.runtime.node_finish(root_pipeline_id, node.id)
-                self.dispatch(
+                self.hook_dispatch(
                     top_pipeline_id=process_info.top_pipeline_id,
                     root_pipeline_id=process_info.root_pipeline_id,
                     node_id=node.id,

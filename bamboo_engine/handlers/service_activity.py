@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 
 import logging
 import traceback
-import typing
+from typing import Any, Dict, List, Optional, Set
 
 from bamboo_engine import metrics, states
 from bamboo_engine.config import Settings
@@ -63,7 +63,7 @@ class ServiceActivityHandler(NodeHandler):
         process_info: ProcessInfo,
         loop: int,
         inner_loop: int,
-    ) -> typing.Dict[str, typing.Any]:
+    ) -> Dict[str, Any]:
         """
         准备执行数据
         :param process_info: 进程信息
@@ -76,9 +76,9 @@ class ServiceActivityHandler(NodeHandler):
         root_pipeline_id: str = process_info.root_pipeline_id
 
         data: Data = self.runtime.get_data(self.node.id)
-        root_pipeline_inputs: typing.Dict[str, typing.Any] = self._get_plain_inputs(process_info.root_pipeline_id)
-        need_render_inputs: typing.Dict[str, typing.Any] = data.need_render_inputs()
-        render_escape_inputs: typing.Dict[str, typing.Any] = data.render_escape_inputs()
+        root_pipeline_inputs: Dict[str, Any] = self._get_plain_inputs(process_info.root_pipeline_id)
+        need_render_inputs: Dict[str, Any] = data.need_render_inputs()
+        render_escape_inputs: Dict[str, Any] = data.render_escape_inputs()
 
         logger.info(
             "root_pipeline[%s] node(%s) activity execute data: %s, root inputs: %s",
@@ -89,7 +89,7 @@ class ServiceActivityHandler(NodeHandler):
         )
 
         # resolve inputs context references
-        inputs_refs: typing.Set[str] = set(Template(need_render_inputs).get_reference())
+        inputs_refs: Set[str] = set(Template(need_render_inputs).get_reference())
         logger.info(
             "root_pipeline[%s] node(%s) activity original refs: %s",
             root_pipeline_id,
@@ -98,7 +98,7 @@ class ServiceActivityHandler(NodeHandler):
         )
 
         # 获取直接或间接引用其他变量的键
-        additional_refs: typing.Set[str] = self.runtime.get_context_key_references(
+        additional_refs: Set[str] = self.runtime.get_context_key_references(
             pipeline_id=top_pipeline_id, keys=inputs_refs
         )
         inputs_refs = inputs_refs.union(additional_refs)
@@ -110,7 +110,7 @@ class ServiceActivityHandler(NodeHandler):
         )
 
         # prepare context
-        context_values: typing.List[ContextValue] = self.runtime.get_context_values(
+        context_values: List[ContextValue] = self.runtime.get_context_values(
             pipeline_id=top_pipeline_id, keys=inputs_refs
         )
 
@@ -157,7 +157,7 @@ class ServiceActivityHandler(NodeHandler):
         loop: int,
         inner_loop: int,
         version: str,
-        recover_point: typing.Optional[ExecuteInterruptPoint] = None,
+        recover_point: Optional[ExecuteInterruptPoint] = None,
     ) -> ExecuteResult:
         """
         节点的 execute 处理逻辑
@@ -175,12 +175,12 @@ class ServiceActivityHandler(NodeHandler):
             top_pipeline_id = process_info.top_pipeline_id
             root_pipeline_id = process_info.root_pipeline_id
 
-            run_data: typing.Dict[str, typing.Any] = self.prepare_data(process_info, loop, inner_loop)
+            run_data: Dict[str, Any] = self.prepare_data(process_info, loop, inner_loop)
             context: Context = run_data["context"]
             data: Data = run_data["data"]
-            need_render_inputs: typing.Dict[str, typing.Any] = run_data["need_render_inputs"]
-            render_escape_inputs: typing.Dict[str, typing.Any] = run_data["render_escape_inputs"]
-            root_pipeline_inputs: typing.Dict[str, typing.Any] = run_data["root_pipeline_inputs"]
+            need_render_inputs: Dict[str, Any] = run_data["need_render_inputs"]
+            render_escape_inputs: Dict[str, Any] = run_data["render_escape_inputs"]
+            root_pipeline_inputs: Dict[str, Any] = run_data["root_pipeline_inputs"]
 
             # hydrate will call user code, use try to catch unexpected error
             try:
@@ -267,7 +267,7 @@ class ServiceActivityHandler(NodeHandler):
             )
         else:
             self.runtime.node_enter(root_pipeline_id=root_pipeline_id, node_id=self.node.id)
-            self.dispatch(
+            self.hook_dispatch(
                 hook=HookType.NODE_ENTER,
                 root_pipeline_id=root_pipeline_id,
                 service=service,
@@ -282,7 +282,7 @@ class ServiceActivityHandler(NodeHandler):
                 service_data.outputs.ex_data = ex_data
                 logger.warning("root_pipeline[%s]service execute fail: %s", process_info.root_pipeline_id, ex_data)
                 self.runtime.node_execute_exception(root_pipeline_id, self.node.id, ex_data=ex_data)
-                self.dispatch(
+                self.hook_dispatch(
                     hook=HookType.NODE_EXECUTE_EXCEPTION,
                     root_pipeline_id=root_pipeline_id,
                     service=service,
@@ -351,7 +351,7 @@ class ServiceActivityHandler(NodeHandler):
             if not self.node.error_ignorable:
 
                 self.runtime.node_execute_fail(root_pipeline_id, self.node.id)
-                self.dispatch(
+                self.hook_dispatch(
                     hook=HookType.NODE_EXECUTE_FAIL,
                     root_pipeline_id=root_pipeline_id,
                     service=service,
@@ -419,7 +419,7 @@ class ServiceActivityHandler(NodeHandler):
         execution_data: ExecutionData,
         error_ignored: bool,
         root_pipeline_inputs: dict,
-        recover_point: typing.Optional[ScheduleInterruptPoint] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         self.runtime.set_state(
             node_id=self.node.id,
@@ -450,8 +450,8 @@ class ServiceActivityHandler(NodeHandler):
         loop: int,
         inner_loop: int,
         schedule: Schedule,
-        callback_data: typing.Optional[CallbackData] = None,
-        recover_point: typing.Optional[ScheduleInterruptPoint] = None,
+        callback_data: Optional[CallbackData] = None,
+        recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         """
         节点的 schedule 处理逻辑
@@ -522,7 +522,7 @@ class ServiceActivityHandler(NodeHandler):
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
                 self.runtime.node_schedule_exception(root_pipeline_id, self.node.id, ex_data=traceback.format_exc())
-                self.dispatch(
+                self.hook_dispatch(
                     hook=HookType.NODE_SCHEDULE_EXCEPTION,
                     root_pipeline_id=root_pipeline_id,
                     service=service,
@@ -604,7 +604,7 @@ class ServiceActivityHandler(NodeHandler):
             if not self.node.error_ignorable:
 
                 self.runtime.node_schedule_fail(root_pipeline_id, self.node.id)
-                self.dispatch(
+                self.hook_dispatch(
                     hook=HookType.NODE_SCHEDULE_FAIL,
                     root_pipeline_id=root_pipeline_id,
                     service=service,
@@ -646,14 +646,16 @@ class ServiceActivityHandler(NodeHandler):
                 recover_point=recover_point,
             )
 
-    def dispatch(
+    def hook_dispatch(
         self,
         hook: HookType,
         root_pipeline_id: str,
         service: Service,
         service_data: ExecutionData,
         root_pipeline_data: ExecutionData,
-        callback_data: typing.Optional[CallbackData] = None,
+        callback_data: Optional[CallbackData] = None,
+        *args,
+        **kwargs
     ) -> bool:
         """
         hook 分发逻辑
@@ -675,7 +677,7 @@ class ServiceActivityHandler(NodeHandler):
         if service.need_run_hook():
             logger.info("root_pipeline[%s] node(%s) start to run hook(%s)", root_pipeline_id, service_data, hook.value)
             try:
-                dispatch_success: bool = service.dispatch(
+                dispatch_success: bool = service.hook_dispatch(
                     hook=hook, data=service_data, root_pipeline_data=root_pipeline_data, callback_data=callback_data
                 )
                 logger.info(

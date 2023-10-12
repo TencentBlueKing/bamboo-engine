@@ -426,7 +426,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
 
     service = MagicMock()
     service.need_run_hook = MagicMock(return_value=True)
-    service.dispatch = MagicMock(return_value=True)
+    service.hook_dispatch = MagicMock(return_value=True)
 
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
@@ -472,7 +472,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.set_execution_data.assert_called_once_with(node_id=node.id, data=execution_data)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_callback_data.assert_not_called()
-    service.dispatch.assert_called_once()
+    service.hook_dispatch.assert_called_once()
     handler.schedule.assert_called_once_with(
         process_info=pi,
         loop=state.loop,

@@ -62,7 +62,7 @@ class ServiceWrapper(ServiceInterface):
 
         return execute_res
 
-    def dispatch(
+    def hook_dispatch(
         self,
         hook: HookType,
         data: ExecutionData,
