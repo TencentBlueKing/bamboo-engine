@@ -11,27 +11,28 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import logging
 import datetime
-from dateutil.relativedelta import relativedelta
+import logging
+
 from celery import task
 from celery.schedules import crontab
 from celery.task import periodic_task
-from django.db import transaction, connection
-
+from dateutil.relativedelta import relativedelta
+from django.apps import apps
+from django.db import connection, transaction
 from pipeline.conf import default_settings
 from pipeline.core.pipeline import Pipeline
 from pipeline.engine import api, signals, states
 from pipeline.engine.core import runtime, schedule
 from pipeline.engine.health import zombie
 from pipeline.engine.models import (
+    History,
     NodeCeleryTask,
     NodeRelationship,
     PipelineProcess,
     ProcessCeleryTask,
-    Status,
     ScheduleService,
-    History,
+    Status,
 )
 from pipeline.models import PipelineInstance
 
@@ -257,6 +258,15 @@ def _clean_pipeline_instance_data(instance_id, timestamp):
     delete_pipeline_process = (
         "DELETE FROM `engine_pipelineprocess` " "WHERE `engine_pipelineprocess`.`root_pipeline_id` = %s"
     )
+
+    delete_rollback_plan = "DELETE FROM `rollback_rollbackplan` WHERE `rollback_rollbackplan`.`root_pipeline_id` = %s"
+    delete_rollback_snapshot = (
+        "DELETE FROM `rollback_rollbacksnapshot` WHERE `rollback_rollbacksnapshot`.`root_pipeline_id` = %s"
+    )
+    delete_rollback_token = (
+        "DELETE FROM `rollback_rollbacktoken` WHERE `rollback_rollbacktoken`.`root_pipeline_id` = %s"
+    )
+
     with transaction.atomic():
         with connection.cursor() as cursor:
             if pipeline_process_ids:
@@ -288,6 +298,15 @@ def _clean_pipeline_instance_data(instance_id, timestamp):
                 _raw_sql_execute(cursor, delete_history_data % history_fs, history_data_ids, timestamp)
             _raw_sql_execute(cursor, delete_pipeline_process, [instance_id], timestamp)
             PipelineInstance.objects.filter(instance_id=instance_id).update(is_expired=True)
+
+            try:
+                apps.get_model("rollback", "RollbackToken")
+            except Exception:
+                logger.error("[_clean_pipeline_rollback_data] delete error, the rollback app not installed")
+                return
+            _raw_sql_execute(cursor, delete_rollback_plan, [instance_id], timestamp)
+            _raw_sql_execute(cursor, delete_rollback_snapshot, [instance_id], timestamp)
+            _raw_sql_execute(cursor, delete_rollback_token, [instance_id], timestamp)
 
 
 def _sql_log(sql, params, timestamp):
