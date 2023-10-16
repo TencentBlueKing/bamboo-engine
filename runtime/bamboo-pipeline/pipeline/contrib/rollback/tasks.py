@@ -255,14 +255,8 @@ class AnyRollbackHandler:
 
         process_info = self.runtime.get_process_info(main_process.id)
 
-        # 如果开启了流程自动回滚，则会开启到目标节点之后自动开始
-        if getattr(settings, "PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED", True):
-            self.runtime.set_state(
-                node_id=root_pipeline_id,
-                to_state=states.RUNNING,
-            )
-        else:
-            # 流程设置为暂停状态，需要用户点击才可以继续开始
+        # 如果PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED为False, 那么则会重制流程为暂停状态
+        if not getattr(settings, "PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED", True):
             self.runtime.set_state(
                 node_id=root_pipeline_id,
                 to_state=states.SUSPENDED,
