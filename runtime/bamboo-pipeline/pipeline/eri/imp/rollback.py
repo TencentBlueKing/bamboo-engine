@@ -2,6 +2,7 @@
 import json
 import logging
 
+from django.apps import apps
 from django.core.serializers.json import DjangoJSONEncoder
 
 from bamboo_engine.builder.builder import generate_pipeline_token
@@ -16,7 +17,7 @@ class RollbackMixin:
         """
         try:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
-            from pipeline.contrib.rollback.models import RollbackToken
+            RollbackToken = apps.get_model("rollback", "RollbackToken")
         except Exception as e:
             logger.error(
                 "[RollbackMixin][set_pipeline_token] import RollbackToken error, "
@@ -34,8 +35,8 @@ class RollbackMixin:
         创建一分节点快照
         """
         try:
+            RollbackNodeSnapshot = apps.get_model("rollback", "RollbackNodeSnapshot")
             # 引用成功说明pipeline rollback 这个 app 是安装过的
-            from pipeline.contrib.rollback.models import RollbackNodeSnapshot
         except Exception as e:
             logger.error(
                 "[RollbackMixin][set_node_snapshot] import RollbackNodeSnapshot error, "
@@ -60,10 +61,11 @@ class RollbackMixin:
         try:
             # 引用成功说明pipeline rollback 这个 app 是安装过的
             from pipeline.contrib.rollback.handler import RollbackDispatcher
-            from pipeline.contrib.rollback.models import RollbackPlan
+
+            RollbackPlan = apps.get_model("rollback", "RollbackPlan")
         except Exception as e:
             logger.error(
-                "[RollbackMixin][set_pipeline_token] import RollbackHandler or RollbackPlan error, "
+                "[RollbackMixin][set_pipeline_token] import RollbackDispatcher or RollbackPlan error, "
                 "Please check whether the rollback app is installed correctly, err={}".format(e)
             )
             return
@@ -74,6 +76,8 @@ class RollbackMixin:
             )
             handler = RollbackDispatcher(root_pipeline_id=root_pipeline_id, mode=rollback_plan.mode)
             handler.rollback(rollback_plan.start_node_id, rollback_plan.target_node_id)
+            rollback_plan.is_expired = True
+            rollback_plan.save(update_fields=["is_expired"])
         except Exception as e:
             logger.error("[RollbackMixin][start_rollback] start a rollback task error, err={}".format(e))
             return

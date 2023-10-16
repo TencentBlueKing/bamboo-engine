@@ -120,9 +120,6 @@ class Engine:
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
         )
 
-        if self.runtime.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value):
-            self.runtime.set_pipeline_token(pipeline)
-
         # execute from start event
         self.runtime.execute(
             process_id=process_id,
@@ -842,27 +839,15 @@ class Engine:
                 # 节点运行成功并且不需要进行调度
                 if not execute_result.should_sleep and execute_result.next_node_id != node.id:
                     self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
-                    if node.type == NodeType.ServiceActivity:
-                        if self.runtime.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value):
-                            inputs = self.runtime.get_execution_data_inputs(node.id)
-                            outputs = self.runtime.get_execution_data_outputs(node.id)
-                            root_pipeline_input = {
-                                key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()
-                            }
-                            self.runtime.set_node_snapshot(
-                                root_pipeline_id=root_pipeline_id,
-                                node_id=node_id,
-                                code=node.code,
-                                version=node.version,
-                                context_values=root_pipeline_input,
-                                inputs=inputs,
-                                outputs=outputs,
-                            )
-                            # 判断是否已经预约了回滚，如果已经预约，则kill掉当前的process，直接return
-                            if node.reserve_rollback:
-                                self.runtime.die(process_id)
-                                self.runtime.start_rollback(root_pipeline_id, node_id)
-                                return
+                    if node.type == NodeType.ServiceActivity and self.runtime.get_config(
+                        RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
+                    ):
+                        self._set_snapshot(root_pipeline_id, node)
+                        # 判断是否已经预约了回滚，如果已经预约，则kill掉当前的process，直接return
+                        if node.reserve_rollback:
+                            self.runtime.die(process_id)
+                            self.runtime.start_rollback(root_pipeline_id, node_id)
+                            return
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -1137,26 +1122,14 @@ class Engine:
             if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
                 self.runtime.node_finish(root_pipeline_id, node.id)
-                if node.type == NodeType.ServiceActivity:
-                    if self.runtime.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value):
-                        inputs = self.runtime.get_execution_data_inputs(node.id)
-                        outputs = self.runtime.get_execution_data_outputs(node.id)
-                        root_pipeline_input = {
-                            key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()
-                        }
-                        self.runtime.set_node_snapshot(
-                            root_pipeline_id=root_pipeline_id,
-                            node_id=node_id,
-                            code=node.code,
-                            version=node.version,
-                            context_values=root_pipeline_input,
-                            inputs=inputs,
-                            outputs=outputs,
-                        )
-                        # 判断是否已经预约了回滚，如果已经预约，启动回滚流程
-                        if node.reserve_rollback:
-                            self.runtime.start_rollback(root_pipeline_id, node_id)
-                            return
+                if node.type == NodeType.ServiceActivity and self.runtime.get_config(
+                    RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
+                ):
+                    self._set_snapshot(root_pipeline_id, node)
+                    # 判断是否已经预约了回滚，如果已经预约，启动回滚流程
+                    if node.reserve_rollback:
+                        self.runtime.start_rollback(root_pipeline_id, node_id)
+                        return
 
                 self.runtime.execute(
                     process_id=process_id,
@@ -1169,6 +1142,20 @@ class Engine:
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                 time.time() - engine_post_schedule_start_at
             )
+
+    def _set_snapshot(self, root_pipeline_id, node):
+        inputs = self.runtime.get_execution_data_inputs(node.id)
+        outputs = self.runtime.get_execution_data_outputs(node.id)
+        root_pipeline_input = {key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()}
+        self.runtime.set_node_snapshot(
+            root_pipeline_id=root_pipeline_id,
+            node_id=node.id,
+            code=node.code,
+            version=node.version,
+            context_values=root_pipeline_input,
+            inputs=inputs,
+            outputs=outputs,
+        )
 
     def _add_history(
         self,

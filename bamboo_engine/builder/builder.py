@@ -16,12 +16,11 @@ import queue
 
 from bamboo_engine.utils.string import unique_id
 
+from ..validator.connection import validate_graph_without_circle
 from .flow.data import Data, Params
 from .flow.event import ExecutableEndEvent
 
 __all__ = ["build_tree"]
-
-from ..validator.connection import validate_graph_without_circle
 
 __skeleton = {
     "id": None,
@@ -144,6 +143,9 @@ def _get_all_nodes(pipeline_tree: dict, with_subprocess: bool = False) -> dict:
 
 
 def _delete_flow_id_from_node_io(node, flow_id, io_type):
+    """
+    删除节点的某条连线，io_type(incoming or outgoing)
+    """
     if node[io_type] == flow_id:
         node[io_type] = ""
     elif isinstance(node[io_type], list):

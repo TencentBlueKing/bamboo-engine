@@ -4,7 +4,7 @@ import copy
 from pipeline.contrib.rollback import constants
 from pipeline.core.constants import PE
 
-from bamboo_engine.utils.graph import Graph
+from bamboo_engine.utils.graph import RollbackGraph
 
 
 class CycleHandler:
@@ -35,7 +35,7 @@ class CycleHandler:
         """
         判断是否有环，存在环是，将返回一个有效的list
         """
-        graph = Graph(nodes, edges)
+        graph = RollbackGraph(nodes, edges)
         return graph.get_cycle()
 
     def delete_edge(self, source, target):
@@ -65,7 +65,7 @@ class CycleHandler:
 
 class RollbackGraphHandler:
     def __init__(self, node_map, start_id, target_id):
-        self.graph = Graph()
+        self.graph = RollbackGraph()
         # 回滚开始的节点
         self.start_id = start_id
         # 回滚结束的节点
@@ -78,6 +78,11 @@ class RollbackGraphHandler:
         self.others_nodes = []
 
     def build(self, node_id, source_id=None):
+        """
+        使用递归构建用于回滚的图谱，最终会生成一条连线 source_id -> node_id
+        @param node_id 本次遍历到的节点id
+        @param source_id 上一个遍历到的节点id
+        """
         node_detail = self.node_map.get(node_id)
         if node_detail is None:
             return
@@ -106,8 +111,10 @@ class RollbackGraphHandler:
         else:
             targets = node_detail.get("targets", {}).values()
 
+        # 为了避免循环的过程中source_id值被覆盖，需要额外临时存储source_id
+        temporary_source_id = source_id
         for target in targets:
-            source_id = self.build(target, source_id)
+            source_id = self.build(target, temporary_source_id)
 
         return source_id
 

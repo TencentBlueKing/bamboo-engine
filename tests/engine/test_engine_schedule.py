@@ -10,7 +10,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
+import copy
 
 import mock
 import pytest
@@ -127,7 +127,6 @@ def recover_point():
 
 
 def test_schedule__lock_get_failed(node_id, schedule_id, state, pi, schedule, interrupter):
-
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.apply_schedule_lock = MagicMock(return_value=False)
@@ -469,6 +468,70 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.execute.assert_called_once_with(
         process_id=pi.process_id, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root", headers={}
     )
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is True
+    assert interrupter.check_point.schedule_result is not None
+    assert interrupter.check_point.lock_released is True
+
+
+def test_schedule__schedule_done_with_node_reserved_rollback(node_id, state, pi, schedule, node, interrupter):
+    node = copy.deepcopy(node)
+    node.reserve_rollback = True
+
+    schedule.type = ScheduleType.POLL
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.start_rollback = MagicMock(return_value=True)
+    runtime.get_config = MagicMock(return_value=True)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.node_finish = MagicMock()
+    handler = MagicMock()
+    handler.schedule = MagicMock(
+        return_value=ScheduleResult(
+            has_next_schedule=False,
+            schedule_after=-1,
+            schedule_done=True,
+            next_node_id="nid2",
+        )
+    )
+    get_handler = MagicMock(return_value=handler)
+
+    engine = Engine(runtime=runtime)
+
+    with mock.patch(
+        "bamboo_engine.engine.HandlerFactory.get_handler",
+        get_handler,
+    ):
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
+
+    runtime.beat.assert_called_once_with(pi.process_id)
+    runtime.get_process_info.assert_called_once_with(pi.process_id)
+    runtime.apply_schedule_lock.assert_called_once_with(schedule.id)
+    runtime.schedule.assert_not_called()
+
+    runtime.start_rollback.assert_called_once_with(pi.root_pipeline_id, node_id)
+
+    runtime.get_schedule.assert_called_once_with(schedule.id)
+    runtime.node_finish.assert_called_once_with(pi.root_pipeline_id, node.id)
+    runtime.get_state.assert_called_once_with(node_id)
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_callback_data.assert_not_called()
+    handler.schedule.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.inner_loop,
+        schedule=schedule,
+        callback_data=None,
+        recover_point=interrupter.recover_point,
+    )
+    runtime.set_next_schedule.assert_not_called()
+    runtime.finish_schedule.assert_called_once_with(schedule.id)
 
     assert interrupter.check_point.name == ScheduleKeyPoint.RELEASE_LOCK_DONE
     assert interrupter.check_point.version_mismatch is False

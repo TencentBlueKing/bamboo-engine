@@ -125,7 +125,7 @@ class RollbackValidator:
     @staticmethod
     def validate_node_state_by_any_mode(root_pipeline_id):
         """
-        使用any模式下的回滚，相同token的节点不允许有正在运行的节点
+        使用any模式下的回滚, 不允许有正在运行的节点
         """
         if (
             State.objects.filter(root_id=root_pipeline_id, name=states.RUNNING)
@@ -379,7 +379,6 @@ class TokenRollbackHandler(BaseRollbackHandler):
 
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
 
-        # 非token 模式, 将直接回到目标节点
         if skip_rollback_nodes is None:
             skip_rollback_nodes = []
 

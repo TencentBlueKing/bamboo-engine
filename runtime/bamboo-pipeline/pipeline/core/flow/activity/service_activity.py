@@ -96,6 +96,9 @@ class Service(object, metaclass=ABCMeta):
     def schedule(self, data, parent_data, callback_data=None):
         return True
 
+    def rollback(self, data, parent_data, rollback_data=None):
+        return True
+
     def finish_schedule(self):
         setattr(self, self.schedule_result_attr, True)
 
@@ -113,9 +116,6 @@ class Service(object, metaclass=ABCMeta):
         if "_runtime_attrs" not in self.__dict__:
             self._runtime_attrs = {}
         self._runtime_attrs.update(**kwargs)
-
-    def rollback(self, data, parent_data, rollback_data=None):
-        return True
 
 
 class ServiceActivity(Activity):

@@ -20,7 +20,7 @@ from django.db.models import F
 from django.utils import timezone
 from pipeline.eri.models import Process
 
-from bamboo_engine import metrics
+from bamboo_engine import metrics, states
 from bamboo_engine.eri import DispatchProcess, ProcessInfo, SuspendedProcessInfo
 
 
@@ -275,17 +275,20 @@ class ProcessMixin:
 
         if getattr(settings, "PIPELINE_ENABLE_ROLLBACK", False):
             # 如果开启了回滚，则会自动删除相关的process信息，防止异常
-            for current_node, destination in from_to.items():
-                Process.objects.filter(
-                    parent_id=parent_id,
-                    asleep=True,
-                    destination_id=destination,
-                    current_node_id=current_node,
-                    root_pipeline_id=root_pipeline_id,
-                    pipeline_stack=stack_json,
-                    priority=qs[0].priority,
-                    queue=qs[0].queue,
-                ).delete()
+            state = self.get_state(root_pipeline_id)
+            # 如果流程处在回滚中，才会删除
+            if state.name == states.ROLLING_BACK:
+                for current_node, destination in from_to.items():
+                    Process.objects.filter(
+                        parent_id=parent_id,
+                        asleep=True,
+                        destination_id=destination,
+                        current_node_id=current_node,
+                        root_pipeline_id=root_pipeline_id,
+                        pipeline_stack=stack_json,
+                        priority=qs[0].priority,
+                        queue=qs[0].queue,
+                    ).delete()
 
         children = [
             Process(

@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-from bamboo_engine.utils.graph import Graph
+from bamboo_engine.utils.graph import RollbackGraph
 
 
 def test_graph():
-    graph1 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4]])
+    graph1 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4]])
     assert not graph1.has_cycle()
     assert graph1.get_cycle() == []
-    graph2 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 1]])
+    graph2 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 1]])
     assert graph2.has_cycle()
     assert graph2.get_cycle() == [1, 2, 3, 4, 1]
-    graph3 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 2]])
+    graph3 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 2]])
     assert graph3.has_cycle()
     assert graph3.get_cycle() == [2, 3, 4, 2]
-    graph4 = Graph(
+    graph4 = RollbackGraph(
         [
             "n20c4a0601193f268bfa168f1192eacd",
             "nef42d10350b3961b53df7af67e16d9b",
@@ -198,7 +198,7 @@ def test_graph():
     )
     assert not graph4.has_cycle()
     assert graph4.get_cycle() == []
-    graph5 = Graph([1, 2, 3, 4, 5], [[1, 2], [2, 3], [2, 4], [4, 5], [5, 2]])
+    graph5 = RollbackGraph([1, 2, 3, 4, 5], [[1, 2], [2, 3], [2, 4], [4, 5], [5, 2]])
     assert graph5.has_cycle()
     assert graph5.get_cycle() == [2, 4, 5, 2]
 

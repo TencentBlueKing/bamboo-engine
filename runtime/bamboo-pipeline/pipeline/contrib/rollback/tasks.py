@@ -26,7 +26,7 @@ from pipeline.eri.runtime import BambooDjangoRuntime
 
 from bamboo_engine import states
 from bamboo_engine.eri import ExecutionData
-from bamboo_engine.utils.graph import Graph
+from bamboo_engine.utils.graph import RollbackGraph
 
 logger = logging.getLogger("celery")
 
@@ -137,7 +137,7 @@ class TokenRollbackTaskHandler:
         )
 
         # 如果开启了流程自动回滚，则会开启到目标节点之后自动开始
-        if getattr(settings, "PIPELINE_ENABLE_AUTO_ROLLBACK", True):
+        if getattr(settings, "PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED", True):
             self.runtime.set_state(
                 node_id=root_pipeline_id,
                 to_state=states.RUNNING,
@@ -158,7 +158,7 @@ class TokenRollbackTaskHandler:
 
     def rollback(self):
         with transaction.atomic():
-            rollback_snapshot = RollbackSnapshot.objects.select_for_update().get(id=self.snapshot_id)
+            rollback_snapshot = RollbackSnapshot.objects.select_for_update().get(id=self.snapshot_id, is_expired=False)
             node_access_record = json.loads(rollback_snapshot.node_access_record)
             # 只有非重试状态下才需要记录访问
             if not self.retry:
@@ -168,7 +168,7 @@ class TokenRollbackTaskHandler:
 
         graph = json.loads(rollback_snapshot.graph)
         target_node_id = rollback_snapshot.target_node_id
-        rollback_graph = Graph(nodes=graph["nodes"], flows=graph["flows"])
+        rollback_graph = RollbackGraph(nodes=graph["nodes"], flows=graph["flows"])
         skip_rollback_nodes = json.loads(rollback_snapshot.skip_rollback_nodes)
         in_degrees = rollback_graph.in_degrees()
 
@@ -256,7 +256,7 @@ class AnyRollbackHandler:
         process_info = self.runtime.get_process_info(main_process.id)
 
         # 如果开启了流程自动回滚，则会开启到目标节点之后自动开始
-        if getattr(settings, "PIPELINE_ENABLE_AUTO_ROLLBACK", True):
+        if getattr(settings, "PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED", True):
             self.runtime.set_state(
                 node_id=root_pipeline_id,
                 to_state=states.RUNNING,
@@ -277,7 +277,7 @@ class AnyRollbackHandler:
 
     def rollback(self):
         with transaction.atomic():
-            rollback_snapshot = RollbackSnapshot.objects.get(id=self.snapshot_id)
+            rollback_snapshot = RollbackSnapshot.objects.get(id=self.snapshot_id, is_expired=False)
             clearner = RollbackCleaner(rollback_snapshot)
             try:
                 clearner.clear_data()
