@@ -72,7 +72,7 @@ class BambooDjangoRuntime(
     RollbackMixin,
     EngineRuntimeInterface,
 ):
-    ERI_SUPPORT_VERSION = 7
+    ERI_SUPPORT_VERSION = 8
 
     def __init__(self):
         try:
