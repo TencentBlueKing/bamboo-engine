@@ -57,6 +57,7 @@ from .metrics import (
     setup_gauge,
     setup_histogram,
 )
+from .utils.constants import RuntimeSettings
 from .utils.host import get_hostname
 from .utils.string import get_lower_case_name
 
@@ -122,6 +123,7 @@ class Engine:
         process_id = self.runtime.prepare_run_pipeline(
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
         )
+
         # execute from start event
         self.runtime.execute(
             process_id=process_id,
@@ -912,7 +914,8 @@ class Engine:
                         # 设置状态前检测
                         if node_state.name not in states.INVERTED_TRANSITION[states.RUNNING]:
                             logger.info(
-                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING for exist state",  # noqa
+                                "[pipeline-trace](root_pipeline: %s) can not transit state from %s to RUNNING "
+                                "for exist state",
                                 process_info.root_pipeline_id,
                                 node_state.name,
                             )
@@ -1010,6 +1013,15 @@ class Engine:
                             hook=HookType.NODE_FINISH,
                             node=node,
                         )
+                    if node.type == NodeType.ServiceActivity and self.runtime.get_config(
+                        RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
+                    ):
+                        self._set_snapshot(root_pipeline_id, node)
+                        # 判断是否已经预约了回滚，如果已经预约，则kill掉当前的process，直接return
+                        if node.reserve_rollback:
+                            self.runtime.die(process_id)
+                            self.runtime.start_rollback(root_pipeline_id, node_id)
+                            return
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -1177,7 +1189,9 @@ class Engine:
                 # only retry at multiple calback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, "
+                        "will not retry to get lock",
+                        # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
@@ -1290,6 +1304,15 @@ class Engine:
                     node=node,
                     callback_data=callback_data,
                 )
+                if node.type == NodeType.ServiceActivity and self.runtime.get_config(
+                    RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
+                ):
+                    self._set_snapshot(root_pipeline_id, node)
+                    # 判断是否已经预约了回滚，如果已经预约，启动回滚流程
+                    if node.reserve_rollback:
+                        self.runtime.start_rollback(root_pipeline_id, node_id)
+                        return
+
                 self.runtime.execute(
                     process_id=process_id,
                     node_id=schedule_result.next_node_id,
@@ -1301,6 +1324,20 @@ class Engine:
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                 time.time() - engine_post_schedule_start_at
             )
+
+    def _set_snapshot(self, root_pipeline_id, node):
+        inputs = self.runtime.get_execution_data_inputs(node.id)
+        outputs = self.runtime.get_execution_data_outputs(node.id)
+        root_pipeline_input = {key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()}
+        self.runtime.set_node_snapshot(
+            root_pipeline_id=root_pipeline_id,
+            node_id=node.id,
+            code=node.code,
+            version=node.version,
+            context_values=root_pipeline_input,
+            inputs=inputs,
+            outputs=outputs,
+        )
 
     def _add_history(
         self,

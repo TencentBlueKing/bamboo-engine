@@ -96,6 +96,7 @@ def node(node_id):
         parent_pipeline_id="root",
         code="",
         version="",
+        reserve_rollback=True,
         error_ignorable=False,
     )
 
@@ -380,7 +381,6 @@ def test_execute__rerun_and_have_to_sleep(node_id, pi, interrupter, node, state)
 
 
 def test_execute__have_to_sleep(node_id, pi, interrupter, node, state):
-
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
@@ -780,7 +780,6 @@ def test_execute__has_dispatch_processes(node_id, pi, interrupter, node, state):
 
 
 def test_execute__have_to_die(node_id, pi, interrupter, node, state):
-
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
@@ -837,6 +836,81 @@ def test_execute__have_to_die(node_id, pi, interrupter, node, state):
     runtime.die.assert_called_once_with(pi.process_id)
 
     get_handler.assert_called_once_with(node, runtime, interrupter)
+    handler.execute.assert_called_once_with(
+        process_info=pi,
+        loop=state.loop,
+        inner_loop=state.loop,
+        version=state.version,
+        recover_point=interrupter.recover_point,
+    )
+
+    assert interrupter.check_point.name == ExecuteKeyPoint.EXECUTE_NODE_DONE
+    assert interrupter.check_point.state_already_exist is False
+    assert interrupter.check_point.running_node_version == "v"
+    assert interrupter.check_point.execute_result is not None
+
+
+def test_execute__has_reversed_rollback_plan(node_id, pi, interrupter, node, state):
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_config = MagicMock(return_value=True)
+    runtime.start_rollback = MagicMock(return_value=True)
+    runtime.get_state_or_none = MagicMock(return_value=None)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.set_state = MagicMock(return_value=state.version)
+    handler = MagicMock()
+    handler.execute = MagicMock(
+        return_value=ExecuteResult(
+            should_sleep=False,
+            schedule_ready=False,
+            schedule_type=None,
+            schedule_after=-1,
+            dispatch_processes=[],
+            next_node_id=None,
+            should_die=True,
+        )
+    )
+
+    get_handler = MagicMock(return_value=handler)
+
+    engine = Engine(runtime=runtime)
+
+    with mock.patch(
+        "bamboo_engine.engine.HandlerFactory.get_handler",
+        get_handler,
+    ):
+        engine.execute(pi.process_id, node_id, pi.root_pipeline_id, pi.top_pipeline_id, interrupter, {})
+
+    runtime.beat.assert_called_once_with(pi.process_id)
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_state_or_none.assert_called_once_with(node_id)
+    runtime.node_rerun_limit.assert_not_called()
+    runtime.set_state.assert_called_once_with(
+        node_id=node.id,
+        to_state=states.RUNNING,
+        version=None,
+        loop=1,
+        inner_loop=1,
+        root_id=pi.root_pipeline_id,
+        parent_id=pi.top_pipeline_id,
+        set_started_time=True,
+        reset_skip=False,
+        reset_retry=False,
+        reset_error_ignored=False,
+        refresh_version=False,
+        ignore_boring_set=False,
+    )
+    runtime.start_rollback.assert_called_once_with(pi.root_pipeline_id, node_id)
+    runtime.sleep.assert_not_called()
+    runtime.set_schedule.assert_not_called()
+    runtime.schedule.assert_not_called()
+    runtime.execute.assert_not_called()
+    runtime.die.assert_called_once_with(pi.process_id)
+
+    get_handler.assert_called_once_with(node, runtime, interrupter)
+
     handler.execute.assert_called_once_with(
         process_info=pi,
         loop=state.loop,

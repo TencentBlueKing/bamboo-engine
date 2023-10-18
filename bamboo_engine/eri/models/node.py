@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 from enum import Enum
-from typing import List, Dict
+from typing import Dict, List
 
 from bamboo_engine.utils.object import Representable
 
@@ -49,7 +49,8 @@ class Node(Representable):
         parent_pipeline_id: str,
         can_skip: bool = True,
         can_retry: bool = True,
-        name: str = None
+        name: str = None,
+        reserve_rollback: bool = False,
     ):
         """
 
@@ -82,6 +83,7 @@ class Node(Representable):
         self.can_skip = can_skip
         self.can_retry = can_retry
         self.name = name
+        self.reserve_rollback = reserve_rollback
 
 
 class EmptyStartEvent(Node):

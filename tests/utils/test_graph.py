@@ -1,125 +1,18 @@
 # -*- coding: utf-8 -*-
-"""
-Tencent is pleased to support the open source community by making 蓝鲸智云PaaS平台社区版 (BlueKing PaaS Community
-Edition) available.
-Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
-Licensed under the MIT License (the "License"); you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-http://opensource.org/licenses/MIT
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
-an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
-specific language governing permissions and limitations under the License.
-"""
+from bamboo_engine.utils.graph import RollbackGraph
 
 
-class Graph(object):
-    def __init__(self, nodes, flows):
-        self.nodes = nodes
-        self.flows = flows
-        self.path = []
-        self.last_visited_node = ""
-        self.graph = {node: [] for node in self.nodes}
-        for flow in self.flows:
-            self.graph[flow[0]].append(flow[1])
-
-    def has_cycle(self):
-        self.path = []
-        visited = {node: False for node in self.nodes}
-        visit_stack = {node: False for node in self.nodes}
-
-        for node in self.nodes:
-            if self._has_cycle(node, visited, visit_stack):
-                return True
-        return False
-
-    def _has_cycle(self, node, visited, visit_stack):
-        self.last_visited_node = node
-        self.path.append(node)
-        visited[node] = True
-        visit_stack[node] = True
-
-        for neighbor in self.graph[node]:
-            if not visited[neighbor]:
-                if self._has_cycle(neighbor, visited, visit_stack):
-                    return True
-            elif visit_stack[neighbor]:
-                self.path.append(neighbor)
-                return True
-
-        self.path.remove(node)
-        visit_stack[node] = False
-        return False
-
-    def get_cycle(self):
-        if self.has_cycle():
-            cross_node = self.path[-1]
-            if self.path.count(cross_node) > 1:
-                return self.path[self.path.index(cross_node) :]
-            else:
-                return self.path
-        return []
-
-
-class RollbackGraph(Graph):
-    def __init__(self, nodes=None, flows=None):
-        self.nodes = nodes or []
-        self.flows = flows or []
-        super().__init__(self.nodes, self.flows)
-        self.edges = self.build_edges()
-        self.path = []
-        self.last_visited_node = ""
-        self.graph = {node: [] for node in self.nodes}
-        for flow in self.flows:
-            self.graph[flow[0]].append(flow[1])
-
-    def build_edges(self):
-        edges = {}
-        for flow in self.flows:
-            edges.setdefault(flow[0], set()).add(flow[1])
-        return edges
-
-    def add_node(self, node):
-        if node not in self.nodes:
-            self.nodes.append(node)
-
-    def add_edge(self, source, target):
-        self.flows.append([source, target])
-        self.edges.setdefault(source, set()).add(target)
-
-    def next(self, node):
-        return self.edges.get(node, {})
-
-    def reverse(self):
-        graph = RollbackGraph()
-        graph.nodes = self.nodes
-        for flow in self.flows:
-            graph.add_edge(flow[1], flow[0])
-
-        return graph
-
-    def in_degrees(self):
-        ingress = {node: 0 for node in self.nodes}
-        for node, targets in self.edges.items():
-            for target in targets:
-                ingress[target] += 1
-
-        return ingress
-
-    def as_dict(self):
-        return {"nodes": self.nodes, "flows": self.flows}
-
-
-if __name__ == "__main__":
-    graph1 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4]])
+def test_graph():
+    graph1 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4]])
     assert not graph1.has_cycle()
     assert graph1.get_cycle() == []
-    graph2 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 1]])
+    graph2 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 1]])
     assert graph2.has_cycle()
     assert graph2.get_cycle() == [1, 2, 3, 4, 1]
-    graph3 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 2]])
+    graph3 = RollbackGraph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4], [4, 2]])
     assert graph3.has_cycle()
     assert graph3.get_cycle() == [2, 3, 4, 2]
-    graph4 = Graph(
+    graph4 = RollbackGraph(
         [
             "n20c4a0601193f268bfa168f1192eacd",
             "nef42d10350b3961b53df7af67e16d9b",
@@ -305,6 +198,9 @@ if __name__ == "__main__":
     )
     assert not graph4.has_cycle()
     assert graph4.get_cycle() == []
-    graph5 = Graph([1, 2, 3, 4, 5], [[1, 2], [2, 3], [2, 4], [4, 5], [5, 2]])
+    graph5 = RollbackGraph([1, 2, 3, 4, 5], [[1, 2], [2, 3], [2, 4], [4, 5], [5, 2]])
     assert graph5.has_cycle()
     assert graph5.get_cycle() == [2, 4, 5, 2]
+
+    graph6 = graph5.reverse()
+    assert graph6.next(2), {1, 5}

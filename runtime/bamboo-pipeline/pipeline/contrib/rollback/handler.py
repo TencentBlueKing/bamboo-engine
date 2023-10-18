@@ -14,197 +14,443 @@ specific language governing permissions and limitations under the License.
 import json
 
 from django.db import transaction
+from django.db.models import Q
+from pipeline.conf.default_settings import ROLLBACK_QUEUE
 from pipeline.contrib.exceptions import RollBackException
-from pipeline.core.constants import PE
-from pipeline.eri.models import (
-    CallbackData,
-    ExecutionData,
-    ExecutionHistory,
-    LogEntry,
-    Node,
-    Process,
-    Schedule,
-    State,
+from pipeline.contrib.rollback import constants
+from pipeline.contrib.rollback.constants import ANY, TOKEN
+from pipeline.contrib.rollback.graph import RollbackGraphHandler
+from pipeline.contrib.rollback.models import (
+    RollbackPlan,
+    RollbackSnapshot,
+    RollbackToken,
 )
+from pipeline.contrib.rollback.tasks import any_rollback, token_rollback
+from pipeline.core.constants import PE
+from pipeline.eri.models import Node, Process, State
 from pipeline.eri.runtime import BambooDjangoRuntime
 
-from bamboo_engine import api, states
+from bamboo_engine import states
 
 
-class RollBackHandler:
-    def __init__(self, root_pipeline_id, node_id):
-        self.root_pipeline_id = root_pipeline_id
-        self.node_id = node_id
-        self.runtime = BambooDjangoRuntime()
-
-    def _compute_validate_nodes(self, node_id, node_map, nodes=None):
-        """
-        计算并得到一个允许回调的节点列表。
-        该方法的实现思路如下，从开始节点开始遍历，通过每个节点的 targets 获取到该节点的下一个节点
-        - 对于并行网关和条件并行网关将直接跳过
-        - 对于分支网关，则会裁剪只保留执行的那条分支
-        - node_map 记录了所有已经执行过的节点的信息，当遍历到node_map中不存在的节点时，意味着已经遍历到了当前未执行的节点
-        此时会停止计算
-        """
-
-        if nodes is None:
-            nodes = []
-        node_detail = node_map.get(node_id)
-        # 当搜索不到时，说明已经扫描了所有已经执行过的节点了，此时直接结束
-        if node_detail is None:
-            return nodes
-
-        if node_detail["type"] == PE.ServiceActivity:
-            nodes.append(node_id)
-
-        # 对于并行网关，无法跳转到任何路径
-        if node_detail["type"] in [PE.ParallelGateway, PE.ConditionalParallelGateway]:
-            targets = [node_detail.get(PE.converge_gateway_id)]
-        # 对于分支网关内的, 只允许跳转到已经执行过的路径
-        elif node_detail["type"] == PE.ExclusiveGateway:
-            targets = [target for target in node_detail.get("targets", {}).values() if target in node_map.keys()]
-        else:
-            targets = node_detail.get("targets", {}).values()
-
-        for target in targets:
-            # 如果目标节点已经出现在了node中，说明出现了环，跳过该分支
-            if target in nodes:
-                continue
-            self._compute_validate_nodes(target, node_map, nodes)
-
-        return nodes
-
-    def _clean_engine_data(self, target_state):
-        """
-        执行清理工作
-        """
-        # 获取当前正在运行的节点
-        state_list = State.objects.filter(root_id=self.root_pipeline_id, name=states.RUNNING).exclude(
-            node_id=self.root_pipeline_id
-        )
-        for state in state_list:
-            # 强制失败这些节点
-            result = api.forced_fail_activity(self.runtime, node_id=state.node_id, ex_data="")
-            if not result.result:
-                raise RollBackException(
-                    "rollback failed: forced_fail_activity failed, node_id={}, message={}".format(
-                        target_state.node_id, result.message
-                    )
-                )
-
-        # 之后清理多余的进程信息，只保留主process即可。
-        Process.objects.filter(root_pipeline_id=self.root_pipeline_id).exclude(parent_id=-1).delete()
-
-        # 查询到所有在该节点之后创建的状态信息
-        need_clean_node_id_list = list(
-            State.objects.filter(root_id=self.root_pipeline_id, created_time__gt=target_state.created_time).values_list(
-                "node_id", flat=True
+class RollbackValidator:
+    @staticmethod
+    def validate_pipeline(root_pipeline_id):
+        pipeline_state = State.objects.filter(node_id=root_pipeline_id).first()
+        if not pipeline_state:
+            raise RollBackException(
+                "rollback failed: pipeline state not exist, pipeline_id={}".format(root_pipeline_id)
             )
-        )
-        # 同时清理掉目标节点的信息
-        need_clean_node_id_list.append(target_state.node_id)
 
-        # 清理状态信息
-        State.objects.filter(root_id=self.root_pipeline_id, node_id__in=need_clean_node_id_list).delete()
-        # 清理Schedule 信息
-        Schedule.objects.filter(node_id__in=need_clean_node_id_list).delete()
-        # 清理日志信息
-        LogEntry.objects.filter(node_id__in=need_clean_node_id_list).delete()
-        ExecutionHistory.objects.filter(node_id__in=need_clean_node_id_list).delete()
-        ExecutionData.objects.filter(node_id__in=need_clean_node_id_list).delete()
-        CallbackData.objects.filter(node_id__in=need_clean_node_id_list).delete()
+        if pipeline_state.name not in [states.RUNNING, states.ROLL_BACK_FAILED]:
+            raise RollBackException(
+                "rollback failed: the task of non-running state is not allowed to roll back, "
+                "pipeline_id={}, state={}".format(root_pipeline_id, pipeline_state.name)
+            )
 
-    def get_allowed_rollback_node_id_list(self):
+    @staticmethod
+    def validate_node(node_id, allow_failed=False):
+        node = Node.objects.filter(node_id=node_id).first()
+        if node is None:
+            raise RollBackException("rollback failed: node not exist, node={}".format(node_id))
+
+        node_detail = json.loads(node.detail)
+        if node_detail["type"] not in [PE.ServiceActivity, PE.EmptyStartEvent]:
+            raise RollBackException("rollback failed: only allows rollback to ServiceActivity type nodes")
+
+        target_node_state = State.objects.filter(node_id=node_id).first()
+
+        if target_node_state is None:
+            raise RollBackException("rollback failed: node state not exist, node={}".format(node_id))
+
+        allow_states = [states.FINISHED]
+        if allow_failed:
+            allow_states = [states.FINISHED, states.FAILED]
+        if target_node_state.name not in allow_states:
+            raise RollBackException(
+                "rollback failed: only allows rollback to finished node, allowed states {}".format(allow_states)
+            )
+
+    @staticmethod
+    def validate_token(root_pipeline_id, start_node_id, target_node_id):
+        try:
+            rollback_token = RollbackToken.objects.get(root_pipeline_id=root_pipeline_id)
+        except RollbackToken.DoesNotExist:
+            raise RollBackException(
+                "rollback failed: pipeline token not exist, pipeline_id={}".format(root_pipeline_id)
+            )
+
+        tokens = json.loads(rollback_token.token)
+
+        start_node_token = tokens.get(start_node_id)
+        target_node_token = tokens.get(target_node_id)
+
+        if start_node_token is None or target_node_token is None:
+            raise RollBackException("rollback failed: token not found, pipeline_id={}".format(root_pipeline_id))
+
+        if start_node_token != target_node_token:
+            raise RollBackException(
+                "rollback failed: start node token must equal target node, pipeline_id={}".format(root_pipeline_id)
+            )
+
+    @staticmethod
+    def validate_node_state_by_token_mode(root_pipeline_id, start_node_id):
         """
-        获取允许回退的节点id列表
+        使用token模式下的回滚，相同token的节点不允许有正在运行的节点
         """
-        # 不需要遍历整颗树，获取到现在已经执行成功的所有列表
+        try:
+            rollback_token = RollbackToken.objects.get(root_pipeline_id=root_pipeline_id)
+        except RollbackToken.DoesNotExist:
+            raise RollBackException(
+                "rollback failed: pipeline token not exist, pipeline_id={}".format(root_pipeline_id)
+            )
+
+        tokens = json.loads(rollback_token.token)
+        start_token = tokens.get(start_node_id)
+        if start_token is None:
+            raise RollBackException("rollback failed: can't find the not token, node_id={}".format(start_node_id))
+
+        node_id_list = []
+        for node_id, token in node_id_list:
+            if token == start_token:
+                node_id_list.append(node_id)
+
+        if State.objects.filter(node_id__in=node_id_list, name=states.RUNNING).exists():
+            raise RollBackException(
+                "rollback failed: there is currently the same node that the same token is running, node_id={}".format(
+                    start_node_id
+                )
+            )
+
+    @staticmethod
+    def validate_node_state_by_any_mode(root_pipeline_id):
+        """
+        使用any模式下的回滚, 不允许有正在运行的节点
+        """
+        if (
+            State.objects.filter(root_id=root_pipeline_id, name=states.RUNNING)
+            .exclude(node_id=root_pipeline_id)
+            .exists()
+        ):
+            raise RollBackException("rollback failed: there is currently the some node is running")
+
+    @staticmethod
+    def validate_start_node_id(root_pipeline_id, start_node_id):
+        """
+        回滚的开始节点必须是流程的末尾节点
+        """
+        if not Process.objects.filter(root_pipeline_id=root_pipeline_id, current_node_id=start_node_id).exists():
+            raise RollBackException("rollback failed: The node to be rolled back must be the current node!")
+
+
+class BaseRollbackHandler:
+    mode = None
+
+    def __init__(self, root_pipeline_id):
+        self.root_pipeline_id = root_pipeline_id
+        self.runtime = BambooDjangoRuntime()
+        # 检查pipeline 回滚的合法性
+        RollbackValidator.validate_pipeline(root_pipeline_id)
+
+    def get_allowed_rollback_node_id_list(self, start_node_id):
+        return []
+
+    def _get_allowed_rollback_node_map(self):
+        # 不需要遍历整颗树，获取到现在已经执行成功和失败节点的所有列表
         finished_node_id_list = (
-            State.objects.filter(root_id=self.root_pipeline_id, name=states.FINISHED)
+            State.objects.filter(root_id=self.root_pipeline_id, name__in=[states.FINISHED, states.FAILED])
             .exclude(node_id=self.root_pipeline_id)
             .values_list("node_id", flat=True)
         )
+        node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
+        # 获取node_id 到 node_detail的映射
+        return {n.node_id: json.loads(n.detail) for n in node_detail_list}
 
-        # 获取到除pipeline节点之外第一个被创建的节点，此时是开始节点
+    def _reserve(self, start_node_id, target_node_id, reserve_rollback=True):
+        # 节点预约 需要在 Node 里面 插入 reserve_rollback = True, 为 True的节点执行完将暂停
+        RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
+        RollbackValidator.validate_node(target_node_id)
+        node = Node.objects.filter(node_id=start_node_id).first()
+        if node is None:
+            raise RollBackException("reserve rollback failed, the node is not exists, node_id={}".format(start_node_id))
+
+        state = State.objects.filter(node_id=start_node_id).first()
+        if state is None:
+            raise RollBackException(
+                "reserve rollback failed, the node state is not exists, node_id={}".format(start_node_id)
+            )
+
+        # 不在执行中的节点不允许预约
+        if state.name != states.RUNNING:
+            raise RollBackException(
+                "reserve rollback failed, the node state is not Running, current state={},  node_id={}".format(
+                    state.name, start_node_id
+                )
+            )
+
+        with transaction.atomic():
+            if reserve_rollback:
+                # 一个流程只能同时拥有一个预约任务
+                if RollbackPlan.objects.filter(root_pipeline_id=self.root_pipeline_id, is_expired=False).exists():
+                    raise RollBackException(
+                        "reserve rollback failed, the rollbackPlan, current state={},  node_id={}".format(
+                            state.name, start_node_id
+                        )
+                    )
+                RollbackPlan.objects.create(
+                    root_pipeline_id=self.root_pipeline_id,
+                    start_node_id=start_node_id,
+                    target_node_id=target_node_id,
+                    mode=self.mode,
+                )
+            else:
+                # 取消回滚，删除所有的任务
+                RollbackPlan.objects.filter(root_pipeline_id=self.root_pipeline_id, start_node_id=start_node_id).update(
+                    is_expired=True
+                )
+
+            node_detail = json.loads(node.detail)
+            node_detail["reserve_rollback"] = reserve_rollback
+            node.detail = json.dumps(node_detail)
+            node.save()
+
+    def reserve_rollback(self, start_node_id, target_node_id):
+        """
+        预约回滚
+        """
+        RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
+        self._reserve(start_node_id, target_node_id)
+
+    def cancel_reserved_rollback(self, start_node_id, target_node_id):
+        """
+        取消预约回滚
+        """
+        RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
+        self._reserve(start_node_id, target_node_id, reserve_rollback=False)
+
+
+class AnyRollbackHandler(BaseRollbackHandler):
+    mode = ANY
+
+    def get_allowed_rollback_node_id_list(self, start_node_id):
+        node_map = self._get_allowed_rollback_node_map()
         start_node_state = (
             State.objects.filter(root_id=self.root_pipeline_id)
             .exclude(node_id=self.root_pipeline_id)
             .order_by("created_time")
             .first()
         )
+        target_node_id = start_node_state.node_id
+        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
+        graph, _ = rollback_graph.build_rollback_graph()
 
-        # 获取到所有当前已经运行完节点的详情
-        node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
-        # 获取node_id 到 node_detail的映射
-        node_map = {n.node_id: json.loads(n.detail) for n in node_detail_list}
+        return list(set(graph.nodes) - {constants.START_FLAG, constants.END_FLAG, start_node_id})
 
-        # 计算当前允许跳过的合法的节点
-        validate_nodes_list = self._compute_validate_nodes(start_node_state.node_id, node_map)
+    def retry_rollback_failed_node(self, node_id, retry_data):
+        """ """
+        raise RollBackException("rollback failed: when mode is any, not support retry")
 
-        return validate_nodes_list
+    def reserve_rollback(self, start_node_id, target_node_id):
+        """
+        预约回滚
+        """
+        self._reserve(start_node_id, target_node_id)
 
-    def rollback(self):
+    def cancel_reserved_rollback(self, start_node_id, target_node_id):
+        """
+        取消预约回滚
+        """
+        self._reserve(start_node_id, target_node_id, reserve_rollback=False)
+
+    def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
+        RollbackValidator.validate_node_state_by_any_mode(self.root_pipeline_id)
+        # 回滚的开始节点运行失败的情况
+        RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
+        RollbackValidator.validate_node(start_node_id, allow_failed=True)
+        RollbackValidator.validate_node(target_node_id)
+
+        node_map = self._get_allowed_rollback_node_map()
+        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
+
+        graph, other_nodes = rollback_graph.build_rollback_graph()
+        node_access_record = {node: 0 for node in graph.nodes}
+
+        rollback_snapshot = RollbackSnapshot.objects.create(
+            root_pipeline_id=self.root_pipeline_id,
+            graph=json.dumps(graph.as_dict()),
+            node_access_record=json.dumps(node_access_record),
+            start_node_id=start_node_id,
+            target_node_id=target_node_id,
+            other_nodes=json.dumps(other_nodes),
+            skip_rollback_nodes=json.dumps([]),
+        )
+
+        any_rollback.apply_async(
+            kwargs={"snapshot_id": rollback_snapshot.id},
+            queue=ROLLBACK_QUEUE,
+        )
+
+
+class TokenRollbackHandler(BaseRollbackHandler):
+    mode = TOKEN
+
+    def get_allowed_rollback_node_id_list(self, start_node_id):
+        """
+        获取允许回滚的节点范围
+        规则：token 一致的节点允许回滚
+        """
+        try:
+            rollback_token = RollbackToken.objects.get(root_pipeline_id=self.root_pipeline_id)
+        except RollbackToken.DoesNotExist:
+            raise RollBackException(
+                "rollback failed: pipeline token not exist, pipeline_id={}".format(self.root_pipeline_id)
+            )
+        node_map = self._get_allowed_rollback_node_map()
+        service_activity_node_list = [
+            node_id for node_id, node_detail in node_map.items() if node_detail["type"] == PE.ServiceActivity
+        ]
+
+        tokens = json.loads(rollback_token.token)
+        start_token = tokens.get(start_node_id)
+        if not start_token:
+            return []
+
+        nodes = []
+        for node_id, token in tokens.items():
+            if start_token == token and node_id != start_node_id and node_id in service_activity_node_list:
+                nodes.append(node_id)
+
+        return nodes
+
+    def retry_rollback_failed_node(self, node_id, retry_data):
+        """
+        重试回滚失败的节点
+        """
         pipeline_state = State.objects.filter(node_id=self.root_pipeline_id).first()
-        if not pipeline_state:
+        if pipeline_state.name != states.ROLL_BACK_FAILED:
             raise RollBackException(
-                "rollback failed: pipeline state not exist, pipeline_id={}".format(self.root_pipeline_id)
+                "rollback failed: only retry the failed pipeline, current_status={}".format(pipeline_state.name)
+            )
+        node_state = State.objects.filter(node_id=node_id).first()
+        if node_state.name != states.ROLL_BACK_FAILED:
+            raise RollBackException(
+                "rollback failed: only retry the failed node, current_status={}".format(node_state.name)
             )
 
-        if pipeline_state.name != states.RUNNING:
-            raise RollBackException(
-                "rollback failed: the task of non-running state is not allowed to roll back, pipeline_id={}".format(
-                    self.root_pipeline_id
-                )
-            )
+        # 获取镜像
+        try:
+            rollback_snapshot = RollbackSnapshot.objects.get(root_pipeline_id=self.root_pipeline_id, is_expired=False)
+        except RollbackSnapshot.DoesNotExist:
+            raise RollBackException("rollback failed: the rollback snapshot is not exists, please check")
+        except RollbackSnapshot.MultipleObjectsReturned:
+            raise RollBackException("rollback failed: found multi not expired rollback snapshot, please check")
 
-        node = Node.objects.filter(node_id=self.node_id).first()
-        if node is None:
-            raise RollBackException("rollback failed: node not exist, node={}".format(self.node_id))
+        # 重置pipeline的状态为回滚中
+        self.runtime.set_state(
+            node_id=self.root_pipeline_id,
+            to_state=states.ROLLING_BACK,
+        )
 
-        node_detail = json.loads(node.detail)
-        if node_detail["type"] not in [PE.ServiceActivity, PE.EmptyStartEvent]:
-            raise RollBackException("rollback failed: only allows rollback to ServiceActivity type nodes")
+        # 驱动这个任务
+        token_rollback.apply_async(
+            kwargs={
+                "snapshot_id": rollback_snapshot.id,
+                "node_id": node_id,
+                "retry": True,
+                "retry_data": retry_data,
+            },
+            queue=ROLLBACK_QUEUE,
+        )
 
-        target_node_state = State.objects.filter(node_id=self.node_id).first()
+    def _node_state_is_failed(self, node_id):
+        """
+        判断该节点是不是失败的状态
+        """
+        node_state = State.objects.filter(node_id=node_id).first()
+        if node_state.name == states.FAILED:
+            return True
+        return False
 
-        if target_node_state is None:
-            raise RollBackException("rollback failed: node state not exist, node={}".format(self.node_id))
+    def _get_failed_skip_node_id_list(self, node_id_list):
+        failed_skip_node_id_list = State.objects.filter(
+            Q(Q(skip=True) | Q(error_ignored=True)) & Q(node_id__in=node_id_list)
+        ).values_list("node_id", flat=True)
+        return failed_skip_node_id_list
 
-        if target_node_state.name != states.FINISHED:
-            raise RollBackException("rollback failed: only allows rollback to finished node")
+    def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
 
-        validate_nodes_list = self.get_allowed_rollback_node_id_list()
+        if skip_rollback_nodes is None:
+            skip_rollback_nodes = []
 
-        if self.node_id not in validate_nodes_list:
-            raise RollBackException("rollback failed: node is not allow to rollback, node={}".format(self.node_id))
+        # 相同token回滚时，不允许有正在运行的节点
+        RollbackValidator.validate_node_state_by_token_mode(self.root_pipeline_id, start_node_id)
+        # 回滚的开始节点运行失败的情况
+        RollbackValidator.validate_node(start_node_id, allow_failed=True)
+        RollbackValidator.validate_node(target_node_id)
+        RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
 
-        with transaction.atomic():
-            try:
-                self._clean_engine_data(target_node_state)
-            except Exception as e:
-                raise RollBackException("rollback failed: clean engine data error, error={}".format(str(e)))
+        # 如果开始节点是失败的情况，则跳过该节点的回滚操作
+        if self._node_state_is_failed(start_node_id):
+            skip_rollback_nodes.append(start_node_id)
 
-            try:
-                # 将当前住进程的正在运行的节点指向目标ID
-                main_process = Process.objects.get(root_pipeline_id=self.root_pipeline_id, parent_id=-1)
-                main_process.current_node_id = self.node_id
-                main_process.save()
+        node_map = self._get_allowed_rollback_node_map()
+        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
 
-                # 重置该节点的状态信息
-                self.runtime.set_state(
-                    node_id=self.node_id,
-                    to_state=states.READY,
-                    is_retry=True,
-                    refresh_version=True,
-                    clear_started_time=True,
-                    clear_archived_time=True,
-                )
-                process_info = self.runtime.get_process_info(main_process.id)
-                self.runtime.execute(
-                    process_id=process_info.process_id,
-                    node_id=self.node_id,
-                    root_pipeline_id=process_info.root_pipeline_id,
-                    parent_pipeline_id=process_info.top_pipeline_id,
-                )
-            except Exception as e:
-                raise RollBackException("rollback failed: rollback to node error, error={}".format(str(e)))
+        runtime = BambooDjangoRuntime()
+
+        graph, other_nodes = rollback_graph.build_rollback_graph()
+        node_access_record = {node: 0 for node in graph.nodes}
+
+        # 所有失败并跳过的节点不再参与回滚
+        failed_skip_node_id_list = self._get_failed_skip_node_id_list(node_map.keys())
+        skip_rollback_nodes.extend(list(failed_skip_node_id_list))
+
+        rollback_snapshot = RollbackSnapshot.objects.create(
+            root_pipeline_id=self.root_pipeline_id,
+            graph=json.dumps(graph.as_dict()),
+            node_access_record=json.dumps(node_access_record),
+            start_node_id=start_node_id,
+            target_node_id=target_node_id,
+            other_nodes=json.dumps(other_nodes),
+            skip_rollback_nodes=json.dumps(skip_rollback_nodes),
+        )
+
+        runtime.set_state(
+            node_id=self.root_pipeline_id,
+            to_state=states.ROLLING_BACK,
+        )
+        # 驱动这个任务
+        token_rollback.apply_async(
+            kwargs={
+                "snapshot_id": rollback_snapshot.id,
+                "node_id": constants.START_FLAG,
+                "retry": False,
+                "retry_data": None,
+            },
+            queue=ROLLBACK_QUEUE,
+        )
+
+
+class RollbackDispatcher:
+    def __init__(self, root_pipeline_id, mode):
+        if mode == ANY:
+            self.handler = AnyRollbackHandler(root_pipeline_id)
+        elif mode == TOKEN:
+            self.handler = TokenRollbackHandler(root_pipeline_id)
+        else:
+            raise RollBackException("rollback failed: not support this mode, please check")
+
+    def rollback(self, start_node_id: str, target_node_id: str, skip_rollback_nodes: list = None):
+        self.handler.rollback(start_node_id, target_node_id, skip_rollback_nodes)
+
+    def reserve_rollback(self, start_node_id: str, target_node_id: str):
+        self.handler.reserve_rollback(start_node_id, target_node_id)
+
+    def retry_rollback_failed_node(self, node_id: str, retry_data: dict = None):
+        self.handler.retry_rollback_failed_node(node_id, retry_data)
+
+    def cancel_reserved_rollback(self, start_node_id: str, target_node_id: str):
+        self.handler.cancel_reserved_rollback(start_node_id, target_node_id)
+
+    def get_allowed_rollback_node_id_list(self, start_node_id: str):
+        return self.handler.get_allowed_rollback_node_id_list(start_node_id)

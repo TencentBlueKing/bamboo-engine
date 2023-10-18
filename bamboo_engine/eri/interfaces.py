@@ -1577,6 +1577,35 @@ class ConfigMixin:
         """
 
 
+class RollbackMixin:
+    @abstractmethod
+    def set_pipeline_token(self, pipeline_tree: dict):
+        """
+        设置pipeline token
+        """
+
+    @abstractmethod
+    def set_node_snapshot(
+        self,
+        root_pipeline_id: str,
+        node_id: str,
+        code: str,
+        version: str,
+        context_values: dict,
+        inputs: dict,
+        outputs: dict,
+    ):
+        """
+        创建一份节点快照
+        """
+
+    @abstractmethod
+    def start_rollback(self, root_pipeline_id: str, node_id: str):
+        """
+        开始回滚
+        """
+
+
 class EngineRuntimeInterface(
     PluginManagerMixin,
     EngineAPIHooksMixin,
@@ -1591,6 +1620,7 @@ class EngineRuntimeInterface(
     ExecutionHistoryMixin,
     InterruptMixin,
     ConfigMixin,
+    RollbackMixin,
     metaclass=ABCMeta,
 ):
     @abstractmethod

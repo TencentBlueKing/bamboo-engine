@@ -17,6 +17,8 @@ from pipeline.conf import default_settings
 from pipeline.eri.models import LogEntry
 from pipeline.eri.signals import pipeline_event
 
+from bamboo_engine.utils.constants import RuntimeSettings
+
 
 class PipelineEvent:
     def __init__(self, event_type, data):
@@ -63,6 +65,9 @@ class HooksMixin:
                 },
             )
         )
+
+        if self.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value):
+            self.set_pipeline_token(pipeline)
 
     def post_prepare_run_pipeline(
         self, pipeline: dict, root_pipeline_data: dict, root_pipeline_context: dict, subprocess_context: dict, **options
