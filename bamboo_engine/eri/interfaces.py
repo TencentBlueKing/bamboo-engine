@@ -26,6 +26,7 @@ from .models import (
     ExecutionData,
     ExecutionHistory,
     ExecutionShortHistory,
+    HookType,
     Node,
     ProcessInfo,
     Schedule,
@@ -87,12 +88,41 @@ class Service(metaclass=ABCMeta):
         """
 
     @abstractmethod
+    def hook_dispatch(
+        self,
+        hook: HookType,
+        data: ExecutionData,
+        root_pipeline_data: ExecutionData,
+        callback_data: Optional[CallbackData] = None,
+    ) -> bool:
+        """
+        hook 分发逻辑
+        :param hook: 钩子名称
+        :type hook: HookType
+        :param data: 节点执行数据
+        :type data: ExecutionData
+        :param root_pipeline_data: 根流程执行数据
+        :type root_pipeline_data: ExecutionData
+        :param callback_data: 回调数据, defaults to None
+        :type callback_data: Optional[CallbackData], optional
+        :return: [description]
+        :rtype: bool
+        """
+
+    @abstractmethod
     def need_schedule(self) -> bool:
         """
         服务是否需要调度
 
         :return: 是否需要调度
         :rtype: bool
+        """
+
+    @abstractmethod
+    def need_run_hook(self) -> bool:
+        """
+        服务是否需要执行 Hook
+        :return:
         """
 
     @abstractmethod
@@ -234,9 +264,9 @@ class PluginManagerMixin:
 
 
 class EngineRuntimeHooksMixin:
-    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+    def node_execute_exception(self, root_pipeline_id: str, node_id: str, ex_data: str):
         """
-        节点execute方法异常需要执行的钩子
+        节点 execute 方法异常需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
@@ -245,15 +275,33 @@ class EngineRuntimeHooksMixin:
         :type ex_data: str
         """
 
-    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+    def node_schedule_exception(self, root_pipeline_id: str, node_id: str, ex_data: str):
         """
-        节点schedule方法异常需要执行的钩子
+        节点 schedule 方法异常需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
         :type node_id: str
         :param ex_data: 异常信息
         :type ex_data: str
+        """
+
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str):
+        """
+        节点 execute 方法失败需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str):
+        """
+        节点 schedule 方法失败需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
         """
 
     def node_enter(self, root_pipeline_id: str, node_id: str):

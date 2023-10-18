@@ -10,6 +10,50 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+from enum import Enum
+
+
+class HookType(Enum):
+    # 节点继续操作前
+    PRE_RESUME_NODE = "pre_resume_node"
+    # 节点继续操作后
+    POST_RESUME_NODE = "post_resume_node"
+    # 节点暂停操作前
+    PRE_PAUSE_NODE = "pre_pause_node"
+    # 节点暂停操作后
+    POST_PAUSE_NODE = "post_pause_node"
+    # 节点重试操作前
+    PRE_RETRY_NODE = "pre_retry_node"
+    # 节点重试操作后
+    POST_RETRY_NODE = "post_retry_node"
+    # 节点跳过操作前
+    PRE_SKIP_NODE = "pre_skip_node"
+    # 节点跳过操作后
+    POST_SKIP_NODE = "post_skip_node"
+    # 节点强制失败操作前
+    PRE_FORCED_FAIL_ACTIVITY = "pre_forced_fail_activity"
+    # 节点强制失败操作后
+    POST_FORCED_FAIL_ACTIVITY = "post_forced_fail_activity"
+    # 节点回调前
+    PRE_CALLBACK = "pre_callback"
+    # 节点回调后
+    POST_CALLBACK = "post_callback"
+    # 节点 execute 失败后
+    NODE_EXECUTE_FAIL = "node_execute_fail"
+    # 节点调度失败后
+    NODE_SCHEDULE_FAIL = "node_schedule_fail"
+    # 节点 execute 异常后
+    NODE_EXECUTE_EXCEPTION = "node_execute_exception"
+    # 节点调度异常后
+    NODE_SCHEDULE_EXCEPTION = "node_schedule_exception"
+    # 节点 execute 前
+    NODE_ENTER = "node_enter"
+    # 节点执行结束
+    NODE_FINISH = "node_finish"
+    # 节点 execute
+    EXECUTE = "execute"
+    # 节点 schedule
+    SCHEDULE = "schedule"
 
 
 class InterruptEvent:

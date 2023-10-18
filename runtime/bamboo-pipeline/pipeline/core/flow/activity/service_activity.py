@@ -29,6 +29,7 @@ from pipeline.utils.utils import convert_bytes_to_str
 class Service(object, metaclass=ABCMeta):
     schedule_result_attr = "__schedule_finish__"
     schedule_determine_attr = "__need_schedule__"
+    run_hook_determine_attr = "__need_run_hook__"
     multi_callback_determine_attr = "__multi_callback_enabled__"
     InputItem = InputItem
     OutputItem = OutputItem
@@ -93,6 +94,9 @@ class Service(object, metaclass=ABCMeta):
     def need_schedule(self):
         return getattr(self, Service.schedule_determine_attr, False)
 
+    def need_run_hook(self):
+        return getattr(self, Service.run_hook_determine_attr, False)
+
     def schedule(self, data, parent_data, callback_data=None):
         return True
 
@@ -116,6 +120,78 @@ class Service(object, metaclass=ABCMeta):
         if "_runtime_attrs" not in self.__dict__:
             self._runtime_attrs = {}
         self._runtime_attrs.update(**kwargs)
+
+    def pre_resume_node(self, data, parent_data):
+        """节点继续操作前"""
+        return True
+
+    def post_resume_node(self, data, parent_data):
+        """节点继续操作后"""
+        return True
+
+    def pre_pause_node(self, data, parent_data):
+        """节点暂停操作前"""
+        return True
+
+    def post_pause_node(self, data, parent_data):
+        """节点暂停操作后"""
+        return True
+
+    def pre_retry_node(self, data, parent_data):
+        """节点重试操作前"""
+        return True
+
+    def post_retry_node(self, data, parent_data):
+        """节点重试操作后"""
+        return True
+
+    def pre_skip_node(self, data, parent_data):
+        """节点跳过操作前"""
+        return True
+
+    def post_skip_node(self, data, parent_data):
+        """节点跳过操作后"""
+        return True
+
+    def pre_forced_fail_activity(self, data, parent_data):
+        """节点跳过操作前"""
+        return True
+
+    def post_forced_fail_activity(self, data, parent_data):
+        """节点跳过操作后"""
+        return True
+
+    def pre_callback(self, data, parent_data, callback_data=None):
+        """节点回调前"""
+        return True
+
+    def post_callback(self, data, parent_data, callback_data=None):
+        """节点回调后"""
+        return True
+
+    def node_execute_fail(self, data, parent_data):
+        """节点 execute 失败后"""
+        return True
+
+    def node_schedule_fail(self, data, parent_data, callback_data=None):
+        """节点调度失败后"""
+        return True
+
+    def node_execute_exception(self, data, parent_data):
+        """节点 execute 异常后"""
+        return True
+
+    def node_schedule_exception(self, data, parent_data, callback_data=None):
+        """节点调度异常后"""
+        return True
+
+    def node_enter(self, data, parent_data):
+        """节点 execute 前"""
+        return True
+
+    def node_finish(self, data, parent_data):
+        """节点执行结束"""
+        return True
 
 
 class ServiceActivity(Activity):

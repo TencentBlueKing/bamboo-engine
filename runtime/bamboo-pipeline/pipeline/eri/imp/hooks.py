@@ -415,26 +415,39 @@ class HooksMixin:
         """
         self._send_event(PipelineEvent(event_type=self.post_retry_subprocess.__name__, data={"node_id": node_id}))
 
-    def node_execute_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+    def node_execute_fail(self, root_pipeline_id: str, node_id: str):
         """
-        节点execute方法异常需要执行的钩子
+        节点 execute 方法失败需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
         :type node_id: str
-        :param ex_data: 异常信息
-        :type ex_data: str
         """
         self._send_event(
             PipelineEvent(
                 event_type=self.node_execute_fail.__name__,
-                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id},
             )
         )
 
-    def node_schedule_fail(self, root_pipeline_id: str, node_id: str, ex_data: str):
+    def node_schedule_fail(self, root_pipeline_id: str, node_id: str):
         """
-        节点schedule方法异常需要执行的钩子
+        节点 schedule 方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_schedule_fail.__name__,
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id},
+            )
+        )
+
+    def node_execute_exception(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点 execute 方法异常需要执行的钩子
         :param root_pipeline_id: 任务ID
         :type node_id: str
         :param node_id: 节点ID
@@ -444,7 +457,24 @@ class HooksMixin:
         """
         self._send_event(
             PipelineEvent(
-                event_type=self.node_schedule_fail.__name__,
+                event_type=self.node_execute_exception.__name__,
+                data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
+            )
+        )
+
+    def node_schedule_exception(self, root_pipeline_id: str, node_id: str, ex_data: str):
+        """
+        节点 schedule 方法异常需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        :param ex_data: 异常信息
+        :type ex_data: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.node_schedule_exception.__name__,
                 data={"root_pipeline_id": root_pipeline_id, "node_id": node_id, "ex_data": ex_data},
             )
         )
