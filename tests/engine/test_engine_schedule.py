@@ -469,7 +469,7 @@ def test_schedule__schedule_done(node_id, state, pi, schedule, node, interrupter
     runtime.get_node.assert_called_once_with(node_id)
     runtime.get_execution_data.assert_called_once_with(node_id)
     runtime.set_execution_data.assert_called_once_with(node_id=node.id, data=execution_data)
-    runtime.get_data_inputs.assert_has_calls([call(node_id), call(node_id)])
+    runtime.get_data_inputs.assert_has_calls([call("root"), call("root")])
     runtime.get_callback_data.assert_not_called()
     service.hook_dispatch.assert_called_once()
     handler.schedule.assert_called_once_with(
