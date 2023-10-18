@@ -4,11 +4,114 @@ import logging
 import pprint
 import re
 import time
+import typing
 
 from pipeline.component_framework.component import Component
 from pipeline.core.flow.activity import Service, StaticIntervalGenerator
 
+from bamboo_engine.eri import HookType
+
 logger = logging.getLogger("celery")
+
+
+class HookMixin:
+    __need_run_hook__ = True
+
+    def recorder(self, hook: HookType, data, parent_data, callback_data=None):
+        self.logger.info("hook_debug_node({}) id: {}".format(hook.value, self.id))
+        self.logger.info("hook_debug_node({}) root_pipeline_id: {}".format(hook.value, self.root_pipeline_id))
+        logger.info("hook_debug_node hook(%s) data %s ", hook.value, pprint.pformat(data.inputs))
+        logger.info("hook_debug_node hook(%s) parent data %s ", hook.value, pprint.pformat(parent_data.inputs))
+        logger.info("hook_debug_node hook(%s) output data %s ", hook.value, pprint.pformat(data.outputs))
+
+        hook_call_count: int = data.get_one_of_outputs(hook.value, 0)
+        data.set_outputs(hook.value, hook_call_count + 1)
+
+        hook_call_order: typing.List[str] = data.get_one_of_outputs("hook_call_order", [])
+        hook_call_order.append(hook.value)
+        data.set_outputs("hook_call_order", hook_call_order)
+        logger.info("hook_debug_node hook(%s) output data %s ", hook.value, pprint.pformat(data.outputs))
+        return True
+
+    def execute(self, data, parent_data):
+        self.recorder(hook=HookType.EXECUTE, data=data, parent_data=parent_data)
+        return super().execute(data, parent_data)
+
+    def schedule(self, data, parent_data, callback_data=None):
+        self.recorder(hook=HookType.SCHEDULE, data=data, parent_data=parent_data, callback_data=callback_data)
+        return super().schedule(data, parent_data, callback_data)
+
+    def pre_resume_node(self, data, parent_data):
+        """节点继续操作前"""
+        return self.recorder(HookType.PRE_RESUME_NODE, data, parent_data)
+
+    def post_resume_node(self, data, parent_data):
+        """节点继续操作后"""
+        return self.recorder(HookType.POST_RESUME_NODE, data, parent_data)
+
+    def pre_pause_node(self, data, parent_data):
+        """节点暂停操作前"""
+        return self.recorder(HookType.PRE_RESUME_NODE, data, parent_data)
+
+    def post_pause_node(self, data, parent_data):
+        """节点暂停操作后"""
+        return self.recorder(HookType.POST_PAUSE_NODE, data, parent_data)
+
+    def pre_retry_node(self, data, parent_data):
+        """节点重试操作前"""
+        return self.recorder(HookType.PRE_RETRY_NODE, data, parent_data)
+
+    def post_retry_node(self, data, parent_data):
+        """节点重试操作后"""
+        return self.recorder(HookType.POST_RETRY_NODE, data, parent_data)
+
+    def pre_skip_node(self, data, parent_data):
+        """节点跳过操作前"""
+        return self.recorder(HookType.PRE_SKIP_NODE, data, parent_data)
+
+    def post_skip_node(self, data, parent_data):
+        """节点跳过操作后"""
+        return self.recorder(HookType.POST_SKIP_NODE, data, parent_data)
+
+    def pre_forced_fail_activity(self, data, parent_data):
+        """节点跳过操作前"""
+        return self.recorder(HookType.PRE_FORCED_FAIL_ACTIVITY, data, parent_data)
+
+    def post_forced_fail_activity(self, data, parent_data):
+        """节点跳过操作后"""
+        return self.recorder(HookType.POST_FORCED_FAIL_ACTIVITY, data, parent_data)
+
+    def pre_callback(self, data, parent_data, callback_data=None):
+        """节点回调前"""
+        return self.recorder(HookType.PRE_CALLBACK, data, parent_data)
+
+    def post_callback(self, data, parent_data, callback_data=None):
+        """节点回调后"""
+        return self.recorder(HookType.POST_CALLBACK, data, parent_data)
+
+    def node_execute_fail(self, data, parent_data):
+        """节点 execute 异常后"""
+        return self.recorder(HookType.NODE_EXECUTE_FAIL, data, parent_data)
+
+    def node_schedule_fail(self, data, parent_data, callback_data=None):
+        """节点调度失败后"""
+        return self.recorder(HookType.NODE_SCHEDULE_FAIL, data, parent_data)
+
+    def node_execute_exception(self, data, parent_data):
+        """节点 execute 异常后"""
+        return self.recorder(HookType.NODE_EXECUTE_EXCEPTION, data, parent_data)
+
+    def node_schedule_exception(self, data, parent_data, callback_data=None):
+        """节点调度失败后"""
+        return self.recorder(HookType.NODE_SCHEDULE_EXCEPTION, data, parent_data)
+
+    def node_enter(self, data, parent_data):
+        """节点 execute 前"""
+        return self.recorder(HookType.NODE_ENTER, data, parent_data)
+
+    def node_finish(self, data, parent_data):
+        """节点执行结束"""
+        return self.recorder(HookType.NODE_FINISH, data, parent_data)
 
 
 class DebugNoScheduleService(Service):
@@ -27,7 +130,7 @@ class DebugNoScheduleService(Service):
 
 
 class DebugNoScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "debug_no_schedule_node"
     bound_service = DebugNoScheduleService
     form = "index.html"
@@ -62,9 +165,20 @@ class DebugService(Service):
 
 
 class DebugComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "debug_node"
     bound_service = DebugService
+    form = "index.html"
+
+
+class HookDebugService(HookMixin, DebugService):
+    pass
+
+
+class HookDebugComponent(Component):
+    name = "debug 组件"
+    code = "hook_debug_node"
+    bound_service = HookDebugService
     form = "index.html"
 
 
@@ -100,7 +214,7 @@ class ScheduleService(Service):
 
 
 class ScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "schedule_node"
     bound_service = ScheduleService
     form = "index.html"
@@ -134,7 +248,7 @@ class SleepTimerService(Service):
             eta = timing
             t = "countdown"
         else:
-            message = u"输入参数%s不符合【秒(s) 或 时间(%%Y-%%m-%%d %%H:%%M:%%S)】格式" % timing
+            message = "输入参数%s不符合【秒(s) 或 时间(%%Y-%%m-%%d %%H:%%M:%%S)】格式" % timing
             data.set_outputs("ex_data", message)
             return False
         data.set_outputs("eta", eta)
@@ -162,7 +276,7 @@ class SleepTimerService(Service):
 
 
 class SleepTimerComponent(Component):
-    name = u"定时"
+    name = "定时"
     code = "sleep_timer"
     bound_service = SleepTimerService
     form = "form.html"
@@ -201,7 +315,7 @@ class LoopCountOutputScheduleService(Service):
 
 
 class LoopCountOutputScheduleComponent(Component):
-    name = u"loop count output component"
+    name = "loop count output component"
     code = "loop_count_s_node"
     bound_service = LoopCountOutputScheduleService
     form = "index.html"
@@ -221,7 +335,7 @@ class LoopCountOutputService(Service):
 
 
 class LoopCountOutputComponent(Component):
-    name = u"loop count output component"
+    name = "loop count output component"
     code = "loop_count_node"
     bound_service = LoopCountOutputService
     form = "index.html"
@@ -245,7 +359,7 @@ class FailAtSecondExecService(Service):
 
 
 class FailAtSecondExecComponent(Component):
-    name = u"fail at second execute component"
+    name = "fail at second execute component"
     code = "fail_at_second_node"
     bound_service = FailAtSecondExecService
     form = "index.html"
@@ -268,9 +382,20 @@ class FailCtrlService(Service):
 
 
 class FailCtrlComponent(Component):
-    name = u"fail control component"
+    name = "fail control component"
     code = "fail_ctrl_node"
     bound_service = FailCtrlService
+    form = "index.html"
+
+
+class HookFailCtrlService(HookMixin, FailCtrlService):
+    pass
+
+
+class HookFailCtrlComponent(Component):
+    name = "fail control component"
+    code = "hook_fail_ctrl_node"
+    bound_service = HookFailCtrlService
     form = "index.html"
 
 
@@ -316,6 +441,17 @@ class CallbackComponent(Component):
     form = "index.html"
 
 
+class HookCallbackService(HookMixin, CallbackService):
+    pass
+
+
+class HookCallbackComponent(Component):
+    name = "callback component"
+    code = "hook_callback_node"
+    bound_service = HookCallbackService
+    form = "index.html"
+
+
 class MultiCallbackService(Service):
     __need_schedule__ = True
     __multi_callback_enabled__ = True
@@ -333,6 +469,7 @@ class MultiCallbackService(Service):
         logger.info("[{}]: callback_data={}".format(_scheduled_times, callback_data))
         if callback_data:
             if int(callback_data.get("bit", 0)) == 0:
+                print("hahacai")
                 return False
 
         _scheduled_times += 1
@@ -351,6 +488,17 @@ class MultiCallbackComponent(Component):
     name = "multi_callback component"
     code = "multi_callback_node"
     bound_service = MultiCallbackService
+    form = "index.html"
+
+
+class HookMultiCallbackService(HookMixin, MultiCallbackService):
+    pass
+
+
+class HookMultiCallbackComponent(Component):
+    name = "multi_callback component"
+    code = "hook_multi_callback_node"
+    bound_service = HookMultiCallbackService
     form = "index.html"
 
 
@@ -396,7 +544,7 @@ class InterruptService(Service):
 
 
 class InterruptComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_test"
     bound_service = InterruptService
     form = "index.html"
@@ -440,7 +588,7 @@ class InterruptScheduleService(Service):
 
 
 class InterruptScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_schedule_test"
     bound_service = InterruptScheduleService
     form = "index.html"
@@ -499,7 +647,18 @@ class InterruptRaiseService(Service):
 
 
 class InterruptScheduleComponent(Component):
-    name = u"debug 组件"
+    name = "debug 组件"
     code = "interrupt_raise_test"
     bound_service = InterruptRaiseService
+    form = "index.html"
+
+
+class HookInterruptRaiseService(HookMixin, InterruptRaiseService):
+    pass
+
+
+class HookInterruptRaiseComponent(Component):
+    name = "debug 组件"
+    code = "hook_interrupt_raise_test"
+    bound_service = HookInterruptRaiseService
     form = "index.html"

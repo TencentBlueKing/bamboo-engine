@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
+from pipeline.eri.runtime import BambooDjangoRuntime
+
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
-from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
 
@@ -21,7 +22,6 @@ def test_parallel_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
 
     node_id_list = [pipeline["id"], start.id, cpg.id, acts[0].id, acts[1].id, acts[2].id, cg.id, end.id]
     node_data_dict = {
@@ -58,8 +58,6 @@ def test_nest_parallel_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [
         pipeline["id"],
@@ -119,8 +117,6 @@ def test_template_parallel_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     node_id_list = [pipeline["id"], start.id, cpg.id, acts[0].id, acts[1].id, cg.id, end.id]
     node_data_dict = {
         a.id: {"inputs": {"_loop": 1, "_inner_loop": 1}, "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True}}
@@ -149,8 +145,6 @@ def test_parallel_execution_no_match():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [start.id]
     node_data_dict = {cpg.id: {"inputs": {}, "outputs": {"ex_data": "all conditions of branches are not meet"}}}

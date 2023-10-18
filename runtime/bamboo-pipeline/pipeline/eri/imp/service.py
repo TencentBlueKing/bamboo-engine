@@ -10,16 +10,22 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import typing
+from typing import Callable, Optional
 
-from typing import Optional
-
-from bamboo_engine.eri import Service as ServiceInterface
-from bamboo_engine.eri import Schedule, ExecutionData, CallbackData, ScheduleType
-
-from pipeline.core.flow.activity import Service
 from pipeline.core.data.base import DataObject
+from pipeline.core.flow.activity import Service
 from pipeline.eri.log import get_logger
 from pipeline.eri.signals import pre_service_execute, pre_service_schedule
+
+from bamboo_engine.eri import (
+    CallbackData,
+    ExecutionData,
+    HookType,
+    Schedule,
+    ScheduleType,
+)
+from bamboo_engine.eri import Service as ServiceInterface
 
 
 class ServiceWrapper(ServiceInterface):
@@ -55,6 +61,46 @@ class ServiceWrapper(ServiceInterface):
             execute_res = True
 
         return execute_res
+
+    def hook_dispatch(
+        self,
+        hook: HookType,
+        data: ExecutionData,
+        root_pipeline_data: ExecutionData,
+        callback_data: Optional[CallbackData] = None,
+    ) -> bool:
+        """
+        hook 分发逻辑
+        :param hook: 钩子
+        :type hook: HookType
+        :param data: 节点执行数据
+        :type data: ExecutionData
+        :param root_pipeline_data: 根流程执行数据
+        :type root_pipeline_data: ExecutionData
+        :param callback_data: 回调数据, defaults to None
+        :type callback_data: Optional[CallbackData], optional
+        :return: [description]
+        :rtype: bool
+        """
+        data_obj = DataObject(inputs=data.inputs, outputs=data.outputs)
+        parent_data_obj = DataObject(inputs=root_pipeline_data.inputs, outputs=root_pipeline_data.outputs)
+
+        hook_res: Optional[bool] = False
+
+        call_params: typing.Dict[str, typing.Any] = {"data": data_obj, "parent_data": parent_data_obj}
+        if callback_data is not None:
+            call_params["callback_data"] = callback_data
+        try:
+            hook_func: Optional[Callable[..., bool]] = getattr(self.service, hook.value, None)
+            if hook_func:
+                hook_res = hook_func(**call_params)
+        finally:
+            data.inputs = data_obj.inputs
+            data.outputs = data_obj.outputs
+
+        if hook_res is None:
+            hook_res = True
+        return hook_res
 
     def schedule(
         self,
@@ -112,6 +158,9 @@ class ServiceWrapper(ServiceInterface):
         :rtype: bool
         """
         return self.service.need_schedule()
+
+    def need_run_hook(self) -> bool:
+        return self.service.need_run_hook()
 
     def schedule_type(self) -> Optional[ScheduleType]:
         """

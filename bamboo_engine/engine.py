@@ -17,16 +17,20 @@ import logging
 import random
 import time
 from functools import wraps
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from . import states, validator
 from .eri import (
+    CallbackData,
     DataInput,
     EngineRuntimeInterface,
     ExecutionData,
+    HookType,
     Node,
     NodeType,
+    ProcessInfo,
     ScheduleType,
+    Service,
     State,
 )
 from .exceptions import InvalidOperationError, NotFoundError
@@ -204,11 +208,32 @@ class Engine:
         if node.type == NodeType.SubProcess:
             raise InvalidOperationError("can not use pause_node_appoint api for {}".format(node.type))
 
+        process_id = self.runtime.get_process_id_with_current_node_id(node_id)
+        process_info: Optional[ProcessInfo] = None
+        if process_id:
+            process_info = self.runtime.get_process_info(process_id)
+
         self.runtime.pre_pause_node(node_id)
+        if process_info:
+            self.hook_dispatch(
+                top_pipeline_id=process_info.top_pipeline_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                node_id=node.id,
+                hook=HookType.PRE_PAUSE_NODE,
+                node=node,
+            )
 
         self.runtime.set_state(node_id=node_id, to_state=states.SUSPENDED)
 
         self.runtime.post_pause_node(node_id)
+        if process_info:
+            self.hook_dispatch(
+                top_pipeline_id=process_info.top_pipeline_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                node_id=node.id,
+                hook=HookType.POST_PAUSE_NODE,
+                node=node,
+            )
 
     def resume_node_appoint(self, node_id: str):
         """
@@ -259,8 +284,6 @@ class Engine:
 
         process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
-        self.runtime.pre_retry_node(node_id, data)
-
         if data is not None:
             self.runtime.set_data_inputs(
                 node_id,
@@ -271,6 +294,15 @@ class Engine:
             )
 
         self._add_history(node_id, state)
+
+        self.runtime.pre_retry_node(node_id, data)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.PRE_RETRY_NODE,
+            node=node,
+        )
 
         self.runtime.set_state(
             node_id=node_id,
@@ -289,6 +321,13 @@ class Engine:
         )
 
         self.runtime.post_retry_node(node_id, data)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.POST_RETRY_NODE,
+            node=node,
+        )
 
     def retry_subprocess(self, node_id: str):
         """
@@ -355,6 +394,13 @@ class Engine:
         process_info = self._ensure_state_is_fail_and_return_process_info(state)
 
         self.runtime.pre_skip_node(node_id)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.PRE_SKIP_NODE,
+            node=node,
+        )
 
         # pure skip node type only has 1 next node
         next_node_id = node.target_nodes[0]
@@ -379,6 +425,13 @@ class Engine:
         )
 
         self.runtime.post_skip_node(node_id)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.POST_SKIP_NODE,
+            node=node,
+        )
 
     def skip_exclusive_gateway(self, node_id: str, flow_id: str):
         """
@@ -506,7 +559,16 @@ class Engine:
         if not process_id:
             raise InvalidOperationError("can not find process with current node id: {}".format(node_id))
 
+        process_info: ProcessInfo = self.runtime.get_process_info(process_id)
+
         self.runtime.pre_forced_fail_activity(node_id, ex_data)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.PRE_FORCED_FAIL_ACTIVITY,
+            node=node,
+        )
 
         outputs = self.runtime.get_execution_data_outputs(node_id)
 
@@ -527,6 +589,13 @@ class Engine:
         self.runtime.kill(process_id)
 
         self.runtime.post_forced_fail_activity(node_id, ex_data, old_ver, new_ver)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node.id,
+            hook=HookType.POST_FORCED_FAIL_ACTIVITY,
+            node=node,
+        )
 
     def callback(self, node_id: str, version: str, data: dict):
         """
@@ -563,13 +632,113 @@ class Engine:
         if schedule.expired:
             raise InvalidOperationError("schedule is already expired")
 
-        self.runtime.pre_callback(node_id, version, data)
+        data_id: int = self.runtime.set_callback_data(node_id, state.version, data)
+        callback_data: CallbackData = self.runtime.get_callback_data(data_id)
 
-        data_id = self.runtime.set_callback_data(node_id, state.version, data)
+        self.runtime.pre_callback(node_id, version, data)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node_id,
+            hook=HookType.PRE_CALLBACK,
+            callback_data=callback_data,
+        )
 
         self.runtime.schedule(process_info.process_id, node_id, schedule.id, data_id)
 
         self.runtime.post_callback(node_id, version, data)
+        self.hook_dispatch(
+            top_pipeline_id=process_info.top_pipeline_id,
+            root_pipeline_id=process_info.root_pipeline_id,
+            node_id=node_id,
+            hook=HookType.POST_CALLBACK,
+            callback_data=callback_data,
+        )
+
+    def hook_dispatch(
+        self,
+        top_pipeline_id: str,
+        root_pipeline_id: str,
+        node_id: str,
+        hook: HookType,
+        node: Optional[Node] = None,
+        service: Optional[Service] = None,
+        callback_data: Optional[CallbackData] = None,
+        *args,
+        **kwargs
+    ):
+        """
+        Hook 分发
+        :param top_pipeline_id:
+        :param root_pipeline_id:
+        :param node_id:
+        :param hook:
+        :param node:
+        :param service:
+        :param callback_data:
+        :return:
+        """
+        if not node:
+            node: Node = self.runtime.get_node(node_id)
+
+        if node.type != NodeType.ServiceActivity:
+            logger.info(
+                "[pipeline-trace](root_pipeline: %s) skip dispatch(%s) at node(%s, %s)",
+                root_pipeline_id,
+                hook.value,
+                node.id,
+                node.type,
+            )
+            return
+
+        if not service:
+            service: Service = self.runtime.get_service(code=node.code, version=node.version, name=node.name)
+
+        if not service.need_run_hook():
+            logger.info(
+                "[pipeline-trace](root_pipeline: %s) skip dispatch(%s) at node(%s, %s), service(%s, %s, %s)",
+                root_pipeline_id,
+                hook.value,
+                node.id,
+                node.type,
+                node.code,
+                node.version,
+                node.name,
+            )
+            return
+
+        state: State = self.runtime.get_state(node_id)
+        service.setup_runtime_attributes(
+            id=node.id,
+            version=state.version,
+            top_pipeline_id=top_pipeline_id,
+            root_pipeline_id=root_pipeline_id,
+            loop=state.loop,
+            inner_loop=state.inner_loop,
+        )
+
+        service_data: ExecutionData = self.runtime.get_execution_data(node.id)
+        root_pipeline_inputs: Dict[str, Any] = {
+            key: di.value for key, di in self.runtime.get_data_inputs(root_pipeline_id).items()
+        }
+        root_pipeline_data: ExecutionData = ExecutionData(inputs=root_pipeline_inputs, outputs={})
+        try:
+            dispatch_success: bool = service.hook_dispatch(
+                hook=hook, data=service_data, root_pipeline_data=root_pipeline_data, callback_data=callback_data
+            )
+            # 只有处于执行主逻辑并且钩子执行成功，才允许保存上下文
+            if dispatch_success and hook.value in [
+                HookType.NODE_ENTER.value,
+                HookType.NODE_FINISH.value,
+                HookType.NODE_EXECUTE_FAIL.value,
+                HookType.NODE_SCHEDULE_FAIL.value,
+                HookType.NODE_EXECUTE_EXCEPTION.value,
+                HookType.NODE_SCHEDULE_EXCEPTION.value,
+            ]:
+                # 保存数据
+                self.runtime.set_execution_data(node_id=node.id, data=service_data)
+        except Exception:
+            pass
 
     # engine event
     @setup_gauge(ENGINE_RUNNING_PROCESSES)
@@ -808,8 +977,6 @@ class Engine:
                     ENGINE_EXECUTE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                         time.time() - engine_pre_execute_start_at
                     )
-                    # 进入节点
-                    self.runtime.node_enter(root_pipeline_id=root_pipeline_id, node_id=node.id)
                     execute_result = handler.execute(
                         process_info=process_info,
                         loop=loop,
@@ -835,6 +1002,14 @@ class Engine:
                 # 节点运行成功并且不需要进行调度
                 if not execute_result.should_sleep and execute_result.next_node_id != node.id:
                     self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
+                    if process_info.pipeline_stack:
+                        self.hook_dispatch(
+                            top_pipeline_id=process_info.top_pipeline_id,
+                            root_pipeline_id=process_info.root_pipeline_id,
+                            node_id=node.id,
+                            hook=HookType.NODE_FINISH,
+                            node=node,
+                        )
 
                 # 进程是否要进入睡眠
                 if execute_result.should_sleep:
@@ -1107,6 +1282,14 @@ class Engine:
             if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
                 self.runtime.node_finish(root_pipeline_id, node.id)
+                self.hook_dispatch(
+                    top_pipeline_id=process_info.top_pipeline_id,
+                    root_pipeline_id=process_info.root_pipeline_id,
+                    node_id=node.id,
+                    hook=HookType.NODE_FINISH,
+                    node=node,
+                    callback_data=callback_data,
+                )
                 self.runtime.execute(
                     process_id=process_id,
                     node_id=schedule_result.next_node_id,
