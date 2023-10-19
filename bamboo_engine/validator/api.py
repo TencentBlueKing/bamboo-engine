@@ -11,16 +11,23 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from bamboo_engine.eri import NodeType
 from bamboo_engine import exceptions
+from bamboo_engine.eri import NodeType
 
 from . import rules
-from .connection import (
-    validate_graph_connection,
-    validate_graph_without_circle,
-)
+from .connection import validate_graph_connection, validate_graph_without_circle
 from .gateway import validate_gateways, validate_stream
-from .utils import format_pipeline_tree_io_to_list
+from .utils import format_pipeline_tree_io_to_list, get_allowed_start_node_ids
+
+
+def validate_pipeline_start_node(pipeline: dict, node_id: str):
+    # 当开始位置位于开始节点时,则直接返回
+    if node_id == pipeline["start_event"]["id"]:
+        return
+
+    allowed_start_node_ids = get_allowed_start_node_ids(pipeline)
+    if node_id not in allowed_start_node_ids:
+        raise exceptions.StartPositionInvalidException("this node_id is not allowed as a starting node")
 
 
 def validate_and_process_pipeline(pipeline: dict, cycle_tolerate=False):

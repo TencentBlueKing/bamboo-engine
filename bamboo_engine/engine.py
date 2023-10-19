@@ -116,6 +116,10 @@ class Engine:
         cycle_tolerate = options.get("cycle_tolerate", False)
         validator.validate_and_process_pipeline(pipeline, cycle_tolerate)
 
+        start_node_id = options.get("start_node_id", pipeline["start_event"]["id"])
+        # 如果起始位置不是开始节点，则需要进行额外校验
+        validator.validate_pipeline_start_node(pipeline, start_node_id)
+
         self.runtime.pre_prepare_run_pipeline(
             pipeline, root_pipeline_data, root_pipeline_context, subprocess_context, **options
         )
@@ -127,7 +131,7 @@ class Engine:
         # execute from start event
         self.runtime.execute(
             process_id=process_id,
-            node_id=pipeline["start_event"]["id"],
+            node_id=start_node_id,
             root_pipeline_id=pipeline["id"],
             parent_pipeline_id=pipeline["id"],
         )
