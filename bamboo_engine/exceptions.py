@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+
 # 异常定义模块
 
 
@@ -35,6 +36,10 @@ class StateVersionNotMatchError(EngineException):
 
 
 class TreeInvalidException(EngineException):
+    pass
+
+
+class StartPositionInvalidException(EngineException):
     pass
 
 

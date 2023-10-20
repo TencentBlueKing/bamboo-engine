@@ -88,3 +88,39 @@ def get_nodes_dict(data):
         node["target"] = [data["flows"][outgoing]["target"] for outgoing in node["outgoing"]]
 
     return nodes
+
+
+def _compute_pipeline_main_nodes(node_id, node_dict):
+    """
+    计算流程中的主线节点，遇到并行网关/分支并行网关/子流程，则会跳过
+    最后计算出来主干分支所允许开始的节点范围
+    """
+    nodes = []
+    node_detail = node_dict[node_id]
+    node_type = node_detail["type"]
+    if node_type in [
+        "EmptyStartEvent",
+        "ServiceActivity",
+        "ExclusiveGateway",
+        "ParallelGateway",
+        "ConditionalParallelGateway",
+    ]:
+        nodes.append(node_id)
+
+    if node_type in ["EmptyStartEvent", "ServiceActivity", "ExclusiveGateway", "ConvergeGateway", "SubProcess"]:
+        next_nodes = node_detail.get("target", [])
+        for next_node_id in next_nodes:
+            nodes += _compute_pipeline_main_nodes(next_node_id, node_dict)
+    elif node_type in ["ParallelGateway", "ConditionalParallelGateway"]:
+        next_node_id = node_detail["converge_gateway_id"]
+        nodes += _compute_pipeline_main_nodes(next_node_id, node_dict)
+
+    return nodes
+
+
+def get_allowed_start_node_ids(pipeline_tree):
+    start_event_id = pipeline_tree["start_event"]["id"]
+    node_dict = get_nodes_dict(pipeline_tree)
+    # 流程的开始位置只允许出现在主干，子流程/并行网关内的节点不允许作为起始位置
+    allowed_start_node_ids = _compute_pipeline_main_nodes(start_event_id, node_dict)
+    return allowed_start_node_ids
