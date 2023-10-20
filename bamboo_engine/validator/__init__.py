@@ -11,4 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from .api import validate_and_process_pipeline  # noqa
+from .api import (  # noqa
+    get_allowed_start_node_ids,
+    validate_and_process_pipeline,
+    validate_pipeline_start_node,
+)
