@@ -91,10 +91,20 @@ def get_nodes_dict(data):
 
 
 def _compute_pipeline_main_nodes(node_id, node_dict):
+    """
+    计算流程中的主线节点，遇到并行网关/分支并行网关/子流程，则会跳过
+    最后计算出来主干分支所允许开始的节点范围
+    """
     nodes = []
     node_detail = node_dict[node_id]
     node_type = node_detail["type"]
-    if node_type in ["EmptyStartEvent", "ServiceActivity"]:
+    if node_type in [
+        "EmptyStartEvent",
+        "ServiceActivity",
+        "ExclusiveGateway",
+        "ParallelGateway",
+        "ConditionalParallelGateway",
+    ]:
         nodes.append(node_id)
 
     if node_type in ["EmptyStartEvent", "ServiceActivity", "ExclusiveGateway", "ConvergeGateway", "SubProcess"]:

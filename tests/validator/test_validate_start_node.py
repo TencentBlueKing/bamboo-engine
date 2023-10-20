@@ -36,8 +36,8 @@ def test_get_allowed_start_node_ids_by_parallel_gateway():
     validate_gateways(pipeline)
     allowed_start_node_ids = get_allowed_start_node_ids(pipeline)
 
-    assert len(allowed_start_node_ids) == 2
-    assert allowed_start_node_ids == [start.id, act_1.id]
+    assert len(allowed_start_node_ids) == 3
+    assert allowed_start_node_ids == [start.id, act_1.id, pg.id]
 
 
 def test_get_allowed_start_node_ids_by_exclusive_gateway():
@@ -53,8 +53,8 @@ def test_get_allowed_start_node_ids_by_exclusive_gateway():
     validate_gateways(pipeline)
     allowed_start_node_ids = get_allowed_start_node_ids(pipeline)
 
-    assert len(allowed_start_node_ids) == 4
-    assert allowed_start_node_ids == [start.id, act_1.id, act_2.id, act_3.id]
+    assert len(allowed_start_node_ids) == 5
+    assert allowed_start_node_ids == [start.id, act_1.id, eg.id, act_2.id, act_3.id]
 
 
 def test_get_allowed_start_node_ids_by_condition_parallel_gateway():
@@ -75,8 +75,8 @@ def test_get_allowed_start_node_ids_by_condition_parallel_gateway():
     validate_gateways(pipeline)
     allowed_start_node_ids = get_allowed_start_node_ids(pipeline)
 
-    assert len(allowed_start_node_ids) == 2
-    assert allowed_start_node_ids == [start.id, act_1.id]
+    assert len(allowed_start_node_ids) == 3
+    assert allowed_start_node_ids == [start.id, act_1.id, cpg.id]
 
 
 def test_get_allowed_start_node_ids_by_normal():
@@ -107,6 +107,6 @@ def test_validate_pipeline_start_node():
     validate_gateways(pipeline)
 
     with pytest.raises(StartPositionInvalidException):
-        validate_pipeline_start_node(pipeline, eg.id)
+        validate_pipeline_start_node(pipeline, end.id)
 
     validate_pipeline_start_node(pipeline, act_1.id)
