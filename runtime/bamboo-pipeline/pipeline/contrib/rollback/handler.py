@@ -153,7 +153,32 @@ class BaseRollbackHandler:
         RollbackValidator.validate_pipeline(root_pipeline_id)
 
     def get_allowed_rollback_node_id_list(self, start_node_id):
-        return []
+        """
+        获取允许回滚的节点范围
+        规则：token 一致的节点允许回滚
+        """
+        try:
+            rollback_token = RollbackToken.objects.get(root_pipeline_id=self.root_pipeline_id)
+        except RollbackToken.DoesNotExist:
+            raise RollBackException(
+                "rollback failed: pipeline token not exist, pipeline_id={}".format(self.root_pipeline_id)
+            )
+        node_map = self._get_allowed_rollback_node_map()
+        service_activity_node_list = [
+            node_id for node_id, node_detail in node_map.items() if node_detail["type"] == PE.ServiceActivity
+        ]
+
+        tokens = json.loads(rollback_token.token)
+        start_token = tokens.get(start_node_id)
+        if not start_token:
+            return []
+
+        nodes = []
+        for node_id, token in tokens.items():
+            if start_token == token and node_id != start_node_id and node_id in service_activity_node_list:
+                nodes.append(node_id)
+
+        return nodes
 
     def _get_allowed_rollback_node_map(self):
         # 不需要遍历整颗树，获取到现在已经执行成功和失败节点的所有列表
@@ -232,20 +257,6 @@ class BaseRollbackHandler:
 class AnyRollbackHandler(BaseRollbackHandler):
     mode = ANY
 
-    def get_allowed_rollback_node_id_list(self, start_node_id):
-        node_map = self._get_allowed_rollback_node_map()
-        start_node_state = (
-            State.objects.filter(root_id=self.root_pipeline_id)
-            .exclude(node_id=self.root_pipeline_id)
-            .order_by("created_time")
-            .first()
-        )
-        target_node_id = start_node_state.node_id
-        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
-        graph, _ = rollback_graph.build_rollback_graph()
-
-        return list(set(graph.nodes) - {constants.START_FLAG, constants.END_FLAG, start_node_id})
-
     def retry_rollback_failed_node(self, node_id, retry_data):
         """ """
         raise RollBackException("rollback failed: when mode is any, not support retry")
@@ -268,6 +279,7 @@ class AnyRollbackHandler(BaseRollbackHandler):
         RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
+        RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
 
         node_map = self._get_allowed_rollback_node_map()
         rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
@@ -293,34 +305,6 @@ class AnyRollbackHandler(BaseRollbackHandler):
 
 class TokenRollbackHandler(BaseRollbackHandler):
     mode = TOKEN
-
-    def get_allowed_rollback_node_id_list(self, start_node_id):
-        """
-        获取允许回滚的节点范围
-        规则：token 一致的节点允许回滚
-        """
-        try:
-            rollback_token = RollbackToken.objects.get(root_pipeline_id=self.root_pipeline_id)
-        except RollbackToken.DoesNotExist:
-            raise RollBackException(
-                "rollback failed: pipeline token not exist, pipeline_id={}".format(self.root_pipeline_id)
-            )
-        node_map = self._get_allowed_rollback_node_map()
-        service_activity_node_list = [
-            node_id for node_id, node_detail in node_map.items() if node_detail["type"] == PE.ServiceActivity
-        ]
-
-        tokens = json.loads(rollback_token.token)
-        start_token = tokens.get(start_node_id)
-        if not start_token:
-            return []
-
-        nodes = []
-        for node_id, token in tokens.items():
-            if start_token == token and node_id != start_node_id and node_id in service_activity_node_list:
-                nodes.append(node_id)
-
-        return nodes
 
     def retry_rollback_failed_node(self, node_id, retry_data):
         """
