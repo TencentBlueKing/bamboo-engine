@@ -110,7 +110,7 @@ class ConditionalParallelGatewayHandler(NodeHandler):
 
             try:
                 expr_func = self.runtime.get_config(RuntimeSettings.PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC.value)
-                result = expr_func(resolved_evaluate, hydrated_context)
+                result = expr_func(resolved_evaluate, hydrated_context, extra_info=self.node.extra_info)
                 logger.info(
                     "root_pipeline[%s] node(%s) %s test result: %s",
                     root_pipeline_id,
