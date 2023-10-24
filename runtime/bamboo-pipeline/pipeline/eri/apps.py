@@ -44,7 +44,7 @@ class ERIConfig(AppConfig):
                 pipeline_exclusive_gateway_expr_func_text = getattr(
                     settings, "PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC_TEXT", "1==1"
                 )
-                check_result = pipeline_exclusive_gateway_expr_func(pipeline_exclusive_gateway_expr_func_text, {})
+                check_result = pipeline_exclusive_gateway_expr_func(pipeline_exclusive_gateway_expr_func_text, {}, {})
                 if not check_result:
                     raise ConfigValidationError("config validate error, the expr func return False")
 
