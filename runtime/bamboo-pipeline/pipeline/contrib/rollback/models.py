@@ -2,6 +2,7 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from pipeline.contrib.rollback.constants import TOKEN
+from pipeline.contrib.rollback.fields import SerializerField
 
 
 class RollbackToken(models.Model):
@@ -38,9 +39,9 @@ class RollbackNodeSnapshot(models.Model):
     node_id = models.CharField(verbose_name="node_id", max_length=64, db_index=True)
     code = models.CharField(verbose_name="node_code", max_length=64)
     version = models.CharField(verbose_name=_("version"), null=False, max_length=33)
-    inputs = models.TextField(verbose_name=_("node inputs"))
-    outputs = models.TextField(verbose_name=_("node outputs"))
-    context_values = models.TextField(verbose_name=_("pipeline context values"))
+    inputs = SerializerField(verbose_name=_("node inputs"))
+    outputs = SerializerField(verbose_name=_("node outputs"))
+    context_values = SerializerField(verbose_name=_("pipeline context values"))
     rolled_back = models.BooleanField(_("whether the node rolls back"), default=False)
 
 

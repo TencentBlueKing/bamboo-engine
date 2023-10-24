@@ -3,7 +3,6 @@ import json
 import logging
 
 from django.apps import apps
-from django.core.serializers.json import DjangoJSONEncoder
 
 from bamboo_engine.builder.builder import generate_pipeline_token
 
@@ -49,9 +48,9 @@ class RollbackMixin:
             node_id=node_id,
             code=code,
             version=version,
-            context_values=json.dumps(context_values, cls=DjangoJSONEncoder),
-            inputs=json.dumps(inputs, cls=DjangoJSONEncoder),
-            outputs=json.dumps(outputs, cls=DjangoJSONEncoder),
+            context_values=context_values,
+            inputs=inputs,
+            outputs=outputs,
         )
 
     def start_rollback(self, root_pipeline_id, node_id):
