@@ -261,18 +261,6 @@ class AnyRollbackHandler(BaseRollbackHandler):
         """ """
         raise RollBackException("rollback failed: when mode is any, not support retry")
 
-    def reserve_rollback(self, start_node_id, target_node_id):
-        """
-        预约回滚
-        """
-        self._reserve(start_node_id, target_node_id)
-
-    def cancel_reserved_rollback(self, start_node_id, target_node_id):
-        """
-        取消预约回滚
-        """
-        self._reserve(start_node_id, target_node_id, reserve_rollback=False)
-
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
         RollbackValidator.validate_node_state_by_any_mode(self.root_pipeline_id)
         # 回滚的开始节点运行失败的情况
