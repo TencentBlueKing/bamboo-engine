@@ -227,7 +227,7 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
             return
 
         # 汇聚网关可以直连结束节点，所以可能会存在找不到对应的汇聚网关的情况
-        if target_node["type"] == "EmptyEndEvent":
+        if target_node["type"] in ["EmptyEndEvent", "ExecutableEndEvent"]:
             node_token_map[target_node["id"]] = token
             return
         # 汇聚网关的token等于对应的网关的token
@@ -249,7 +249,7 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
         return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
 
     # 如果遇到结束节点，直接返回
-    if node["type"] == "EmptyEndEvent":
+    if node["type"] == ["EmptyEndEvent", "ExecutableEndEvent"]:
         return node
 
     if node["type"] == "SubProcess":
