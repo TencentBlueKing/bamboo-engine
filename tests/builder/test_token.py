@@ -45,13 +45,45 @@ def test_inject_pipeline_token_normal():
 
     start.extend(act).extend(end)
     pipeline = build_tree(start)
-
     node_token_map = generate_pipeline_token(pipeline)
 
     assert get_node_token(pipeline, "act_1", node_token_map) == get_node_token(pipeline, "start_event", node_token_map)
     assert get_node_token(pipeline, "start_event", node_token_map) == get_node_token(
         pipeline, "end_event", node_token_map
     )
+
+
+def test_inject_pipeline_token_with_complex_cycle():
+    start = EmptyStartEvent()
+    end = EmptyEndEvent()
+
+    write_document = ServiceActivity(name="act_1", component_code="example_component")
+    review_document = ServiceActivity(name="act_2", component_code="example_component")
+    rework_document = ServiceActivity(name="act_3", component_code="example_component")
+
+    release_document = ServiceActivity(name="act_4", component_code="example_component")
+    gateway = ExclusiveGateway(
+        conditions={0: "${act_1_output} < 0", 1: "${act_1_output} >= 0", 2: "${act_1_output} >= 0"},
+        name="ExclusiveGateway",
+    )
+
+    start.extend(write_document).extend(review_document).extend(gateway).connect(
+        release_document, end, rework_document
+    ).to(release_document).extend(end)
+    rework_document.extend(review_document)
+    pipeline = build_tree(start)
+    node_token_map = generate_pipeline_token(pipeline)
+
+    assert (
+        get_node_token(pipeline, "start_event", node_token_map)
+        == get_node_token(pipeline, "act_1", node_token_map)
+        == get_node_token(pipeline, "act_2", node_token_map)
+        == get_node_token(pipeline, "ExclusiveGateway", node_token_map)
+        == get_node_token(pipeline, "end_event", node_token_map)
+        != get_node_token(pipeline, "act_3", node_token_map)
+    )
+
+    assert get_node_token(pipeline, "act_4", node_token_map) == get_node_token(pipeline, "act_3", node_token_map)
 
 
 def test_inject_pipeline_token_parallel_gateway():
@@ -67,7 +99,6 @@ def test_inject_pipeline_token_parallel_gateway():
 
     pipeline = build_tree(start)
     node_token_map = generate_pipeline_token(pipeline)
-
     assert (
         get_node_token(pipeline, "start_event", node_token_map)
         == get_node_token(pipeline, "ParallelGateway", node_token_map)

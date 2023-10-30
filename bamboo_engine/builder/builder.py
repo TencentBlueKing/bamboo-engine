@@ -101,6 +101,10 @@ def _get_next_node(node, pipeline_tree):
 
     out_goings = node["outgoing"]
 
+    # 说明曾经去除过环，此时没有out_goings
+    if out_goings == "":
+        return []
+
     # 当只有一个输出时,
     if not isinstance(out_goings, list):
         out_goings = [out_goings]
@@ -211,7 +215,7 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
     if node["type"] in ["ParallelGateway", "ExclusiveGateway", "ConditionalParallelGateway"]:
         next_nodes = _get_next_node(node, pipeline_tree)
         node_token = unique_id("t")
-        target_node = None
+        target_nodes = {}
         for next_node in next_nodes:
             # 分支网关各个分支token相同
             node_token_map[next_node["id"]] = node_token
@@ -220,23 +224,23 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
                 node_token = unique_id("t")
                 node_token_map[next_node["id"]] = node_token
 
-            # 如果是网关，沿着路径向内搜索，最终遇到对应的分支网关会返回
+            # 如果是并行网关，沿着路径向内搜索，最终遇到对应的汇聚网关会返回
             target_node = inject_pipeline_token(next_node, pipeline_tree, node_token_map, node_token)
+            if target_node:
+                target_nodes[target_node["id"]] = target_node
 
-        if target_node is None:
-            return
-
-        # 汇聚网关可以直连结束节点，所以可能会存在找不到对应的汇聚网关的情况
-        if target_node["type"] in ["EmptyEndEvent", "ExecutableEndEvent"]:
+        for target_node in target_nodes.values():
+            # 汇聚网关可以直连结束节点，所以可能会存在找不到对应的汇聚网关的情况
+            if target_node["type"] in ["EmptyEndEvent", "ExecutableEndEvent"]:
+                node_token_map[target_node["id"]] = token
+                continue
+            # 汇聚网关的token等于对应的网关的token
             node_token_map[target_node["id"]] = token
-            return
-        # 汇聚网关的token等于对应的网关的token
-        node_token_map[target_node["id"]] = token
-        # 到汇聚网关之后，此时继续向下遍历
-        next_node = _get_next_node(target_node, pipeline_tree)[0]
-        # 汇聚网关只会有一个出度
-        node_token_map[next_node["id"]] = token
-        return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
+            # 到汇聚网关之后，此时继续向下遍历
+            next_node = _get_next_node(target_node, pipeline_tree)[0]
+            # 汇聚网关只会有一个出度
+            node_token_map[next_node["id"]] = token
+            inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
 
     # 如果是汇聚网关，并且id等于converge_id，说明此时遍历在某个单元
     if node["type"] == "ConvergeGateway":
@@ -244,12 +248,16 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
 
     # 如果是普通的节点，说明只有一个出度，此时直接向下遍历就好
     if node["type"] in ["ServiceActivity", "EmptyStartEvent"]:
-        next_node = _get_next_node(node, pipeline_tree)[0]
+        next_node_list = _get_next_node(node, pipeline_tree)
+        # 此时有可能遇到一个去环的节点，该节点没有
+        if not next_node_list:
+            return
+        next_node = next_node_list[0]
         node_token_map[next_node["id"]] = token
         return inject_pipeline_token(next_node, pipeline_tree, node_token_map, token)
 
     # 如果遇到结束节点，直接返回
-    if node["type"] == ["EmptyEndEvent", "ExecutableEndEvent"]:
+    if node["type"] in ["EmptyEndEvent", "ExecutableEndEvent"]:
         return node
 
     if node["type"] == "SubProcess":
