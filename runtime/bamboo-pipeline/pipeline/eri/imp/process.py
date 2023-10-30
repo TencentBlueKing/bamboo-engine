@@ -175,7 +175,7 @@ class ProcessMixin:
             parent_id=qs[0].parent_id,
         )
 
-    def get_process_id_with_current_node_id(self, node_id: str) -> Optional[str]:
+    def get_process_id_with_current_node_id(self, node_id: str) -> Optional[int]:
         """
         获取当前节点 ID 为 node_id 且存活的进程 ID
 

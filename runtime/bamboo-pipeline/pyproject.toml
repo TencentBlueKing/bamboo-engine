@@ -26,6 +26,7 @@ django-timezone-field = "^4.0"
 Werkzeug = "^1.0.0"
 prometheus-client = "^0.9.0"
 boto3 = "^1.9.130"
+isodate = "^0.6.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
