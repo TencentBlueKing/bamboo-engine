@@ -16,7 +16,6 @@ import logging
 import signal
 import time
 
-from django.conf import settings
 from django.core.management import BaseCommand
 from django.db import connections
 from pipeline.contrib.node_timer_event.models import ExpiredNodesRecord
@@ -32,8 +31,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         signal.signal(signal.SIGTERM, self._graceful_exit)
-        redis_inst = settings.redis_inst
-        nodes_pool = settings.EXECUTING_NODE_POOL
+        redis_inst = node_timer_event_settings.redis_inst
+        nodes_pool = node_timer_event_settings.executing_pool
         while not self.has_killed:
             try:
                 start = time.time()
@@ -42,7 +41,7 @@ class Command(BaseCommand):
                 logger.info(f"[node_timeout_process] time consuming: {end-start}")
             except Exception as e:
                 logger.exception(e)
-            time.sleep(1)
+            time.sleep(node_timer_event_settings.pool_scan_interval)
 
     def _graceful_exit(self, *args):
         self.has_killed = True

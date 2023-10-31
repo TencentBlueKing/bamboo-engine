@@ -30,6 +30,7 @@ logger = logging.getLogger("celery")
 def dispatch_expired_nodes(record_id: int):
     record: ExpiredNodesRecord = ExpiredNodesRecord.objects.get(id=record_id)
     node_keys: List[str] = json.loads(record.nodes)
+    logger.info("[dispatch_expired_nodes] record -> %s, nodes -> %s", record_id, node_keys)
     for node_key in node_keys:
         key_info: Dict[str, Union[str, int]] = NodeTimerEventConfig.parse_event_key(node_key)
         index: int = key_info["index"]

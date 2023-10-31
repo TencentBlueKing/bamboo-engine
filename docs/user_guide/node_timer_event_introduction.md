@@ -31,7 +31,7 @@
    @register_action("example")
    class ExampleAction(BaseAction):
        def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:
-           logger.info("[Action] example do: data -> %s, parent_data -> %", data, parent_data)
+           logger.info("[Action] example do: data -> %s, parent_data -> %s", data, parent_data)
            return True
 
    ```
@@ -91,6 +91,8 @@ PIPELINE_NODE_TIMER_EVENT_KEY_PREFIX = "bamboo:v1:node_timer_event"  # Redis key
 PIPELINE_NODE_TIMER_EVENT_HANDLE_QUEUE = None  # 节点计时器边界事件处理队列名称, 用于处理计时器边界事件， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
 PIPELINE_NODE_TIMER_EVENT_DISPATCH_QUEUE = None  # 节点计时器边界事件分发队列名称, 用于记录计时器边界事件， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
 PIPELINE_NODE_TIMER_EVENT_EXECUTING_POOL = "bamboo:v1:node_timer_event:executing_node_pool"  # 执行节点池名称，用于记录正在执行的节点，需要保证 Redis key 唯一，命名示例: {app_code}:{app_env}:{module}:executing_node_pool
+PIPELINE_NODE_TIMER_EVENT_POOL_SCAN_INTERVAL = 1   # 节点池扫描间隔，间隔越小，边界事件触发时间越精准，相应的事件处理的 workload 负载也会提升，默认为 1 s
+PIPELINE_NODE_TIMER_EVENT_MAX_EXPIRE_TIME = 60 * 60 * 24 * 15   # 最长过期时间，兜底删除 Redis 冗余数据，默认为 15 Days，请根据业务场景调整
 ```
 
 ## 使用样例

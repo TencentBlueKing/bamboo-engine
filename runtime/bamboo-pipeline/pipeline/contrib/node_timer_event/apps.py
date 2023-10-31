@@ -19,6 +19,9 @@ class NodeTimerEventConfig(AppConfig):
     verbose_name = "PipelineNodeTimerEvent"
 
     def ready(self):
+        from pipeline.contrib.node_timer_event.signals.handlers import (  # noqa
+            bamboo_engine_eri_node_state_handler,
+        )
         from pipeline.contrib.node_timer_event.tasks import (  # noqa
             dispatch_expired_nodes,
             execute_node_timer_event_action,

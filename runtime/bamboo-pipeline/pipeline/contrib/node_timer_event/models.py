@@ -77,7 +77,8 @@ class NodeTimerEventConfigManager(models.Manager):
 
                     index += 1
 
-                configs.append({"node_id": act_id, "events": treated_timer_events})
+                if treated_timer_events:
+                    configs.append({"node_id": act_id, "events": treated_timer_events})
 
         return {"result": True, "data": configs, "message": ""}
 
@@ -155,6 +156,7 @@ class NodeTimerEventConfig(models.Model):
 
         # TODO 考虑 incr & zadd 合并，使用 lua 封装成原子操作
         loop: int = int(redis_inst.incr(key, 1))
+        redis_inst.expire(key, node_timer_event_settings.max_expire_time)
         if loop > event["repetitions"]:
             logger.info(
                 "[add_to_pool] No need to add: node -> %s, version -> %s, loop -> %s, event -> %s",
@@ -173,6 +175,7 @@ class NodeTimerEventConfig(models.Model):
             node_id,
             version,
             event,
+            key,
             expired_time,
         )
 

@@ -97,5 +97,5 @@ class ActionFactory:
 @register_action("example")
 class ExampleAction(BaseAction):
     def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:
-        logger.info("[Action] example do: data -> %s, parent_data -> %", data, parent_data)
+        logger.info("[Action] example do: data -> %s, parent_data -> %s", data, parent_data)
         return True

@@ -17,11 +17,19 @@ from django.conf import settings
 class NodeTimerEventSettngs:
     PREFIX = "PIPELINE_NODE_TIMER_EVENT"
     DEFAULT_SETTINGS = {
+        # # Redis key 前缀，用于记录正在执行的节点，命名示例: {app_code}:{app_env}:{module}:node_timer_event
         # v1 表示 node_timer_event 的版本，预留以隔离
         "key_prefix": "bamboo:v1:node_timer_event",
+        # 节点计时器边界事件处理队列名称, 用于处理计时器边界事件， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
         "dispatch_queue": None,
+        # 节点计时器边界事件分发队列名称, 用于记录计时器边界事件， 需要 worker 接收该队列消息，默认为 None，即使用 celery 默认队列
         "handle_queue": None,
+        # 执行节点池名称，用于记录正在执行的节点，需要保证 Redis key 唯一，命名示例: {app_code}:{app_env}:{module}:executing_node_pool
         "executing_pool": "bamboo:v1:node_timer_event:executing_node_pool",
+        # 节点池扫描间隔，间隔越小，边界事件触发时间越精准，相应的事件处理的 workload 负载也会提升
+        "pool_scan_interval": 1,
+        # 最长过期时间，兜底删除 Redis 冗余数据，默认为 15 Days，请根据业务场景调整
+        "max_expire_time": 60 * 60 * 24 * 15,
     }
 
     def __getattr__(self, item: str):
