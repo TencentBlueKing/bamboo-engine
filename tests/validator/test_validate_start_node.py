@@ -12,8 +12,9 @@ from bamboo_engine.builder import (
     build_tree,
 )
 from bamboo_engine.exceptions import StartPositionInvalidException
-from bamboo_engine.validator import (
+from bamboo_engine.validator.api import (
     get_allowed_start_node_ids,
+    get_skipped_execute_node_ids,
     validate_pipeline_start_node,
 )
 from bamboo_engine.validator.gateway import validate_gateways
@@ -39,6 +40,10 @@ def test_get_allowed_start_node_ids_by_parallel_gateway():
     assert len(allowed_start_node_ids) == 3
     assert allowed_start_node_ids == [start.id, act_1.id, pg.id]
 
+    skipped_execute_node_ids = get_skipped_execute_node_ids(pipeline, pg.id)
+    assert len(skipped_execute_node_ids) == 2
+    assert set(skipped_execute_node_ids) == {start.id, act_1.id}
+
 
 def test_get_allowed_start_node_ids_by_exclusive_gateway():
     start = EmptyStartEvent()
@@ -55,6 +60,18 @@ def test_get_allowed_start_node_ids_by_exclusive_gateway():
 
     assert len(allowed_start_node_ids) == 5
     assert allowed_start_node_ids == [start.id, act_1.id, eg.id, act_2.id, act_3.id]
+
+    skipped_execute_node_ids = get_skipped_execute_node_ids(pipeline, eg.id)
+    assert len(skipped_execute_node_ids) == 2
+    assert set(skipped_execute_node_ids) == {start.id, act_1.id}
+
+    skipped_execute_node_ids = get_skipped_execute_node_ids(pipeline, act_2.id)
+    assert len(skipped_execute_node_ids) == 3
+    assert set(skipped_execute_node_ids) == {start.id, act_1.id, eg.id}
+
+    skipped_execute_node_ids = get_skipped_execute_node_ids(pipeline, act_3.id)
+    assert len(skipped_execute_node_ids) == 3
+    assert set(skipped_execute_node_ids) == {start.id, act_1.id, eg.id}
 
 
 def test_get_allowed_start_node_ids_by_condition_parallel_gateway():
@@ -77,6 +94,10 @@ def test_get_allowed_start_node_ids_by_condition_parallel_gateway():
 
     assert len(allowed_start_node_ids) == 3
     assert allowed_start_node_ids == [start.id, act_1.id, cpg.id]
+
+    skipped_execute_node_ids = get_skipped_execute_node_ids(pipeline, cpg.id)
+    assert len(skipped_execute_node_ids) == 2
+    assert set(skipped_execute_node_ids) == {start.id, act_1.id}
 
 
 def test_get_allowed_start_node_ids_by_normal():
