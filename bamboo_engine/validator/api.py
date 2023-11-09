@@ -40,6 +40,11 @@ def get_skipped_execute_node_ids(pipeline_tree, start_node_id, validate=True):
     if validate and start_node_id not in get_allowed_start_node_ids(pipeline_tree):
         raise Exception("the start_node_id is not legal, please check")
     start_event_id = pipeline_tree["start_event"]["id"]
+
+    # 如果开始节点 = start_node_id， 说明要从开始节点开始执行，此时没有任何节点被跳过
+    if start_node_id == start_event_id:
+        return []
+
     node_dict = get_nodes_dict(pipeline_tree)
     # 流程的开始位置只允许出现在主干，子流程/并行网关内的节点不允许作为起始位置
     will_skipped_nodes = compute_pipeline_skip_executed_map(start_event_id, node_dict, start_node_id)
