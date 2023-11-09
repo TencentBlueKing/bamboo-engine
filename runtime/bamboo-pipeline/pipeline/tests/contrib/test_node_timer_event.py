@@ -162,6 +162,8 @@ class NodeTimerEventTestCase(TestCase):
                 ]
             )
 
+            self.assertFalse(ExpiredNodesRecord.objects.filter(id=1).exists())
+
     def execute_node_timeout_action_success_test_helper(self, index: int):
         NodeTimerEventConfig.objects.create(
             root_pipeline_id=self.root_pipeline_id, node_id=self.node_id, events=json.dumps(self.timer_events)
@@ -175,7 +177,7 @@ class NodeTimerEventTestCase(TestCase):
 
         key: str = f"bamboo:v1:node_timer_event:node:{self.node_id}:version:{self.version}:index:{index}"
         with patch("pipeline.contrib.node_timer_event.handlers.BambooDjangoRuntime", self.mock_runtime):
-            with patch("pipeline.contrib.node_timer_event.models.node_timer_event_settings.redis_inst", redis_inst):
+            with patch("pipeline.contrib.node_timer_event.adapter.node_timer_event_settings.redis_inst", redis_inst):
                 result = execute_node_timer_event_action(self.node_id, self.version, index=index)
                 self.assertEqual(result["result"], True)
                 self.runtime.get_execution_data.assert_called_once_with(self.node_id)

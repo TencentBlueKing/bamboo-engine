@@ -14,4 +14,12 @@ specific language governing permissions and limitations under the License.
 
 import typing
 
+T = typing.TypeVar("T")
+
 TimeDefined = typing.Dict[str, typing.Any]
+
+
+TimerEvent = typing.Dict[str, typing.Any]
+
+
+TimerEvents = typing.List[TimerEvent]

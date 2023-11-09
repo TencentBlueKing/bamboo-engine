@@ -11,10 +11,10 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, Type
 
 from django.dispatch import receiver
-from pipeline.contrib.node_timer_event.models import NodeTimerEventConfig
+from pipeline.contrib.node_timer_event.adapter import NodeTimerEventBaseAdapter
 from pipeline.contrib.node_timer_event.settings import node_timer_event_settings
 from pipeline.eri.signals import post_set_state
 
@@ -25,8 +25,7 @@ logger = logging.getLogger(__name__)
 
 def _node_timer_event_info_update(redis_inst, to_state: str, node_id: str, version: str):
 
-    events: Optional[List[Dict[str, Any]]] = None
-    node_timer_event_config: Optional[NodeTimerEventConfig] = None
+    adapter: Optional[NodeTimerEventBaseAdapter] = None
 
     if to_state in [
         bamboo_engine_states.RUNNING,
@@ -34,10 +33,11 @@ def _node_timer_event_info_update(redis_inst, to_state: str, node_id: str, versi
         bamboo_engine_states.FINISHED,
         bamboo_engine_states.SUSPENDED,
     ]:
-        node_timer_event_config: Optional[NodeTimerEventConfig] = NodeTimerEventConfig.objects.filter(
-            node_id=node_id
-        ).first()
-        if not node_timer_event_config:
+
+        adapter_class: Type[NodeTimerEventBaseAdapter] = node_timer_event_settings.adapter_class
+        adapter: NodeTimerEventBaseAdapter = adapter_class(node_id=node_id, version=version)
+
+        if not adapter.is_ready():
             logger.info(
                 "[node_timer_event_info_update] node_timer_event_config not exist and skipped: "
                 "node_id -> %s, version -> %s",
@@ -45,29 +45,29 @@ def _node_timer_event_info_update(redis_inst, to_state: str, node_id: str, versi
                 version,
             )
             return
-        events = node_timer_event_config.get_events()
+
         logger.info(
             "[node_timer_event_info_update] load node_timer_event_config: node_id -> %s, version -> %s, events -> %s",
             node_id,
             version,
-            events,
+            adapter.events,
         )
 
     if to_state == bamboo_engine_states.RUNNING:
         # 遍历节点时间事件，丢进待调度节点池
-        for event in events:
-            node_timer_event_config.add_to_pool(redis_inst, node_id, version, event)
+        for event in adapter.events:
+            adapter.add_to_pool(redis_inst, event)
 
     elif to_state in [bamboo_engine_states.FAILED, bamboo_engine_states.FINISHED, bamboo_engine_states.SUSPENDED]:
-        keys: List[str] = [node_timer_event_config.get_event_key(node_id, version, event) for event in events]
+        keys: List[str] = adapter.fetch_keys_to_be_rem()
         redis_inst.zrem(node_timer_event_settings.executing_pool, *keys)
         redis_inst.delete(*keys)
         logger.info(
-            "[node_timer_event_info_update] remove events from redis: "
+            "[node_timer_event_info_update] removed events from redis: "
             "node_id -> %s, version -> %s, events -> %s, keys -> %s",
             node_id,
             version,
-            events,
+            adapter.events,
             keys,
         )
 

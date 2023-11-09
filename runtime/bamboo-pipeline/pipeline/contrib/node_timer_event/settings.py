@@ -11,7 +11,32 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from importlib import import_module
+
 from django.conf import settings
+from pipeline.contrib.node_timer_event import types
+
+
+def get_import_path(cls: types.T) -> str:
+    return f"{cls.__module__}.{cls.__name__}"
+
+
+def import_string(dotted_path: str):
+    """
+    Import a dotted module path and return the attribute/class designated by the
+    last name in the path. Raise ImportError if the import failed.
+    """
+    try:
+        module_path, class_name = dotted_path.rsplit(".", 1)
+    except ValueError as err:
+        raise ImportError(f"{dotted_path} doesn't look like a module path") from err
+
+    module = import_module(module_path)
+
+    try:
+        return getattr(module, class_name)
+    except AttributeError as err:
+        raise ImportError(f'Module "{module_path}" does not define a "{class_name}" attribute/class') from err
 
 
 class NodeTimerEventSettngs:
@@ -30,11 +55,16 @@ class NodeTimerEventSettngs:
         "pool_scan_interval": 1,
         # 最长过期时间，兜底删除 Redis 冗余数据，默认为 15 Days，请根据业务场景调整
         "max_expire_time": 60 * 60 * 24 * 15,
+        # 边界事件处理适配器，默认为 `pipeline.contrib.node_timer_event.adapter.NodeTimerEventAdapter`
+        "adapter_class": "pipeline.contrib.node_timer_event.adapter.NodeTimerEventAdapter",
     }
 
     def __getattr__(self, item: str):
         if item == "redis_inst":
             return settings.redis_inst
+        if item == "adapter_class":
+            return import_string(getattr(settings, f"{self.PREFIX}_{item.upper()}", self.DEFAULT_SETTINGS.get(item)))
+
         return getattr(settings, f"{self.PREFIX}_{item.upper()}", self.DEFAULT_SETTINGS.get(item))
 
 

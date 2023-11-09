@@ -14,9 +14,11 @@ import copy
 from typing import Any, Dict, List
 
 from pipeline.contrib.node_timer_event.models import NodeTimerEventConfig
+from pipeline.contrib.utils import ensure_return_pipeline_contrib_api_result
 from pipeline.core.constants import PE
 
 
+@ensure_return_pipeline_contrib_api_result
 def apply_node_timer_event_configs(pipeline_tree: Dict[str, Any], configs: Dict[str, List[Dict[str, Any]]]):
     """
     在 pipeline_tree 中应用节点计时器边界事件配置
@@ -29,9 +31,7 @@ def apply_node_timer_event_configs(pipeline_tree: Dict[str, Any], configs: Dict[
         if act["type"] == PE.SubProcess:
             apply_node_timer_event_configs(act[PE.pipeline], configs)
         elif act["type"] == PE.ServiceActivity and act_id in configs:
-            if "events" not in act:
-                act["events"] = {}
-            act["events"]["timer_events"] = [
+            act.setdefault("events", {})["timer_events"] = [
                 {
                     "enable": config["enable"],
                     "timer_type": config["timer_type"],
@@ -43,6 +43,7 @@ def apply_node_timer_event_configs(pipeline_tree: Dict[str, Any], configs: Dict[
     return new_pipeline_tree
 
 
+@ensure_return_pipeline_contrib_api_result
 def batch_create_node_timer_event_config(root_pipeline_id: str, pipeline_tree: Dict[str, Any]):
     """
     批量创建节点时间事件配置
