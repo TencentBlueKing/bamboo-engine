@@ -18,21 +18,30 @@
 
 目前，pipeline.contrib.node_timer_event 模块提供了以下接口或扩展：
 
-1. 自定义 Action
-   该扩展用于定义计时器边界事件的处理动作，例如定义一个名为 `example` 的 Action
+1. Action
+
+   SDK 内置了两个 Action 提供「节点超时」处理能力
+    - `bamboo_engine_forced_fail`: 节点超时强制失败
+    - `bamboo_engine_forced_fail_and_skip`: 节点超时强制失败并跳过
+
+   SDK 也提供了比较友好的自定义 Action 扩展和接入能力，用于定义业务层计时器边界事件的处理动作，例如定义一个名为 `example`
+   的 Action
+
    ```python
    import logging
    
    from pipeline.core.data.base import DataObject
-   from pipeline.contrib.node_timer_event.handlers import register_action, BaseAction
+   from pipeline.contrib.node_timer_event.handlers import BaseAction
    
    logger = logging.getLogger(__name__)
    
-   @register_action("example")
    class ExampleAction(BaseAction):
-       def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:
-           logger.info("[Action] example do: data -> %s, parent_data -> %s", data, parent_data)
-           return True
+   def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:
+       logger.info("[Action] example do: data -> %s, parent_data -> %s", data, parent_data)
+       return True
+   
+   class Meta:
+       action_name = "example"
 
    ```
 
@@ -58,7 +67,7 @@
     - action 表示计时器触发时执行的动作
     - defined 代表计时器定义
     - timer_type 表示计时器类型
-    - defined & timer_type 更多配置方式，请参考
+    - defined & timer_type 更多配置方式，请参考文末「附录」
 
 3. batch_create_node_timeout_config
    该接口用于批量创建节点计时器边界事件，接口定义如下：
@@ -93,6 +102,7 @@ PIPELINE_NODE_TIMER_EVENT_DISPATCH_QUEUE = None  # 节点计时器边界事件�
 PIPELINE_NODE_TIMER_EVENT_EXECUTING_POOL = "bamboo:v1:node_timer_event:executing_node_pool"  # 执行节点池名称，用于记录正在执行的节点，需要保证 Redis key 唯一，命名示例: {app_code}:{app_env}:{module}:executing_node_pool
 PIPELINE_NODE_TIMER_EVENT_POOL_SCAN_INTERVAL = 1   # 节点池扫描间隔，间隔越小，边界事件触发时间越精准，相应的事件处理的 workload 负载也会提升，默认为 1 s
 PIPELINE_NODE_TIMER_EVENT_MAX_EXPIRE_TIME = 60 * 60 * 24 * 15   # 最长过期时间，兜底删除 Redis 冗余数据，默认为 15 Days，请根据业务场景调整
+PIPELINE_NODE_TIMER_EVENT_ADAPTER_CLASS = "pipeline.contrib.node_timer_event.adapter.NodeTimerEventAdapter" # 边界事件处理适配器，默认为 `pipeline.contrib.node_timer_event.adapter.NodeTimerEventAdapter`
 ```
 
 ## 使用样例
