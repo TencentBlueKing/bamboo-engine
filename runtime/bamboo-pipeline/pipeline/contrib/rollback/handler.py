@@ -94,7 +94,7 @@ class RollbackValidator:
             )
 
     @staticmethod
-    def validate_node_state_by_token_mode(root_pipeline_id, start_node_id):
+    def validate_node_state(root_pipeline_id, start_node_id):
         """
         使用token模式下的回滚，相同token的节点不允许有正在运行的节点
         """
@@ -121,18 +121,6 @@ class RollbackValidator:
                     start_node_id
                 )
             )
-
-    @staticmethod
-    def validate_node_state_by_any_mode(root_pipeline_id):
-        """
-        使用any模式下的回滚, 不允许有正在运行的节点
-        """
-        if (
-            State.objects.filter(root_id=root_pipeline_id, name=states.RUNNING)
-            .exclude(node_id=root_pipeline_id)
-            .exists()
-        ):
-            raise RollBackException("rollback failed: there is currently the some node is running")
 
     @staticmethod
     def validate_start_node_id(root_pipeline_id, start_node_id):
@@ -262,12 +250,12 @@ class AnyRollbackHandler(BaseRollbackHandler):
         raise RollBackException("rollback failed: when mode is any, not support retry")
 
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None):
-        RollbackValidator.validate_node_state_by_any_mode(self.root_pipeline_id)
-        # 回滚的开始节点运行失败的情况
         RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
         RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
+        # 相同token回滚时，不允许同一token路径上有正在运行的节点
+        RollbackValidator.validate_node_state(self.root_pipeline_id, start_node_id)
 
         node_map = self._get_allowed_rollback_node_map()
         rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
@@ -354,11 +342,11 @@ class TokenRollbackHandler(BaseRollbackHandler):
         if skip_rollback_nodes is None:
             skip_rollback_nodes = []
 
-        # 相同token回滚时，不允许有正在运行的节点
-        RollbackValidator.validate_node_state_by_token_mode(self.root_pipeline_id, start_node_id)
         # 回滚的开始节点运行失败的情况
         RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
+        # 相同token回滚时，不允许同一token路径上有正在运行的节点
+        RollbackValidator.validate_node_state(self.root_pipeline_id, start_node_id)
         RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
 
         # 如果开始节点是失败的情况，则跳过该节点的回滚操作
