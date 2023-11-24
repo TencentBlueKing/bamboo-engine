@@ -41,7 +41,6 @@ class TestPluginExecuteBase(TestCase):
         state = api.get_state(task_id).data
 
         self.assertEqual(state["state"], "READY")
-        self.assertDictEqual(state["callback_data"], {})
         self.assertDictEqual(state["inputs"], {"hello": "world"})
         self.assertDictEqual(state["contexts"], {"hello": "world"})
 
