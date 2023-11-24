@@ -22,7 +22,7 @@ def test_run_plugin_with_schedule():
     time.sleep(20)
     state = api.get_state(task_id).data
     assert state["state"] == "FINISHED"
-    assert state["count"] == 5
+    assert state["outputs"]["count"] == 5
 
 
 def test_run_plugin_with_callback():
