@@ -36,10 +36,10 @@ class TestPluginExecuteBase(TestCase):
         self.assertDictEqual(task.contexts, {"hello": "world"})
         self.assertDictEqual(task.inputs, {"hello": "world"})
 
+    @mock.patch("pipeline.contrib.plugin_execute.handler.execute", MagicMock(return_value=mock_execute))
     def test_get_state(self):
         task_id = api.run("debug_callback_node", "legacy", {"hello": "world"}, {"hello": "world"}).data
         state = api.get_state(task_id).data
-
         self.assertEqual(state["state"], "READY")
         self.assertDictEqual(state["inputs"], {"hello": "world"})
         self.assertDictEqual(state["contexts"], {"hello": "world"})
@@ -65,6 +65,7 @@ class TestPluginExecuteBase(TestCase):
         self.assertDictEqual(task.contexts, {"hello": "jav"})
 
     @mock.patch("pipeline.contrib.plugin_execute.handler.schedule", MagicMock(return_value=mock_schedule))
+    @mock.patch("pipeline.contrib.plugin_execute.handler.execute", MagicMock(return_value=mock_execute))
     def test_callback(self):
         task_id = api.run("debug_callback_node", "legacy", {"hello": "world"}, {"hello": "world"}).data
         task = PluginExecuteTask.objects.get(id=task_id)
@@ -81,6 +82,7 @@ class TestPluginExecuteBase(TestCase):
         task.refresh_from_db()
         self.assertDictEqual(task.callback_data, {"hello": "sandri"})
 
+    @mock.patch("pipeline.contrib.plugin_execute.handler.execute", MagicMock(return_value=mock_execute))
     def test_force_fail(self):
         task_id = api.run("debug_callback_node", "legacy", {"hello": "world"}, {"hello": "world"}).data
         task = PluginExecuteTask.objects.get(id=task_id)
@@ -98,19 +100,34 @@ class TestPluginExecuteBase(TestCase):
         self.assertEqual(task.state, "FAILED")
 
     def test_execute_task(self):
-        task_id = api.run("interrupt_dummy_exec_node", "legacy", {"time": 1}, {}).data
-        execute(task_id)
-        task = PluginExecuteTask.objects.get(id=task_id)
+        task = PluginExecuteTask.objects.create(
+            state="READY",
+            inputs={"time": 1},
+            version="legacy",
+            component_code="interrupt_dummy_exec_node",
+            contexts={},
+            runtime_attrs={},
+        )
+
+        execute(task.id)
+        task.refresh_from_db()
         self.assertEqual(task.state, "FINISHED")
         self.assertDictEqual(task.outputs, {"execute_count": 1})
 
     def test_schedule_task(self):
-        task_id = api.run("debug_callback_node", "legacy", {}, {}).data
-        task = PluginExecuteTask.objects.get(id=task_id)
+        task = PluginExecuteTask.objects.create(
+            state="READY",
+            inputs={},
+            version="legacy",
+            component_code="debug_callback_node",
+            contexts={},
+            runtime_attrs={},
+        )
+
+        task = PluginExecuteTask.objects.get(id=task.id)
         task.callback_data = {"bit": 1}
         task.save()
-
-        execute(task_id)
-        schedule(task_id)
+        execute(task.id)
+        schedule(task.id)
         task.refresh_from_db()
         self.assertEqual(task.state, "FINISHED")
