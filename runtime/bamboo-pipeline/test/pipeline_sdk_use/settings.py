@@ -21,7 +21,6 @@ from pipeline.eri.celery import queues, step
 CELERY_QUEUES.extend(queues.CELERY_QUEUES)  # noqa
 CELERY_QUEUES.extend(queues.QueueResolver("api").queues())  # noqa
 
-
 step.PromServerStep.port = 8002
 app = Celery("proj")
 app.config_from_object("django.conf:settings")
@@ -55,13 +54,14 @@ INSTALLED_APPS = (
     "pipeline",
     "pipeline.log",
     "pipeline.engine",
-    "pipeline.contrib.rollback",
     "pipeline.contrib.node_timer_event",
     "pipeline.component_framework",
     "pipeline.variable_framework",
     "pipeline.django_signal_valve",
     "pipeline.contrib.periodic_task",
     "pipeline.contrib.node_timeout",
+    "pipeline.contrib.rollback",
+    "pipeline.contrib.plugin_execute",
     "django_celery_beat",
     "pipeline_test_use",
     "variable_app",
@@ -156,7 +156,6 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 
-
 ENABLE_EXAMPLE_COMPONENTS = True
 
 BROKER_VHOST = "/"
@@ -181,3 +180,6 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 #         }
 #     }
 # ]
+
+
+PLUGIN_EXECUTE_QUEUE = "default"
