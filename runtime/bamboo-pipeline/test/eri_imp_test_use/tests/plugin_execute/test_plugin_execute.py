@@ -16,10 +16,10 @@ def test_run_plugin_no_schedule():
 
 def test_run_plugin_with_schedule():
     # 测试schedule的情况
-    task_id = api.run("schedule_node", "legacy", {}, {}).data
+    task_id = api.run("schedule_node", "legacy", {"count": 1}, {}).data
     state = api.get_state(task_id).data
     assert state["state"] == "READY"
-    time.sleep(20)
+    time.sleep(30)
     state = api.get_state(task_id).data
     assert state["state"] == "FINISHED"
     assert state["outputs"]["count"] == 5
