@@ -14,10 +14,15 @@
 from unittest import TestCase
 
 from mock.mock import MagicMock
+from pipeline.component_framework.library import ComponentLibrary
 from pipeline.contrib.plugin_execute import api
 from pipeline.contrib.plugin_execute.models import PluginExecuteTask
 from pipeline.contrib.plugin_execute.tasks import execute, schedule
 from pipeline.tests import mock
+from pipeline_test_use.components.collections.atom import (
+    DebugCallbackComponent,
+    InterruptDummyExecuteComponent,
+)
 
 mock_execute = MagicMock()
 mock_execute.apply_async = MagicMock(return_value=True)
@@ -108,7 +113,7 @@ class TestPluginExecuteBase(TestCase):
             contexts={},
             runtime_attrs={},
         )
-
+        ComponentLibrary.register_component("interrupt_dummy_exec_node", "legacy", InterruptDummyExecuteComponent)
         execute(task.id)
         task.refresh_from_db()
         self.assertEqual(task.state, "FINISHED")
@@ -123,7 +128,7 @@ class TestPluginExecuteBase(TestCase):
             contexts={},
             runtime_attrs={},
         )
-
+        ComponentLibrary.register_component("debug_callback_node", "legacy", DebugCallbackComponent)
         task = PluginExecuteTask.objects.get(id=task.id)
         task.callback_data = {"bit": 1}
         task.save()
