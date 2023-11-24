@@ -100,8 +100,8 @@ class TokenRollbackTaskHandler:
         node_snapshots = RollbackNodeSnapshot.objects.filter(node_id=self.node_id, rolled_back=False).order_by("-id")
         for node_snapshot in node_snapshots:
             service = self.runtime.get_service(code=node_snapshot.code, version=node_snapshot.version)
-            data = ExecutionData(inputs=json.loads(node_snapshot.inputs), outputs=json.loads(node_snapshot.outputs))
-            parent_data = ExecutionData(inputs=json.loads(node_snapshot.context_values), outputs={})
+            data = ExecutionData(inputs=node_snapshot.inputs, outputs=node_snapshot.outputs)
+            parent_data = ExecutionData(inputs=node_snapshot.context_values, outputs={})
             result = service.service.rollback(data, parent_data, self.retry_data)
             node_snapshot.rolled_back = True
             node_snapshot.save()

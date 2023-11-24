@@ -11,6 +11,16 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-default_app_config = "pipeline.apps.PipelineConfig"
+from django.contrib import admin
+from pipeline.contrib.node_timer_event import models
 
-__version__ = "3.29.0rc4"
+
+@admin.register(models.NodeTimerEventConfig)
+class NodeTimerEventConfigAdmin(admin.ModelAdmin):
+    list_display = ["root_pipeline_id", "node_id", "events"]
+    search_fields = ["root_pipeline_id__exact", "node_id__exact"]
+
+
+@admin.register(models.ExpiredNodesRecord)
+class ExpiredNodesRecordAdmin(admin.ModelAdmin):
+    list_display = ["id", "nodes"]

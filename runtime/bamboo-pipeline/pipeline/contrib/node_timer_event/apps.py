@@ -10,7 +10,22 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+from django.apps import AppConfig
+from django.conf import settings
 
-default_app_config = "pipeline.apps.PipelineConfig"
 
-__version__ = "3.29.0rc4"
+class NodeTimerEventConfig(AppConfig):
+    name = "pipeline.contrib.node_timer_event"
+    verbose_name = "PipelineNodeTimerEvent"
+
+    def ready(self):
+        from pipeline.contrib.node_timer_event.signals.handlers import (  # noqa
+            bamboo_engine_eri_node_state_handler,
+        )
+        from pipeline.contrib.node_timer_event.tasks import (  # noqa
+            dispatch_expired_nodes,
+            execute_node_timer_event_action,
+        )
+
+        if not hasattr(settings, "redis_inst"):
+            raise Exception("Django Settings should have redis_inst attribute")

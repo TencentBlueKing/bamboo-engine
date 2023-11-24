@@ -54,6 +54,7 @@ INSTALLED_APPS = (
     "pipeline",
     "pipeline.log",
     "pipeline.engine",
+    "pipeline.contrib.node_timer_event",
     "pipeline.component_framework",
     "pipeline.variable_framework",
     "pipeline.django_signal_valve",

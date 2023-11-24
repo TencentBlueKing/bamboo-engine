@@ -11,6 +11,15 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-default_app_config = "pipeline.apps.PipelineConfig"
 
-__version__ = "3.29.0rc4"
+import typing
+
+T = typing.TypeVar("T")
+
+TimeDefined = typing.Dict[str, typing.Any]
+
+
+TimerEvent = typing.Dict[str, typing.Any]
+
+
+TimerEvents = typing.List[TimerEvent]
