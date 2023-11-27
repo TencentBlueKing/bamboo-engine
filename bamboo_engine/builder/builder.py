@@ -214,10 +214,10 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
     # 如果是网关
     if node["type"] in ["ParallelGateway", "ExclusiveGateway", "ConditionalParallelGateway"]:
         next_nodes = _get_next_node(node, pipeline_tree)
-        node_token = unique_id("t")
         target_nodes = {}
         for next_node in next_nodes:
             # 分支网关各个分支token相同
+            node_token = token
             node_token_map[next_node["id"]] = node_token
             # 并行网关token不同
             if node["type"] in ["ParallelGateway", "ConditionalParallelGateway"]:

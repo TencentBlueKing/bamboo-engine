@@ -80,7 +80,7 @@ def test_inject_pipeline_token_with_complex_cycle():
         == get_node_token(pipeline, "act_2", node_token_map)
         == get_node_token(pipeline, "ExclusiveGateway", node_token_map)
         == get_node_token(pipeline, "end_event", node_token_map)
-        != get_node_token(pipeline, "act_3", node_token_map)
+        == get_node_token(pipeline, "act_3", node_token_map)
     )
 
     assert get_node_token(pipeline, "act_4", node_token_map) == get_node_token(pipeline, "act_3", node_token_map)
@@ -131,7 +131,7 @@ def test_inject_pipeline_token_exclusive_gateway():
         == get_node_token(pipeline, "act_1", node_token_map)
         == get_node_token(pipeline, "ExclusiveGateway", node_token_map)
         == get_node_token(pipeline, "end_event", node_token_map)
-        != get_node_token(pipeline, "act_2", node_token_map)
+        == get_node_token(pipeline, "act_2", node_token_map)
     )
 
     assert get_node_token(pipeline, "act_2", node_token_map) == get_node_token(pipeline, "act_3", node_token_map)
@@ -196,7 +196,7 @@ def test_inject_pipeline_token_subprocess():
         == get_node_token(pipeline, "end_event", node_token_map)
         == get_node_token(pipeline, "ExclusiveGateway", node_token_map)
         == get_node_token(pipeline, "end_event", node_token_map)
-        != get_node_token(pipeline, "act_3", node_token_map)
+        == get_node_token(pipeline, "act_3", node_token_map)
     )
 
     assert get_node_token(pipeline, "act_3", node_token_map) == get_node_token(pipeline, "act_4", node_token_map)
@@ -230,7 +230,7 @@ def test_inject_pipeline_token_with_cycle():
         == get_node_token(pipeline, "act_1", node_token_map)
         == get_node_token(pipeline, "ExclusiveGateway", node_token_map)
         == get_node_token(pipeline, "end_event", node_token_map)
-        != get_node_token(pipeline, "act_2", node_token_map)
+        == get_node_token(pipeline, "act_2", node_token_map)
     )
 
     assert get_node_token(pipeline, "act_2", node_token_map) == get_node_token(pipeline, "act_3", node_token_map)
