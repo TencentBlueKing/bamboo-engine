@@ -40,7 +40,6 @@ class PluginExecuteHandler:
 
         if not (isinstance(inputs, dict) and isinstance(contexts, dict) and isinstance(runtime_attrs, dict)):
             raise PluginExecuteException("[plugin_execute_run] error, the inputs, contexts, runtime_attrs must be dict")
-
         plugin_execute_task = PluginExecuteTask.objects.create(
             state=State.READY,
             inputs=inputs,
@@ -52,11 +51,11 @@ class PluginExecuteHandler:
 
         def action():
             # 发送执行任务
-            result = execute.apply_async(kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE)
+            execute.apply_async(
+                kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE, ignore_result=True
+            )
             logger.info(
-                "[plugin_execute_run] send execute task, celery task_id = {}, plugin_execute_task_id = {}".format(
-                    result.id, plugin_execute_task.id
-                )
+                "[plugin_execute_run] send execute task, plugin_execute_task_id = {}".format(plugin_execute_task.id)
             )
 
         try:
@@ -125,13 +124,13 @@ class PluginExecuteHandler:
             # 需要加锁，防止流程处在回调的过程中
             with get_schedule_lock(task_id) as locked:
                 if not locked:
-                    raise PluginExecuteException(
-                        "[plugin_execute_callback] error, it`s have callbacking task, please try"
-                    )
+                    raise PluginExecuteException("[plugin_execute_callback] error, it`s have callback task, please try")
                 plugin_execute_task.callback_data = callback_data
                 plugin_execute_task.save()
-                result = schedule.apply_async(kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE)
-                logger.info("[plugin_execute_callback] send callback task, celery task_id = {}".format(result.id))
+                schedule.apply_async(
+                    kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE, ignore_result=True
+                )
+                logger.info("[plugin_execute_callback] send callback task, plugin_execute_task_id = {}".format(task_id))
 
         _retry_once(action=action)
 
@@ -162,7 +161,9 @@ class PluginExecuteHandler:
         plugin_execute_task.save()
 
         def action():
-            result = execute.apply_async(kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE)
-            logger.info("[plugin_execute_retry_node] send retry_node task, celery task_id = {}".format(result.id))
+            execute.apply_async(kwargs={"task_id": plugin_execute_task.id}, queue=PLUGIN_EXECUTE_QUEUE)
+            logger.info(
+                "[plugin_execute_retry_node] send retry_node task,  plugin_execute_task_id = {}".format(task_id)
+            )
 
         _retry_once(action=action)

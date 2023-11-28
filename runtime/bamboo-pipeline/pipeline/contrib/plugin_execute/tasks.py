@@ -50,6 +50,9 @@ def execute(task_id):
         # 封装运行时
         service.setup_runtime_attrs(**plugin_execute_task.runtime_attrs)
         execute_success = service.execute(data, parent_data)
+        # 在 pipeline 中，如果插件返回为None,则表示成功
+        if execute_success is None:
+            execute_success = True
         plugin_execute_task.outputs = data.outputs
         plugin_execute_task.save()
     except Exception as e:
@@ -62,7 +65,7 @@ def execute(task_id):
         plugin_execute_task.save()
         return
 
-        # 单纯的执行失败, 更新状态和输出信息
+    # 单纯的执行失败, 更新状态和输出信息
     if not execute_success:
         plugin_execute_task.state = State.FAILED
         plugin_execute_task.save()
@@ -78,7 +81,12 @@ def execute(task_id):
 
     # 需要调度，则调度自身
     if service.interval:
-        schedule.apply_async(kwargs={"task_id": task_id}, queue=PLUGIN_EXECUTE_QUEUE, countdown=service.interval.next())
+        schedule.apply_async(
+            kwargs={"task_id": task_id},
+            queue=PLUGIN_EXECUTE_QUEUE,
+            countdown=service.interval.next(),
+            ignore_result=True,
+        )
 
 
 @task
@@ -106,6 +114,9 @@ def schedule(task_id):
         schedule_success = service.schedule(
             data=data, parent_data=parent_data, callback_data=plugin_execute_task.callback_data
         )
+        # 在 pipeline 中，如果插件返回为None,则表示成功
+        if schedule_success is None:
+            schedule_success = True
         plugin_execute_task.outputs = data.outputs
         plugin_execute_task.save()
     except Exception as e:
@@ -132,4 +143,9 @@ def schedule(task_id):
     # 还需要下一次的调度
     # 需要调度，则调度自身
     if service.interval:
-        schedule.apply_async(kwargs={"task_id": task_id}, queue=PLUGIN_EXECUTE_QUEUE, countdown=service.interval.next())
+        schedule.apply_async(
+            kwargs={"task_id": task_id},
+            queue=PLUGIN_EXECUTE_QUEUE,
+            countdown=service.interval.next(),
+            ignore_result=True,
+        )

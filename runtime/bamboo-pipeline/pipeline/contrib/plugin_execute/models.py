@@ -59,7 +59,7 @@ def get_schedule_lock(task_id: int) -> ScheduleLock:
 
 class PluginExecuteTask(models.Model):
     """
-    回滚配置token信息
+    单节点执行任务
     """
 
     state = models.CharField(_("状态名"), null=False, max_length=64)
@@ -76,3 +76,6 @@ class PluginExecuteTask(models.Model):
     finish_at = models.DateTimeField("finish time", null=True)
 
     objects = ScheduleManger()
+
+    class Meta:
+        indexes = [models.Index(fields=["id", "scheduling"])]
