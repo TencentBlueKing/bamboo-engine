@@ -48,7 +48,7 @@ def execute(task_id):
         service = comp_cls.bound_service(name=plugin_execute_task.runtime_attrs.get("name", None))
 
         # 封装运行时
-        service.setup_runtime_attrs(**plugin_execute_task.runtime_attrs)
+        service.setup_runtime_attrs(**plugin_execute_task.runtime_attrs, logger=logger)
         execute_success = service.execute(data, parent_data)
         # 在 pipeline 中，如果插件返回为None,则表示成功
         if execute_success is None:
@@ -110,7 +110,7 @@ def schedule(task_id):
         # 获取service
         service = comp_cls.bound_service(name=plugin_execute_task.runtime_attrs.get("name", None))
         # 封装运行时
-        service.setup_runtime_attrs(**plugin_execute_task.runtime_attrs)
+        service.setup_runtime_attrs(**plugin_execute_task.runtime_attrs, logger=logger)
         schedule_success = service.schedule(
             data=data, parent_data=parent_data, callback_data=plugin_execute_task.callback_data
         )
