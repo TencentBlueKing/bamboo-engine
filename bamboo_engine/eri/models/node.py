@@ -166,6 +166,7 @@ class ConditionalParallelGateway(Node):
         conditions: List[Condition],
         converge_gateway_id: str,
         default_condition: DefaultCondition = None,
+        extra_info: dict = None,
         *args,
         **kwargs
     ):
@@ -180,6 +181,7 @@ class ConditionalParallelGateway(Node):
         self.conditions = conditions
         self.default_condition = default_condition
         self.converge_gateway_id = converge_gateway_id
+        self.extra_info = extra_info or {}
 
 
 class ExclusiveGateway(Node):
@@ -187,7 +189,14 @@ class ExclusiveGateway(Node):
     分支网关
     """
 
-    def __init__(self, conditions: List[Condition], default_condition: DefaultCondition = None, *args, **kwargs):
+    def __init__(
+        self,
+        conditions: List[Condition],
+        default_condition: DefaultCondition = None,
+        extra_info: dict = None,
+        *args,
+        **kwargs
+    ):
         """
 
         :param conditions: 分支条件
@@ -198,6 +207,7 @@ class ExclusiveGateway(Node):
         super().__init__(*args, **kwargs)
         self.conditions = conditions
         self.default_condition = default_condition
+        self.extra_info = extra_info or {}
 
 
 class ServiceActivity(Node):

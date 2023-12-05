@@ -193,6 +193,8 @@ class BambooDjangoRuntime(
                 if default_condition
                 else None
             )
+            if gateway.get("extra_info"):
+                detail["extra_info"] = gateway["extra_info"]
         elif gateway["type"] == NodeType.ParallelGateway.value:
             detail["converge_gateway_id"] = gateway["converge_gateway_id"]
 
@@ -216,6 +218,8 @@ class BambooDjangoRuntime(
                 if default_condition
                 else None
             )
+            if gateway.get("extra_info"):
+                detail["extra_info"] = gateway["extra_info"]
             detail["converge_gateway_id"] = gateway["converge_gateway_id"]
         elif gateway["type"] == NodeType.ConvergeGateway.value:
             pass
