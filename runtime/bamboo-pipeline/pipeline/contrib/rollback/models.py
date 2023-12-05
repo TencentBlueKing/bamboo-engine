@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from pipeline.contrib.fields import SerializerField
 from pipeline.contrib.rollback.constants import TOKEN
-from pipeline.contrib.rollback.fields import SerializerField
 
 
 class RollbackToken(models.Model):

@@ -10,17 +10,12 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
-from pipeline.exceptions import PipelineException
-
-
-class RollBackException(PipelineException):
-    pass
+from django.apps import AppConfig
 
 
-class UpdatePipelineContextException(PipelineException):
-    pass
+class RollbackConfig(AppConfig):
+    name = "pipeline.contrib.plugin_execute"
+    verbose_name = "PipelinePluginExecute"
 
-
-class PluginExecuteException(PipelineException):
-    pass
+    def ready(self):
+        from pipeline.contrib.plugin_execute import tasks  # noqa
