@@ -16,8 +16,8 @@ from pipeline.contrib.utils import ensure_return_pipeline_contrib_api_result
 
 
 @ensure_return_pipeline_contrib_api_result
-def run(component_code: str, version: str, inputs: dict, contexts: dict, runtime_attr: dict = None):
-    task_id = PluginExecuteHandler.run(component_code, version, inputs, contexts, runtime_attr)
+def run(component_code: str, version: str, inputs: dict, contexts: dict, runtime_attrs: dict = None):
+    task_id = PluginExecuteHandler.run(component_code, version, inputs, contexts, runtime_attrs)
     return task_id
 
 
@@ -37,5 +37,5 @@ def forced_fail(task_id):
 
 
 @ensure_return_pipeline_contrib_api_result
-def retry(task_id: int, inputs: dict = None, context: dict = None, runtime_attr: dict = None):
-    PluginExecuteHandler.retry_node(task_id, inputs, context, runtime_attr)
+def retry(task_id: int, inputs: dict = None, contexts: dict = None, runtime_attrs: dict = None):
+    PluginExecuteHandler.retry_node(task_id, inputs, contexts, runtime_attrs)

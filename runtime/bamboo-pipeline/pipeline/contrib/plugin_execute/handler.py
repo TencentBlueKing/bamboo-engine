@@ -84,6 +84,7 @@ class PluginExecuteHandler:
             "invoke_count": plugin_execute_task.invoke_count,
             "inputs": plugin_execute_task.inputs,
             "outputs": plugin_execute_task.outputs,
+            "callback_data": plugin_execute_task.callback_data,
             "contexts": plugin_execute_task.contexts,
             "runtime_attrs": plugin_execute_task.runtime_attrs,
             "create_at": plugin_execute_task.created_at,
