@@ -13,14 +13,13 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 import os
 
+from celery import Celery
 from pipeline.celery.queues import ScalableQueues  # noqa
 from pipeline.celery.settings import *  # noqa
 from pipeline.eri.celery import queues, step
-from celery import Celery
 
-CELERY_QUEUES.extend(queues.CELERY_QUEUES)
-CELERY_QUEUES.extend(queues.QueueResolver("api").queues())
-
+CELERY_QUEUES.extend(queues.CELERY_QUEUES)  # noqa
+CELERY_QUEUES.extend(queues.QueueResolver("api").queues())  # noqa
 
 step.PromServerStep.port = 8002
 app = Celery("proj")
@@ -55,11 +54,14 @@ INSTALLED_APPS = (
     "pipeline",
     "pipeline.log",
     "pipeline.engine",
+    "pipeline.contrib.node_timer_event",
     "pipeline.component_framework",
     "pipeline.variable_framework",
     "pipeline.django_signal_valve",
     "pipeline.contrib.periodic_task",
     "pipeline.contrib.node_timeout",
+    "pipeline.contrib.rollback",
+    "pipeline.contrib.plugin_execute",
     "django_celery_beat",
     "pipeline_test_use",
     "variable_app",
@@ -154,14 +156,13 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 
-
 ENABLE_EXAMPLE_COMPONENTS = True
 
 BROKER_VHOST = "/"
 
 BROKER_URL = "amqp://guest:guest@localhost:5672//"
 
-# BROKER_URL = 'redis://localhost:6379/0'
+# BROKER_URL = "redis://localhost:6379/0"
 
 PIPELINE_DATA_BACKEND = "pipeline.engine.core.data.redis_backend.RedisDataBackend"
 
@@ -179,3 +180,6 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 #         }
 #     }
 # ]
+
+
+PLUGIN_EXECUTE_QUEUE = "default"

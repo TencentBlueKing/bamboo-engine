@@ -57,7 +57,7 @@ tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 
 [[package]]
 name = "bamboo-engine"
-version = "2.9.0"
+version = "2.10.0rc4"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
@@ -342,6 +342,17 @@ description = "iniconfig: brain-dead simple config-ini parsing"
 category = "dev"
 optional = false
 python-versions = "*"
+
+[[package]]
+name = "isodate"
+version = "0.6.1"
+description = "An ISO 8601 date/time/duration parser and formatter"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+six = "*"
 
 [[package]]
 name = "jmespath"
@@ -735,7 +746,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 4"
-content-hash = "dd378de3f4e8e58678c31bc9c3898ee1b5d89765bfcda3c1de20c027f7058bd4"
+content-hash = "468798c3a0ae9c7014244e15919d01134dca7ed1be76c3d7d12f8acf985c6b4c"
 
 [metadata.files]
 amqp = []
@@ -763,6 +774,7 @@ faker = []
 idna = []
 importlib-metadata = []
 iniconfig = []
+isodate = []
 jmespath = []
 jsonschema = []
 kombu = []

@@ -18,8 +18,9 @@ class HookMixin:
     __need_run_hook__ = True
 
     def recorder(self, hook: HookType, data, parent_data, callback_data=None):
-        self.logger.info("hook_debug_node({}) id: {}".format(hook.value, self.id))
-        self.logger.info("hook_debug_node({}) root_pipeline_id: {}".format(hook.value, self.root_pipeline_id))
+        if hasattr(hook.value, "id"):
+            self.logger.info("hook_debug_node({}) id: {}".format(hook.value, self.id))
+            self.logger.info("hook_debug_node({}) root_pipeline_id: {}".format(hook.value, self.root_pipeline_id))
         logger.info("hook_debug_node hook(%s) data %s ", hook.value, pprint.pformat(data.inputs))
         logger.info("hook_debug_node hook(%s) parent data %s ", hook.value, pprint.pformat(parent_data.inputs))
         logger.info("hook_debug_node hook(%s) output data %s ", hook.value, pprint.pformat(data.outputs))
@@ -441,6 +442,32 @@ class CallbackComponent(Component):
     form = "index.html"
 
 
+class DebugCallbackService(Service):
+    __need_schedule__ = True
+    interval = None
+
+    def execute(self, data, parent_data):
+        return True
+
+    def schedule(self, data, parent_data, callback_data=None):
+        if callback_data:
+            if int(callback_data.get("bit", 1)) == 1:
+                self.finish_schedule()
+                return True
+
+        return False
+
+    def outputs_format(self):
+        return []
+
+
+class DebugCallbackComponent(Component):
+    name = "callback component"
+    code = "debug_callback_node"
+    bound_service = DebugCallbackService
+    form = "index.html"
+
+
 class HookCallbackService(HookMixin, CallbackService):
     pass
 
@@ -469,7 +496,6 @@ class MultiCallbackService(Service):
         logger.info("[{}]: callback_data={}".format(_scheduled_times, callback_data))
         if callback_data:
             if int(callback_data.get("bit", 0)) == 0:
-                print("hahacai")
                 return False
 
         _scheduled_times += 1
@@ -646,7 +672,7 @@ class InterruptRaiseService(Service):
         return []
 
 
-class InterruptScheduleComponent(Component):
+class InterruptRaiseScheduleComponent(Component):
     name = "debug 组件"
     code = "interrupt_raise_test"
     bound_service = InterruptRaiseService

@@ -20,3 +20,7 @@ class RollBackException(PipelineException):
 
 class UpdatePipelineContextException(PipelineException):
     pass
+
+
+class PluginExecuteException(PipelineException):
+    pass

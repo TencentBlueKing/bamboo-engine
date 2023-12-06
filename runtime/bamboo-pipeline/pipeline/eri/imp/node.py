@@ -13,24 +13,24 @@ specific language governing permissions and limitations under the License.
 
 import json
 
+from pipeline.eri.models import Node as DBNode
+
 from bamboo_engine import metrics
 from bamboo_engine.eri import (
-    Node,
-    NodeType,
-    ServiceActivity,
-    SubProcess,
-    ExclusiveGateway,
-    ParallelGateway,
+    Condition,
     ConditionalParallelGateway,
     ConvergeGateway,
-    EmptyStartEvent,
-    EmptyEndEvent,
-    ExecutableEndEvent,
-    Condition,
     DefaultCondition,
+    EmptyEndEvent,
+    EmptyStartEvent,
+    ExclusiveGateway,
+    ExecutableEndEvent,
+    Node,
+    NodeType,
+    ParallelGateway,
+    ServiceActivity,
+    SubProcess,
 )
-
-from pipeline.eri.models import Node as DBNode
 
 
 class NodeMixin:
@@ -48,6 +48,7 @@ class NodeMixin:
             can_skip=node_detail["can_skip"],
             name=node_detail.get("name"),
             can_retry=node_detail["can_retry"],
+            reserve_rollback=node_detail.get("reserve_rollback", False),
         )
 
         if node_type == NodeType.ServiceActivity.value:

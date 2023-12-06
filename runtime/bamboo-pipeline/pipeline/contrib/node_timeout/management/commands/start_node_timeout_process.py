@@ -12,17 +12,15 @@ specific language governing permissions and limitations under the License.
 """
 import datetime
 import json
+import logging
 import signal
 import time
-import logging
 
-from django.conf import settings
 from django.core.management import BaseCommand
 from django.db import connections
-
+from pipeline.contrib.node_timeout.models import TimeoutNodesRecord
 from pipeline.contrib.node_timeout.settings import node_timeout_settings
 from pipeline.contrib.node_timeout.tasks import dispatch_timeout_nodes
-from pipeline.contrib.node_timeout.models import TimeoutNodesRecord
 
 logger = logging.getLogger("root")
 
@@ -33,8 +31,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         signal.signal(signal.SIGTERM, self._graceful_exit)
-        redis_inst = settings.redis_inst
-        nodes_pool = settings.EXECUTING_NODE_POOL
+        redis_inst = node_timeout_settings.redis_inst
+        nodes_pool = node_timeout_settings.executing_pool
         while not self.has_killed:
             try:
                 start = time.time()

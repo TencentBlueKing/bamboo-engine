@@ -88,3 +88,50 @@ def get_nodes_dict(data):
         node["target"] = [data["flows"][outgoing]["target"] for outgoing in node["outgoing"]]
 
     return nodes
+
+
+def compute_pipeline_main_nodes(node_id, node_dict):
+    """
+    计算流程中的主线节点，遇到并行网关/分支并行网关/子流程，则会跳过
+    最后计算出来主干分支所允许开始的节点范围
+    """
+    nodes = []
+    node_detail = node_dict[node_id]
+    node_type = node_detail["type"]
+    if node_type in [
+        "EmptyStartEvent",
+        "ServiceActivity",
+        "ExclusiveGateway",
+        "ParallelGateway",
+        "ConditionalParallelGateway",
+    ]:
+        nodes.append(node_id)
+
+    if node_type in ["EmptyStartEvent", "ServiceActivity", "ExclusiveGateway", "ConvergeGateway", "SubProcess"]:
+        next_nodes = node_detail.get("target", [])
+        for next_node_id in next_nodes:
+            nodes += compute_pipeline_main_nodes(next_node_id, node_dict)
+    elif node_type in ["ParallelGateway", "ConditionalParallelGateway"]:
+        next_node_id = node_detail["converge_gateway_id"]
+        nodes += compute_pipeline_main_nodes(next_node_id, node_dict)
+
+    return nodes
+
+
+def compute_pipeline_skip_executed_map(node_id, node_dict, start_node_id):
+    nodes = [node_id]
+    if node_id == start_node_id:
+        return nodes
+    node_detail = node_dict[node_id]
+    next_nodes = node_detail.get("target", [])
+    if node_detail["type"] in ["ExclusiveGateway"]:
+        for next_node_id in next_nodes:
+            node_ids = compute_pipeline_skip_executed_map(next_node_id, node_dict, start_node_id)
+            # 如果开始的位置在分支网关内，只处理该分支
+            if start_node_id in node_ids:
+                nodes += node_ids
+    else:
+        for next_node_id in next_nodes:
+            nodes += compute_pipeline_skip_executed_map(next_node_id, node_dict, start_node_id)
+
+    return set(nodes) - {start_node_id}

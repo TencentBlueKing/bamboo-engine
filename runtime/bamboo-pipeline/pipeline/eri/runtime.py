@@ -29,6 +29,7 @@ from pipeline.eri.imp.interrupt import InterruptMixin
 from pipeline.eri.imp.node import NodeMixin
 from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
 from pipeline.eri.imp.process import ProcessMixin
+from pipeline.eri.imp.rollback import RollbackMixin
 from pipeline.eri.imp.schedule import ScheduleMixin
 from pipeline.eri.imp.state import StateMixin
 from pipeline.eri.imp.task import TaskMixin
@@ -68,10 +69,10 @@ class BambooDjangoRuntime(
     InterruptMixin,
     EventMixin,
     ConfigMixin,
+    RollbackMixin,
     EngineRuntimeInterface,
 ):
-
-    ERI_SUPPORT_VERSION = 7
+    ERI_SUPPORT_VERSION = 8
 
     def __init__(self):
         try:

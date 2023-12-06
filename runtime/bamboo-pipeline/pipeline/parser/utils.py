@@ -13,23 +13,35 @@ specific language governing permissions and limitations under the License.
 
 import logging
 
-from pipeline.utils.uniqid import node_uniqid, line_uniqid
 from pipeline.core.constants import PE
 from pipeline.exceptions import NodeNotExistException
+from pipeline.utils.uniqid import line_uniqid, node_uniqid
 
 logger = logging.getLogger("root")
 
 BRANCH_SELECT_GATEWAYS = {PE.ExclusiveGateway, PE.ConditionalParallelGateway}
 
 
-def recursive_replace_id(pipeline_data):
+def _recursive_replace_id_with_node_map(pipeline_data, subprocess_id=None):
+    """
+    替换pipeline_id 并返回 对应的 node_map 映射
+    """
     pipeline_data[PE.id] = node_uniqid()
-    replace_all_id(pipeline_data)
+    node_map = {}
+    replace_result_map = replace_all_id(pipeline_data)
+    pipeline_id = subprocess_id or pipeline_data[PE.id]
+    node_map[pipeline_id] = replace_result_map
     activities = pipeline_data[PE.activities]
     for act_id, act in list(activities.items()):
         if act[PE.type] == PE.SubProcess:
-            recursive_replace_id(act[PE.pipeline])
+            replace_result_map = _recursive_replace_id_with_node_map(act[PE.pipeline], act_id)
             act[PE.pipeline][PE.id] = act_id
+            node_map[pipeline_id].setdefault("subprocess", {}).update(replace_result_map)
+    return node_map
+
+
+def recursive_replace_id(pipeline_data):
+    return _recursive_replace_id_with_node_map(pipeline_data)
 
 
 def replace_all_id(pipeline_data):

@@ -10,23 +10,40 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from pipeline.contrib.rollback.handler import RollBackHandler
+from pipeline.contrib.rollback.constants import TOKEN
+from pipeline.contrib.rollback.handler import RollbackDispatcher
 from pipeline.contrib.utils import ensure_return_pipeline_contrib_api_result
 
 
 @ensure_return_pipeline_contrib_api_result
-def rollback(root_pipeline_id: str, node_id: str):
+def rollback(
+    root_pipeline_id: str, start_node_id: str, target_node_id: str, skip_rollback_nodes: list = None, mode: str = TOKEN
+):
     """
     :param root_pipeline_id: pipeline id
-    :param node_id: 节点 id
+    :param start_node_id: 开始的 id
+    :param target_node_id: 开始的 id
+    :param mode 回滚模式
     :return: True or False
-
-    回退的思路是，先搜索计算出来当前允许跳过的节点，在计算的过程中网关节点会合并成一个节点
-    只允许回退到已经执行过的节点
     """
-    RollBackHandler(root_pipeline_id, node_id).rollback()
+    RollbackDispatcher(root_pipeline_id, mode).rollback(start_node_id, target_node_id)
 
 
 @ensure_return_pipeline_contrib_api_result
-def get_allowed_rollback_node_id_list(root_pipeline_id: str):
-    return RollBackHandler(root_pipeline_id, None).get_allowed_rollback_node_id_list()
+def reserve_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
+    RollbackDispatcher(root_pipeline_id, mode).reserve_rollback(start_node_id, target_node_id)
+
+
+@ensure_return_pipeline_contrib_api_result
+def cancel_reserved_rollback(root_pipeline_id: str, start_node_id: str, target_node_id: str, mode: str = TOKEN):
+    RollbackDispatcher(root_pipeline_id, mode).cancel_reserved_rollback(start_node_id, target_node_id)
+
+
+@ensure_return_pipeline_contrib_api_result
+def retry_rollback_failed_node(root_pipeline_id: str, node_id: str, retry_data: dict = None, mode: str = TOKEN):
+    RollbackDispatcher(root_pipeline_id, mode).retry_rollback_failed_node(node_id, retry_data)
+
+
+@ensure_return_pipeline_contrib_api_result
+def get_allowed_rollback_node_id_list(root_pipeline_id: str, start_node_id: str, mode: str = TOKEN):
+    return RollbackDispatcher(root_pipeline_id, mode).get_allowed_rollback_node_id_list(start_node_id)

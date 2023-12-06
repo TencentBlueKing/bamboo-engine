@@ -60,6 +60,55 @@ class Graph(object):
         return []
 
 
+class RollbackGraph(Graph):
+    def __init__(self, nodes=None, flows=None):
+        self.nodes = nodes or []
+        self.flows = flows or []
+        super().__init__(self.nodes, self.flows)
+        self.edges = self.build_edges()
+        self.path = []
+        self.last_visited_node = ""
+        self.graph = {node: [] for node in self.nodes}
+        for flow in self.flows:
+            self.graph[flow[0]].append(flow[1])
+
+    def build_edges(self):
+        edges = {}
+        for flow in self.flows:
+            edges.setdefault(flow[0], set()).add(flow[1])
+        return edges
+
+    def add_node(self, node):
+        if node not in self.nodes:
+            self.nodes.append(node)
+
+    def add_edge(self, source, target):
+        self.flows.append([source, target])
+        self.edges.setdefault(source, set()).add(target)
+
+    def next(self, node):
+        return self.edges.get(node, {})
+
+    def reverse(self):
+        graph = RollbackGraph()
+        graph.nodes = self.nodes
+        for flow in self.flows:
+            graph.add_edge(flow[1], flow[0])
+
+        return graph
+
+    def in_degrees(self):
+        ingress = {node: 0 for node in self.nodes}
+        for node, targets in self.edges.items():
+            for target in targets:
+                ingress[target] += 1
+
+        return ingress
+
+    def as_dict(self):
+        return {"nodes": self.nodes, "flows": self.flows}
+
+
 if __name__ == "__main__":
     graph1 = Graph([1, 2, 3, 4], [[1, 2], [2, 3], [3, 4]])
     assert not graph1.has_cycle()

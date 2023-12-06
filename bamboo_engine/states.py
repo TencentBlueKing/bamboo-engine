@@ -29,6 +29,9 @@ class StateType(Enum):
     FINISHED = "FINISHED"
     FAILED = "FAILED"
     REVOKED = "REVOKED"
+    ROLLING_BACK = "ROLLING_BACK"
+    ROLL_BACK_SUCCESS = "ROLL_BACK_SUCCESS"
+    ROLL_BACK_FAILED = "ROLL_BACK_FAILED"
 
 
 CREATED = StateType.CREATED.value
@@ -39,8 +42,11 @@ BLOCKED = StateType.BLOCKED.value
 FINISHED = StateType.FINISHED.value
 FAILED = StateType.FAILED.value
 REVOKED = StateType.REVOKED.value
+ROLLING_BACK = StateType.ROLLING_BACK.value
+ROLL_BACK_SUCCESS = StateType.ROLL_BACK_SUCCESS.value
+ROLL_BACK_FAILED = StateType.ROLL_BACK_FAILED.value
 
-ALL_STATES = frozenset([READY, RUNNING, SUSPENDED, BLOCKED, FINISHED, FAILED, REVOKED])
+ALL_STATES = frozenset([READY, RUNNING, SUSPENDED, BLOCKED, FINISHED, FAILED, REVOKED, ROLLING_BACK])
 
 ARCHIVED_STATES = frozenset([FINISHED, FAILED, REVOKED])
 SLEEP_STATES = frozenset([SUSPENDED, REVOKED])
@@ -51,18 +57,20 @@ INVERTED_TRANSITION = ConstantDict({RUNNING: frozenset([READY, FINISHED])})
 TRANSITION = ConstantDict(
     {
         READY: frozenset([RUNNING, SUSPENDED]),
-        RUNNING: frozenset([FINISHED, FAILED, REVOKED, SUSPENDED]),
-        SUSPENDED: frozenset([READY, REVOKED, RUNNING]),
+        RUNNING: frozenset([FINISHED, FAILED, REVOKED, SUSPENDED, ROLLING_BACK]),
+        SUSPENDED: frozenset([READY, REVOKED, RUNNING, ROLLING_BACK]),
         BLOCKED: frozenset([]),
-        FINISHED: frozenset([RUNNING, FAILED]),
+        FINISHED: frozenset([RUNNING, FAILED, ROLLING_BACK]),
         FAILED: frozenset([READY, FINISHED]),
         REVOKED: frozenset([]),
+        ROLLING_BACK: frozenset([ROLL_BACK_SUCCESS, ROLL_BACK_FAILED]),
+        ROLL_BACK_SUCCESS: frozenset([READY, FINISHED]),
+        ROLL_BACK_FAILED: frozenset([READY, FINISHED, ROLLING_BACK]),
     }
 )
 
 
 def can_transit(from_state, to_state):
-
     if from_state in TRANSITION:
         if to_state in TRANSITION[from_state]:
             return True
