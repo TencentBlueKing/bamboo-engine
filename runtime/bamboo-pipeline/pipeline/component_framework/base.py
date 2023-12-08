@@ -65,6 +65,9 @@ class ComponentMeta(type):
         if not getattr(new_class, "version", None):
             setattr(new_class, "version", LEGACY_PLUGINS_VERSION)
 
+        if not getattr(new_class, "is_default_version", None):
+            setattr(new_class, "is_default_version", False)
+
         # category/group name
         group_name = getattr(module, "__group_name__", new_class.__module__.split(".")[-1].title())
         setattr(new_class, "group_name", group_name)
@@ -85,7 +88,13 @@ class ComponentMeta(type):
             try:
                 print("update {} component model".format(new_class.code))
                 ComponentModel.objects.update_or_create(
-                    code=new_class.code, version=new_class.version, defaults={"name": new_name, "status": __debug__}
+                    code=new_class.code,
+                    version=new_class.version,
+                    defaults={
+                        "name": new_name,
+                        "status": __debug__,
+                        "is_default_version": new_class.is_default_version,
+                    },
                 )
             except Exception as e:
                 if not isinstance(e, ProgrammingError):
