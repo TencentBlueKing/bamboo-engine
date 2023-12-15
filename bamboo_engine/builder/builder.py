@@ -162,9 +162,9 @@ def _delete_flow_id_from_node_io(node, flow_id, io_type):
 
             # recover to original format
             if (
-                    len(node[io_type]) == 1
-                    and io_type == "outgoing"
-                    and node["type"] in ["EmptyStartEvent", "ServiceActivity", "ConvergeGateway"]
+                len(node[io_type]) == 1
+                and io_type == "outgoing"
+                and node["type"] in ["EmptyStartEvent", "ServiceActivity", "ConvergeGateway"]
             ):
                 node[io_type] = node[io_type][0]
 
