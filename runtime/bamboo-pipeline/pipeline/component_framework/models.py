@@ -64,6 +64,7 @@ class ComponentModel(models.Model):
     code = models.CharField(_("组件编码"), max_length=255, db_index=True)
     version = models.CharField(_("组件版本"), max_length=64, default=LEGACY_PLUGINS_VERSION, db_index=True)
     name = models.CharField(_("组件名称"), max_length=255)
+    is_default_version = models.BooleanField(_("是否是默认版本"), default=False)
     status = models.BooleanField(_("组件是否可用"), default=True)
 
     objects = ComponentManager()
