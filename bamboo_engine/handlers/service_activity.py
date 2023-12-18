@@ -275,7 +275,23 @@ class ServiceActivityHandler(NodeHandler):
                 root_pipeline_data=root_pipeline_data,
             )
             try:
+                self.runtime.pre_execute(root_pipeline_id=root_pipeline_id, node_id=self.node.id)
+                self.hook_dispatch(
+                    hook=HookType.PRE_EXECUTE,
+                    root_pipeline_id=root_pipeline_id,
+                    service=service,
+                    service_data=service_data,
+                    root_pipeline_data=root_pipeline_data,
+                )
                 execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
+                self.runtime.post_execute(root_pipeline_id=root_pipeline_id, node_id=self.node.id)
+                self.hook_dispatch(
+                    hook=HookType.POST_EXECUTE,
+                    root_pipeline_id=root_pipeline_id,
+                    service=service,
+                    service_data=service_data,
+                    root_pipeline_data=root_pipeline_data,
+                )
             except Exception:
                 ENGINE_EXECUTE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 ex_data = traceback.format_exc()
@@ -512,11 +528,27 @@ class ServiceActivityHandler(NodeHandler):
             )
         else:
             try:
+                self.runtime.pre_schedule(root_pipeline_id=root_pipeline_id, node_id=self.node.id)
+                self.hook_dispatch(
+                    hook=HookType.PRE_SCHEDULE,
+                    root_pipeline_id=root_pipeline_id,
+                    service=service,
+                    service_data=service_data,
+                    root_pipeline_data=root_pipeline_data,
+                )
                 schedule_success = service.schedule(
                     schedule=schedule,
                     data=service_data,
                     root_pipeline_data=root_pipeline_data,
                     callback_data=callback_data,
+                )
+                self.runtime.post_schedule(root_pipeline_id=root_pipeline_id, node_id=self.node.id)
+                self.hook_dispatch(
+                    hook=HookType.POST_SCHEDULE,
+                    root_pipeline_id=root_pipeline_id,
+                    service=service,
+                    service_data=service_data,
+                    root_pipeline_data=root_pipeline_data,
                 )
             except Exception:
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()

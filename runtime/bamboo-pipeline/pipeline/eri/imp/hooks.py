@@ -506,3 +506,59 @@ class HooksMixin:
                 event_type=self.node_finish.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
             )
         )
+
+    def pre_execute(self, root_pipeline_id: str, node_id: str):
+        """
+        节点执行前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_execute.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )
+
+    def post_execute(self, root_pipeline_id: str, node_id: str):
+        """
+        节点执行后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_execute.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )
+
+    def pre_schedule(self, root_pipeline_id: str, node_id: str):
+        """
+        节点调度前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.pre_schedule.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )
+
+    def post_schedule(self, root_pipeline_id: str, node_id: str):
+        """
+        节点调度后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+        self._send_event(
+            PipelineEvent(
+                event_type=self.post_schedule.__name__, data={"root_pipeline_id": root_pipeline_id, "node_id": node_id}
+            )
+        )

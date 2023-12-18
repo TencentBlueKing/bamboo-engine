@@ -54,6 +54,14 @@ class HookType(Enum):
     EXECUTE = "execute"
     # 节点 schedule
     SCHEDULE = "schedule"
+    # 节点 execute 前
+    PRE_EXECUTE = "pre_execute"
+    # 节点 execute 后
+    POST_EXECUTE = "post_execute"
+    # 节点 schedule 前
+    PRE_SCHEDULE = "pre_schedule"
+    # 节点 schedule 后
+    POST_SCHEDULE = "post_schedule"
 
 
 class InterruptEvent:

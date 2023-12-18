@@ -598,6 +598,15 @@ class TaskMixin:
     引擎任务派发相关接口
     """
 
+    def pre_execute(self, root_pipeline_id: str, node_id: str):
+        """
+        执行节点前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
     @abstractmethod
     def execute(
         self,
@@ -625,6 +634,24 @@ class TaskMixin:
         :type headers: Optional[dict]
         """
 
+    def post_execute(self, root_pipeline_id: str, node_id: str):
+        """
+        执行节点后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
+    def pre_schedule(self, root_pipeline_id: str, node_id: str):
+        """
+        派发调度任务前需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
+        """
+
     @abstractmethod
     def schedule(
         self,
@@ -650,6 +677,15 @@ class TaskMixin:
         :type recover_point: Optional[ExecuteInterruptPoint]
         :param headers: 任务头部信息
         :type headers: Optional[dict]
+        """
+
+    def post_schedule(self, root_pipeline_id: str, node_id: str):
+        """
+        派发调度任务后需要执行的钩子
+        :param root_pipeline_id: 任务ID
+        :type node_id: str
+        :param node_id: 节点ID
+        :type node_id: str
         """
 
     @abstractmethod
