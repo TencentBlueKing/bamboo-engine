@@ -1131,7 +1131,7 @@ class Engine:
             # engine context prepare
             set_node_info(CurrentNodeInfo(node_id=node_id, version=state.version, loop=state.loop))
 
-            # schedule alredy finished
+            # schedule already finished
             if schedule.finished:
                 logger.warning(
                     "root pipeline[%s] schedule(%s) %s with version %s already finished",
@@ -1190,7 +1190,7 @@ class Engine:
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
-                # only retry at multiple calback type
+                # only retry at multiple callback type
                 if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
                     logger.info(
                         "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, "
