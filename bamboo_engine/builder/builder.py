@@ -197,10 +197,17 @@ def _acyclic(pipeline):
         _delete_flow_id_from_node_io(target_node, flow_id, "incoming")
 
 
+def _acyclic_flow(tree):
+    _acyclic(tree)
+    for node in tree["activities"].values():
+        if node["type"] == "SubProcess":
+            _acyclic_flow(node["pipeline"])
+
+
 def generate_pipeline_token(pipeline_tree):
     tree = copy.deepcopy(pipeline_tree)
     # 去环
-    _acyclic(tree)
+    _acyclic_flow(tree)
 
     start_node = tree["start_event"]
     token = unique_id("t")
