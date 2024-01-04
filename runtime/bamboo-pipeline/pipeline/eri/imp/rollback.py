@@ -31,7 +31,7 @@ class RollbackMixin:
 
     def set_node_snapshot(self, root_pipeline_id, node_id, code, version, context_values, inputs, outputs):
         """
-        创建一分节点快照
+        创建一份节点快照
         """
         try:
             RollbackNodeSnapshot = apps.get_model("rollback", "RollbackNodeSnapshot")
@@ -74,7 +74,7 @@ class RollbackMixin:
                 root_pipeline_id=root_pipeline_id, start_node_id=node_id, is_expired=False
             )
             handler = RollbackDispatcher(root_pipeline_id=root_pipeline_id, mode=rollback_plan.mode)
-            handler.rollback(rollback_plan.start_node_id, rollback_plan.target_node_id)
+            handler.rollback(rollback_plan.start_node_id, rollback_plan.target_node_id, **rollback_plan.options)
             rollback_plan.is_expired = True
             rollback_plan.save(update_fields=["is_expired"])
         except Exception as e:

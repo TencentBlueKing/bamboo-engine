@@ -50,4 +50,5 @@ class RollbackPlan(models.Model):
     start_node_id = models.CharField(verbose_name="start node id", max_length=64, db_index=True)
     target_node_id = models.CharField(verbose_name="target_node_id", max_length=64, db_index=True)
     mode = models.CharField(verbose_name="rollback mode", max_length=32, default=TOKEN)
+    options = SerializerField(verbose_name="rollback options", default={})
     is_expired = models.BooleanField(verbose_name="is expired", default=False)
