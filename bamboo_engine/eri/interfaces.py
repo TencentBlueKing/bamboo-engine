@@ -39,7 +39,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "7.1.0"
+__version__ = "7.1.1"
 
 
 def version():
