@@ -2,10 +2,22 @@
 
 from pipeline.eri.runtime import BambooDjangoRuntime
 
-from bamboo_engine.builder import *  # noqa
+from bamboo_engine.builder import (
+    EmptyEndEvent,
+    EmptyStartEvent,
+    ServiceActivity,
+    build_tree,
+)
 from bamboo_engine.engine import Engine
 
-from ..utils import *  # noqa
+from ..utils import (
+    assert_all_finish,
+    assert_all_running,
+    assert_exec_data_equal,
+    assert_schedule_finish,
+    assert_schedule_not_finish,
+    sleep,
+)
 
 
 def test_callback_node_success():
@@ -38,10 +50,22 @@ def test_callback_node_success():
                     "_inner_loop": 1,
                     "_loop": 1,
                     "_result": True,
-                    "hook_call_order": ["node_enter", "execute", "schedule"],
+                    "hook_call_order": [
+                        "node_enter",
+                        "pre_execute",
+                        "execute",
+                        "post_execute",
+                        "pre_schedule",
+                        "schedule",
+                        "post_schedule",
+                    ],
+                    "pre_execute": 1,
                     "execute": 1,
+                    "post_execute": 1,
                     "node_enter": 1,
+                    "pre_schedule": 1,
                     "schedule": 1,
+                    "post_schedule": 1,
                 },
             }
         }
@@ -88,16 +112,32 @@ def test_multi_callback_node_success():
                     "_result": True,
                     "hook_call_order": [
                         "node_enter",
+                        "pre_execute",
                         "execute",
+                        "post_execute",
+                        "pre_schedule",
                         "schedule",
+                        "post_schedule",
+                        "pre_schedule",
                         "schedule",
+                        "post_schedule",
+                        "pre_schedule",
                         "schedule",
+                        "post_schedule",
+                        "pre_schedule",
                         "schedule",
+                        "post_schedule",
+                        "pre_schedule",
                         "schedule",
+                        "post_schedule",
                     ],
+                    "pre_execute": 1,
                     "execute": 1,
+                    "post_execute": 1,
                     "node_enter": 1,
+                    "pre_schedule": 5,
                     "schedule": 5,
+                    "post_schedule": 5,
                     "_scheduled_times": 5,
                 },
             }
@@ -139,14 +179,20 @@ def test_callback_node_fail_and_skip():
                     "node_enter": 1,
                     "hook_call_order": [
                         "node_enter",
+                        "pre_execute",
                         "execute",
+                        "post_execute",
+                        "pre_schedule",
                         "schedule",
                         "node_schedule_fail",
                     ],
+                    "pre_execute": 1,
                     "execute": 1,
+                    "post_execute": 1,
                     "_result": False,
                     "_loop": 1,
                     "_inner_loop": 1,
+                    "pre_schedule": 1,
                     "schedule": 1,
                     "node_schedule_fail": 1,
                 },
