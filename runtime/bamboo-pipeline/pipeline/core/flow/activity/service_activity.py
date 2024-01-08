@@ -193,6 +193,22 @@ class Service(object, metaclass=ABCMeta):
         """节点执行结束"""
         return True
 
+    def pre_execute(self, data, parent_data):
+        """节点执行前"""
+        return True
+
+    def post_execute(self, data, parent_data):
+        """节点执行后"""
+        return True
+
+    def pre_schedule(self, data, parent_data):
+        """节点调度前"""
+        return True
+
+    def post_schedule(self, data, parent_data):
+        """节点调度后"""
+        return True
+
 
 class ServiceActivity(Activity):
     result_bit = "_result"

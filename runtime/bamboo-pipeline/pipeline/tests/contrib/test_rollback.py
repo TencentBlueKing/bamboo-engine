@@ -30,6 +30,9 @@ from bamboo_engine.utils.string import unique_id
 token_rollback = MagicMock()
 token_rollback.apply_async = MagicMock(return_value=True)
 
+any_rollback = MagicMock()
+any_rollback.apply_async = MagicMock(return_value=True)
+
 
 class TestRollBackBase(TestCase):
     @mock.patch("pipeline.contrib.rollback.handler.token_rollback", MagicMock(return_value=token_rollback))
@@ -338,3 +341,134 @@ class TestRollBackBase(TestCase):
 
         result = api.retry_rollback_failed_node(root_pipeline_id, node_id)
         self.assertTrue(result.result)
+
+    @mock.patch("pipeline.contrib.rollback.handler.any_rollback", MagicMock(return_value=any_rollback))
+    def test_rollback_with_any_mode_and_skip_check_token(self):
+        pipeline_id = unique_id("n")
+        State.objects.create(
+            node_id=pipeline_id, root_id=pipeline_id, parent_id=pipeline_id, name=states.RUNNING, version=unique_id("v")
+        )
+
+        start_node_id = unique_id("n")
+        State.objects.create(
+            node_id=start_node_id,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.FINISHED,
+            version=unique_id("v"),
+        )
+
+        target_node_id = unique_id("n")
+        State.objects.create(
+            node_id=target_node_id,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.FINISHED,
+            version=unique_id("v"),
+        )
+
+        target_node_detail = {
+            "id": target_node_id,
+            "type": PE.ServiceActivity,
+            "targets": {target_node_id: start_node_id},
+            "root_pipeline_id": pipeline_id,
+            "parent_pipeline_id": pipeline_id,
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        start_node_detail = {
+            "id": start_node_id,
+            "type": PE.ServiceActivity,
+            "targets": {},
+            "root_pipeline_id": pipeline_id,
+            "parent_pipeline_id": pipeline_id,
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        Node.objects.create(node_id=target_node_id, detail=json.dumps(target_node_detail))
+        Node.objects.create(node_id=start_node_id, detail=json.dumps(start_node_detail))
+        Process.objects.create(root_pipeline_id=pipeline_id, current_node_id=start_node_id, priority=1)
+        result = api.reserve_rollback(pipeline_id, start_node_id, target_node_id)
+        self.assertFalse(result.result)
+        message = "rollback failed: pipeline token not exist, pipeline_id={}".format(pipeline_id)
+        self.assertEqual(str(result.exc), message)
+
+        RollbackToken.objects.create(
+            root_pipeline_id=pipeline_id, token=json.dumps({target_node_id: "xxx", start_node_id: "xxx"})
+        )
+
+        result = api.rollback(pipeline_id, start_node_id, target_node_id, mode="ANY", skip_check_token=True)
+        self.assertTrue(result.result)
+
+    def test_get_allowed_rollback_node_id_list_with_skip_check_token(self):
+        pipeline_id = unique_id("n")
+        State.objects.create(
+            node_id=pipeline_id, root_id=pipeline_id, parent_id=pipeline_id, name=states.RUNNING, version=unique_id("v")
+        )
+
+        start_node_id = unique_id("n")
+        State.objects.create(
+            node_id=start_node_id,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.FINISHED,
+            version=unique_id("v"),
+        )
+
+        target_node_id = unique_id("n")
+        State.objects.create(
+            node_id=target_node_id,
+            root_id=pipeline_id,
+            parent_id=pipeline_id,
+            name=states.FINISHED,
+            version=unique_id("v"),
+        )
+
+        target_node_detail = {
+            "id": target_node_id,
+            "type": PE.ServiceActivity,
+            "targets": {target_node_id: start_node_id},
+            "root_pipeline_id": pipeline_id,
+            "parent_pipeline_id": pipeline_id,
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        start_node_detail = {
+            "id": start_node_id,
+            "type": PE.ServiceActivity,
+            "targets": {},
+            "root_pipeline_id": pipeline_id,
+            "parent_pipeline_id": pipeline_id,
+            "can_skip": True,
+            "code": "bk_display",
+            "version": "v1.0",
+            "error_ignorable": True,
+            "can_retry": True,
+        }
+
+        Node.objects.create(node_id=target_node_id, detail=json.dumps(target_node_detail))
+        Node.objects.create(node_id=start_node_id, detail=json.dumps(start_node_detail))
+
+        result = api.get_allowed_rollback_node_id_list(pipeline_id, start_node_id, "ANY", skip_check_token=True)
+        self.assertTrue(result.result)
+        self.assertListEqual(list({target_node_id}), list(set(result.data)))
+
+        RollbackToken.objects.create(
+            root_pipeline_id=pipeline_id, token=json.dumps({target_node_id: "xsx", start_node_id: "xxx"})
+        )
+
+        result = api.get_allowed_rollback_node_id_list(pipeline_id, start_node_id, "ANY")
+        self.assertTrue(result.result)
+        self.assertListEqual([], result.data)

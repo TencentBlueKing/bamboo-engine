@@ -34,13 +34,29 @@ class HookMixin:
         logger.info("hook_debug_node hook(%s) output data %s ", hook.value, pprint.pformat(data.outputs))
         return True
 
+    def pre_execute(self, data, parent_data):
+        """节点执行前"""
+        return self.recorder(HookType.PRE_EXECUTE, data, parent_data)
+
     def execute(self, data, parent_data):
         self.recorder(hook=HookType.EXECUTE, data=data, parent_data=parent_data)
         return super().execute(data, parent_data)
 
+    def post_execute(self, data, parent_data):
+        """节点执行后"""
+        return self.recorder(HookType.POST_EXECUTE, data, parent_data)
+
+    def pre_schedule(self, data, parent_data):
+        """节点调度前"""
+        return self.recorder(HookType.PRE_SCHEDULE, data, parent_data)
+
     def schedule(self, data, parent_data, callback_data=None):
         self.recorder(hook=HookType.SCHEDULE, data=data, parent_data=parent_data, callback_data=callback_data)
         return super().schedule(data, parent_data, callback_data)
+
+    def post_schedule(self, data, parent_data):
+        """节点调度后"""
+        return self.recorder(HookType.POST_SCHEDULE, data, parent_data)
 
     def pre_resume_node(self, data, parent_data):
         """节点继续操作前"""

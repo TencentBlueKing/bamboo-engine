@@ -81,8 +81,10 @@ MIDDLEWARE = (
 )
 
 REDIS = {
-    "host": "localhost",
-    "port": 6379,
+    "host": os.getenv("PIPELINE_TEST_REDIS_HOST", "localhost"),
+    "port": int(os.getenv("PIPELINE_TEST_REDIS_PORT") or 6379),
+    "password": os.getenv("PIPELINE_TEST_REDIS_PASSWORD"),
+    "db": int(os.getenv("PIPELINE_TEST_REDIS_DB") or 0),
 }
 
 TEMPLATES = [
@@ -117,8 +119,8 @@ else:
             "NAME": os.getenv("PIPELINE_TEST_DB_NAME"),
             "USER": os.getenv("PIPELINE_TEST_DB_USER"),
             "PASSWORD": os.getenv("PIPELINE_TEST_DB_PWD"),
-            "HOST": "localhost",
-            "PORT": 3306,
+            "HOST": os.getenv("PIPELINE_TEST_DB_HOST", "localhost"),
+            "PORT": int(os.getenv("PIPELINE_TEST_DB_PORT", 3306)),
             "TEST": {"CHARSET": "utf8", "COLLATION": "utf8_general_ci"},
         }
     }
@@ -160,7 +162,7 @@ ENABLE_EXAMPLE_COMPONENTS = True
 
 BROKER_VHOST = "/"
 
-BROKER_URL = "amqp://guest:guest@localhost:5672//"
+BROKER_URL = os.getenv("PIPELINE_TEST_BROKER_URL", "amqp://guest:guest@localhost:5672//")
 
 # BROKER_URL = "redis://localhost:6379/0"
 

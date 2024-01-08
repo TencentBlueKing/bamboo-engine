@@ -4,10 +4,23 @@ import typing
 import pytest
 from pipeline.eri.runtime import BambooDjangoRuntime
 
-from bamboo_engine.builder import *  # noqa
+from bamboo_engine.builder import (  # noqa
+    EmptyEndEvent,
+    EmptyStartEvent,
+    ServiceActivity,
+    Var,
+    build_tree,
+    builder,
+)
 from bamboo_engine.engine import Engine
 
-from ..utils import *  # noqa
+from ..utils import (
+    assert_all_failed,
+    assert_all_finish,
+    assert_exec_data_equal,
+    assert_schedule_finish,
+    runtime,
+)
 
 
 def test_execution():
@@ -32,11 +45,24 @@ def test_execution():
                     "_inner_loop": 1,
                     "_loop": 1,
                     "_result": True,
-                    "hook_call_order": ["node_enter", "execute", "schedule", "node_finish"],
+                    "hook_call_order": [
+                        "node_enter",
+                        "pre_execute",
+                        "execute",
+                        "post_execute",
+                        "pre_schedule",
+                        "schedule",
+                        "post_schedule",
+                        "node_finish",
+                    ],
+                    "pre_execute": 1,
                     "execute": 1,
+                    "post_execute": 1,
                     "node_enter": 1,
                     "node_finish": 1,
+                    "pre_schedule": 1,
                     "schedule": 1,
+                    "post_schedule": 1,
                 },
             },
         }
@@ -51,28 +77,46 @@ def test_execution():
             True,
             False,
             False,
-            ["node_enter", "execute", "node_execute_exception", "node_execute_fail"],
+            ["node_enter", "pre_execute", "execute", "node_execute_exception", "node_execute_fail"],
             id="execute raise and not ignore",
         ),
         pytest.param(
             True,
             False,
             True,
-            ["node_enter", "execute", "node_execute_exception", "node_finish"],
+            ["node_enter", "pre_execute", "execute", "node_execute_exception", "node_finish"],
             id="execute raise and ignore",
         ),
         pytest.param(
             False,
             True,
             False,
-            ["node_enter", "execute", "schedule", "node_schedule_exception", "node_schedule_fail"],
+            [
+                "node_enter",
+                "pre_execute",
+                "execute",
+                "post_execute",
+                "pre_schedule",
+                "schedule",
+                "node_schedule_exception",
+                "node_schedule_fail",
+            ],
             id="schedule raise and not ignore",
         ),
         pytest.param(
             False,
             True,
             True,
-            ["node_enter", "execute", "schedule", "node_schedule_exception", "node_finish"],
+            [
+                "node_enter",
+                "pre_execute",
+                "execute",
+                "post_execute",
+                "pre_schedule",
+                "schedule",
+                "node_schedule_exception",
+                "node_finish",
+            ],
             id="schedule raise and ignore",
         ),
     ],

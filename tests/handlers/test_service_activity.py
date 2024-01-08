@@ -39,7 +39,6 @@ from bamboo_engine.interrupt import (
     ScheduleInterrupter,
     ScheduleKeyPoint,
 )
-from tests.engine.test_engine_execute import recover_point
 
 
 @pytest.fixture
@@ -139,13 +138,13 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
     handler = ServiceActivityHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == True
-    assert result.schedule_ready == False
-    assert result.schedule_type == None
+    assert result.should_sleep is True
+    assert result.schedule_ready is False
+    assert result.schedule_type is None
     assert result.schedule_after == -1
     assert result.dispatch_processes == []
-    assert result.next_node_id == None
-    assert result.should_die == False
+    assert result.next_node_id is None
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -159,14 +158,15 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-    assert runtime.set_execution_data.call_count == 4
+    assert runtime.set_execution_data.call_count == 5
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
-    assert service.hook_dispatch.call_count == 3
+    assert service.hook_dispatch.call_count == 4
     assert service.hook_dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
-    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
-    assert service.hook_dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
+    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.PRE_EXECUTE
+    assert service.hook_dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
+    assert service.hook_dispatch.call_args_list[3].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -216,13 +216,13 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     handler = ServiceActivityHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == False
-    assert result.schedule_ready == False
-    assert result.schedule_type == None
+    assert result.should_sleep is False
+    assert result.schedule_ready is False
+    assert result.schedule_type is None
     assert result.schedule_after == -1
     assert result.dispatch_processes == []
     assert result.next_node_id == node.target_nodes[0]
-    assert result.should_die == False
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -237,13 +237,14 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
         error_ignored=True,
         ignore_boring_set=recover_point is not None,
     )
-    assert runtime.set_execution_data.call_count == 3
+    assert runtime.set_execution_data.call_count == 4
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert "ex_data" in runtime.set_execution_data.call_args.kwargs["data"].outputs
-    assert service.hook_dispatch.call_count == 2
+    assert service.hook_dispatch.call_count == 3
     assert service.hook_dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
-    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
+    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.PRE_EXECUTE
+    assert service.hook_dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_EXECUTE_EXCEPTION
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -293,13 +294,13 @@ def test_context_hydrate__raise(pi, node, interrupter, recover_point):
     with patch("bamboo_engine.handlers.service_activity.Context", MagicMock(return_value=raise_context)):
         result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == True
-    assert result.schedule_ready == False
-    assert result.schedule_type == None
+    assert result.should_sleep is True
+    assert result.schedule_ready is False
+    assert result.schedule_type is None
     assert result.schedule_after == -1
     assert result.dispatch_processes == []
-    assert result.next_node_id == None
-    assert result.should_die == False
+    assert result.next_node_id is None
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -358,13 +359,13 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     handler = ServiceActivityHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == True
-    assert result.schedule_ready == True
+    assert result.should_sleep is True
+    assert result.schedule_ready is True
     assert result.schedule_type == ScheduleType.POLL
     assert result.schedule_after == 5
     assert result.dispatch_processes == []
-    assert result.next_node_id == None
-    assert result.should_die == False
+    assert result.next_node_id is None
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -400,8 +401,8 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     if recover_point and recover_point.handler_data.service_executed:
         service.hook_dispatch.assert_not_called()
     else:
-        service.hook_dispatch.assert_called_once()
-        assert service.hook_dispatch.call_args.kwargs["hook"] == HookType.NODE_ENTER
+        service.hook_dispatch.assert_called()
+        assert service.hook_dispatch.call_args.kwargs["hook"] == HookType.POST_EXECUTE
 
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
@@ -461,13 +462,13 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
     handler = ServiceActivityHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == False
-    assert result.schedule_ready == False
-    assert result.schedule_type == None
+    assert result.should_sleep is False
+    assert result.schedule_ready is False
+    assert result.schedule_type is None
     assert result.schedule_after == -1
     assert result.dispatch_processes == []
     assert result.next_node_id == node.target_nodes[0]
-    assert result.should_die == False
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -526,9 +527,9 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
         service.hook_dispatch.assert_not_called()
         assert runtime.set_execution_data.call_count == 1
     else:
-        service.hook_dispatch.assert_called_once()
-        assert service.hook_dispatch.call_args.kwargs["hook"] == HookType.NODE_ENTER
-        assert runtime.set_execution_data.call_count == 2
+        service.hook_dispatch.assert_called()
+        assert service.hook_dispatch.call_args.kwargs["hook"] == HookType.POST_EXECUTE
+        assert runtime.set_execution_data.call_count == 4
 
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
@@ -578,13 +579,13 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     handler = ServiceActivityHandler(node, runtime, interrupter)
     result = handler.execute(pi, 1, 1, "v1", recover_point)
 
-    assert result.should_sleep == True
-    assert result.schedule_ready == False
-    assert result.schedule_type == None
+    assert result.should_sleep is True
+    assert result.schedule_ready is False
+    assert result.schedule_type is None
     assert result.schedule_after == -1
     assert result.dispatch_processes == []
-    assert result.next_node_id == None
-    assert result.should_die == False
+    assert result.next_node_id is None
+    assert result.should_die is False
 
     runtime.get_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
@@ -601,7 +602,7 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     if recover_point and recover_point.handler_data.service_executed:
         assert runtime.set_execution_data.call_count == 2
     else:
-        assert runtime.set_execution_data.call_count == 3
+        assert runtime.set_execution_data.call_count == 4
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -631,9 +632,10 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
         service.hook_dispatch.assert_called_once()
         assert service.hook_dispatch.call_args.kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
     else:
-        assert service.hook_dispatch.call_count == 2
+        assert service.hook_dispatch.call_count == 3
         assert service.hook_dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_ENTER
-        assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
+        assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.PRE_EXECUTE
+        assert service.hook_dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_EXECUTE_FAIL
 
     assert interrupter.check_point.name == ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE
     assert interrupter.check_point.handler_data.service_executed is True
@@ -670,17 +672,17 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == False
-    assert result.next_node_id == None
+    assert result.schedule_done is False
+    assert result.next_node_id is None
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    assert runtime.set_execution_data.call_count == 3
+    assert runtime.set_execution_data.call_count == 4
     runtime.set_execution_data.assert_has_calls(calls=[call(node_id=node.id, data=service_data)] * 3)
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
@@ -692,12 +694,14 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
         set_archive_time=True,
         ignore_boring_set=recover_point is not None,
     )
-    assert service.hook_dispatch.call_count == 2
+    assert service.hook_dispatch.call_count == 3
 
-    assert service.hook_dispatch.call_args_list[0].kwargs["hook"] == HookType.NODE_SCHEDULE_EXCEPTION
-    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_SCHEDULE_FAIL
+    assert service.hook_dispatch.call_args_list[0].kwargs["hook"] == HookType.PRE_SCHEDULE
+    assert service.hook_dispatch.call_args_list[1].kwargs["hook"] == HookType.NODE_SCHEDULE_EXCEPTION
+    assert service.hook_dispatch.call_args_list[2].kwargs["hook"] == HookType.NODE_SCHEDULE_FAIL
     assert service.hook_dispatch.call_args_list[0].kwargs["data"] == service_data
     assert service.hook_dispatch.call_args_list[1].kwargs["data"] == service_data
+    assert service.hook_dispatch.call_args_list[2].kwargs["data"] == service_data
 
     service.setup_runtime_attributes.assert_called_once_with(
         id=node.id,
@@ -711,7 +715,7 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     assert service.schedule.call_args.kwargs["data"] == service_data
     assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
     assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+    assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -752,9 +756,9 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == True
+    assert result.schedule_done is True
     assert result.next_node_id == node.target_nodes[0]
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
@@ -788,7 +792,7 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     assert service.schedule.call_args.kwargs["data"] == service_data
     assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
     assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-    assert service.schedule.call_args.kwargs["callback_data"] == None
+    assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -831,17 +835,17 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == 5
-    assert result.schedule_done == False
-    assert result.next_node_id == None
+    assert result.schedule_done is False
+    assert result.next_node_id is None
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
@@ -869,7 +873,7 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -913,9 +917,9 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == True
+    assert result.schedule_done is True
     assert result.next_node_id == node.target_nodes[0]
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
@@ -923,7 +927,7 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -959,7 +963,7 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -1005,9 +1009,9 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == True
+    assert result.schedule_done is True
     assert result.next_node_id == node.target_nodes[0]
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
@@ -1015,7 +1019,7 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -1050,7 +1054,7 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -1095,17 +1099,17 @@ def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interr
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == 5
-    assert result.schedule_done == False
-    assert result.next_node_id == None
+    assert result.schedule_done is False
+    assert result.next_node_id is None
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
@@ -1132,7 +1136,7 @@ def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interr
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -1177,9 +1181,9 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == True
+    assert result.schedule_done is True
     assert result.next_node_id == node.target_nodes[0]
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
@@ -1187,7 +1191,7 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -1222,7 +1226,7 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
@@ -1267,17 +1271,17 @@ def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point)
     handler = ServiceActivityHandler(node, runtime, schedule_interrupter)
     result = handler.schedule(pi, 1, 1, schedule, None, recover_point)
 
-    assert result.has_next_schedule == False
+    assert result.has_next_schedule is False
     assert result.schedule_after == -1
-    assert result.schedule_done == False
-    assert result.next_node_id == None
+    assert result.schedule_done is False
+    assert result.next_node_id is None
 
     runtime.get_data_outputs.assert_called_once_with(node.id)
     runtime.get_execution_data.assert_called_once_with(node.id)
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
     runtime.add_schedule_times.assert_called_once_with(schedule.id)
-    runtime.set_execution_data.assert_called_once()
+    runtime.set_execution_data.assert_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {}
     assert runtime.set_execution_data.call_args.kwargs["data"].outputs == {
@@ -1309,7 +1313,7 @@ def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point)
         assert service.schedule.call_args.kwargs["data"] == service_data
         assert service.schedule.call_args.kwargs["root_pipeline_data"].inputs == {}
         assert service.schedule.call_args.kwargs["root_pipeline_data"].outputs == {}
-        assert service.schedule.call_args.kwargs["callback_data"] == None
+        assert service.schedule.call_args.kwargs["callback_data"] is None
 
     assert schedule_interrupter.check_point.name == ScheduleKeyPoint.SA_SERVICE_SCHEDULE_TIME_ADDED
     assert schedule_interrupter.check_point.handler_data.service_scheduled is True
