@@ -245,8 +245,12 @@ class AnyRollbackHandler(BaseRollbackHandler):
         # 如果开启了token跳过检查这个选项，那么将返回所有运行过的节点作为回滚范围
         if options.get("skip_check_token", False):
             node_map = self.get_allowed_rollback_node_map()
-            node_map.pop(start_node_id, Node)
-            return list(node_map.keys())
+            service_activity_node_list = [
+                node_id
+                for node_id, node_detail in node_map.items()
+                if node_detail["type"] == PE.ServiceActivity and node_id != start_node_id
+            ]
+            return service_activity_node_list
         return super(AnyRollbackHandler, self).get_allowed_rollback_node_id_list(start_node_id, **options)
 
     def retry_rollback_failed_node(self, node_id, retry_data):
