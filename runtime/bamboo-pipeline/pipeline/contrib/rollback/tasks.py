@@ -161,7 +161,7 @@ class TokenRollbackTaskHandler(BaseRollbackTaskHandler):
         """
         # 将当前住进程的正在运行的节点指向目标ID
         process = Process.objects.get(root_pipeline_id=process_id, parent_id=-1)
-        process.current_node_id = process_id
+        process.current_node_id = target_node_id
         process.dead = False
         process.save()
 
@@ -290,6 +290,7 @@ class AnyRollbackHandler(BaseRollbackTaskHandler):
         """
         process = Process.objects.get(id=process_id)
         process.current_node_id = target_node_id
+        process.dead = False
         process.save()
 
         # 重置该节点的状态信息
