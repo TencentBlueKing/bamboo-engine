@@ -128,17 +128,20 @@ class RollbackValidator:
         node_map = CycleHandler(node_map).remove_cycle()
 
         def is_node_in_same_path(node_map, node_id, start_node_id):
-            "检查节点是否处于同一条路线上"
+            """
+            start_node_id 回滚开始的节点
+            node_id: 回滚的目标节点
+            """
             if node_id == start_node_id:
                 return True
             node_details = node_map.get(node_id)
             if node_details is None:
                 return False
-            results = []
             for node in node_details["targets"].values():
                 result = is_node_in_same_path(node_map, node, start_node_id)
-                results.append(result)
-            return any(results)
+                if result:
+                    return result
+            return False
 
         if not is_node_in_same_path(node_map, node_id, start_node_id):
             raise RollBackException("rollback failed: the start node and the end node must be on the same path")
@@ -198,7 +201,7 @@ class BaseRollbackHandler:
             .exclude(node_id=self.root_pipeline_id)
             .values_list("node_id", flat=True)
         )
-        node_detail_list = Node.objects.filter(node_id__in=node_id_list)
+        node_detail_list = Node.objects.filter(node_id__in=list(node_id_list))
         # 获取node_id 到 node_detail的映射
         return {n.node_id: json.loads(n.detail) for n in node_detail_list}
 
@@ -319,13 +322,16 @@ class AnyRollbackHandler(BaseRollbackHandler):
             )
 
     def get_nodes_in_path(self, node_map, target_node_id):
-        node_detail = node_map.get(target_node_id)
-        if node_detail is None:
-            return []
-        node_id_list = [target_node_id]
-        targets = node_detail.get("targets", {}).values()
-        for next_node_id in targets:
-            node_id_list += self.get_nodes_in_path(node_map, next_node_id)
+        node_id_list = []
+        stack = [target_node_id]
+
+        while stack:
+            current_node_id = stack.pop()
+            node_detail = node_map.get(current_node_id)
+            if node_detail is not None:
+                node_id_list.append(current_node_id)
+                targets = node_detail.get("targets", {}).values()
+                stack.extend(targets)
 
         return node_id_list
 
