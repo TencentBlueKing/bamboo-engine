@@ -269,7 +269,10 @@ class AnyRollbackHandler(BaseRollbackHandler):
 
     def find_paths_including_target(self, node_map, start, end, path=[]):
         """
-        在node_map 中找到包含目标节点的路径
+        在node_map 中找到包含目标节点的路径,
+        回滚路径是:
+        开始节点-1-2-3-4-5-6, 集合可能有多个
+        该函数的作用是找到所有能从开始节点触达6的路径集合，return [[1,2,3,4,5,6]]
         """
         path = path + [start]
         if start == end:
