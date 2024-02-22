@@ -11,6 +11,7 @@ from pipeline.contrib.rollback.models import (
     RollbackNodeSnapshot,
     RollbackPlan,
     RollbackSnapshot,
+    RollbackToken,
 )
 from pipeline.eri.models import CallbackData
 from pipeline.eri.models import ExecutionData as DBExecutionData
@@ -42,6 +43,21 @@ class RollbackCleaner:
         node.detail = json.dumps(node_detail)
         node.save()
 
+    def _clear_process(self, nodes):
+        """
+        扫描路径上的聚合网关，删除聚合网关对应的process
+        """
+        converge_gateway_ids = []
+        node_list = Node.objects.filter(node_id__in=nodes)
+        for node in node_list:
+            node_detail = json.loads(node.detail)
+            if node_detail["type"] == "ParallelGateway":
+                converge_gateway_ids.append(node_detail["converge_gateway_id"])
+
+        Process.objects.filter(
+            root_pipeline_id=self.snapshot.root_pipeline_id, destination_id__in=converge_gateway_ids
+        ).exclude(parent_id=-1).delete()
+
     def clear_data(self):
         # 节点快照需要全部删除，可能会有下一次的回滚
         RollbackNodeSnapshot.objects.filter(root_pipeline_id=self.snapshot.root_pipeline_id).delete()
@@ -54,12 +70,9 @@ class RollbackCleaner:
         # 节点的预约信息需要清理掉
         self._clear_node_reserve_flag(self.snapshot.start_node_id)
         # 需要删除该节点的进程信息/非主进程的，防止网关再分支处回滚时，仍然有正在运行的process得不到清理
-        Process.objects.filter(
-            root_pipeline_id=self.snapshot.root_pipeline_id, current_node_id=self.snapshot.start_node_id
-        ).exclude(parent_id=-1).delete()
-
         graph = json.loads(self.snapshot.graph)
-        need_clean_node_id_list = graph["nodes"] + json.loads(self.snapshot.other_nodes)
+        need_clean_node_id_list = set(graph["nodes"] + json.loads(self.snapshot.other_nodes))
+        self._clear_process(need_clean_node_id_list)
         # 清理状态信息
         State.objects.filter(root_id=self.snapshot.root_pipeline_id, node_id__in=need_clean_node_id_list).delete()
         # 清理Schedule 信息
@@ -71,7 +84,39 @@ class RollbackCleaner:
         CallbackData.objects.filter(node_id__in=need_clean_node_id_list).delete()
 
 
-class TokenRollbackTaskHandler:
+class BaseRollbackTaskHandler:
+    def modify_process_ack(self, process, main_process_id):
+        if process.parent_id != -1:
+            parent_process = Process.objects.get(id=process.parent_id)
+            # 如果process已经被ack完，此时需要重置ack=1
+            if parent_process.ack_num == -1:
+                parent_process.ack_num = 1
+            parent_process.dead = 0
+            parent_process.need_ack = parent_process.ack_num
+            parent_process.ack_num = parent_process.ack_num - 1
+            parent_process.save()
+            self.modify_process_ack(parent_process, main_process_id)
+
+    def get_current_process_id(self, rollback_snapshot):
+        # 获取当前正在运行的process_id, 当在并行网关内回滚时, 此时应该从子进程中启动
+        # 获取当前与 rollback_snapshot.target_node_id 相同token的正在运行的process_id
+        tokens = json.loads(RollbackToken.objects.get(root_pipeline_id=rollback_snapshot.root_pipeline_id).token)
+        target_node_id_token = tokens[rollback_snapshot.target_node_id]
+        nodes = []
+        for node_id, token in tokens.items():
+            if token == target_node_id_token:
+                nodes.append(node_id)
+        # 同一个token下一定只有一个节点正在执行
+        process = Process.objects.filter(current_node_id__in=nodes).first()
+        main_process = Process.objects.get(root_pipeline_id=rollback_snapshot.root_pipeline_id, parent_id=-1)
+        if process is None:
+            return main_process.id
+        # 说明process之上还有父流程，此时应该将父流程的need_act重制为1
+        self.modify_process_ack(process, main_process.id)
+        return process.id
+
+
+class TokenRollbackTaskHandler(BaseRollbackTaskHandler):
     def __init__(self, snapshot_id, node_id, retry, retry_data):
         self.snapshot_id = snapshot_id
         self.node_id = node_id
@@ -110,14 +155,15 @@ class TokenRollbackTaskHandler:
 
         return True
 
-    def start_pipeline(self, root_pipeline_id, target_node_id):
+    def start_pipeline(self, root_pipeline_id, target_node_id, process_id):
         """
         启动pipeline
         """
         # 将当前住进程的正在运行的节点指向目标ID
-        main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
-        main_process.current_node_id = target_node_id
-        main_process.save()
+        process = Process.objects.get(root_pipeline_id=process_id, parent_id=-1)
+        process.current_node_id = target_node_id
+        process.dead = False
+        process.save()
 
         # 重置该节点的状态信息
         self.runtime.set_state(
@@ -129,7 +175,7 @@ class TokenRollbackTaskHandler:
             clear_archived_time=True,
         )
 
-        process_info = self.runtime.get_process_info(main_process.id)
+        process_info = self.runtime.get_process_info(process.id)
         # 设置pipeline的状态
         self.runtime.set_state(
             node_id=root_pipeline_id,
@@ -150,7 +196,7 @@ class TokenRollbackTaskHandler:
             )
 
         self.runtime.execute(
-            process_id=process_info.process_id,
+            process_id=process_id,
             node_id=target_node_id,
             root_pipeline_id=process_info.root_pipeline_id,
             parent_pipeline_id=process_info.top_pipeline_id,
@@ -210,9 +256,13 @@ class TokenRollbackTaskHandler:
             if list(next_node)[0] == constants.END_FLAG:
                 self.set_state(rollback_snapshot.root_pipeline_id, states.ROLL_BACK_SUCCESS)
                 try:
+                    # 清理数据前先得到当前回滚分支开始节点的所在的父process_id
+                    process_id = self.get_current_process_id(rollback_snapshot)
                     clearner.clear_data()
                     self.start_pipeline(
-                        root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=target_node_id
+                        root_pipeline_id=rollback_snapshot.root_pipeline_id,
+                        target_node_id=target_node_id,
+                        process_id=process_id,
                     )
                 except Exception as e:
                     logger.error("[TokenRollbackTaskHandler][rollback] start_pipeline failed, err={}".format(e))
@@ -229,19 +279,19 @@ class TokenRollbackTaskHandler:
                 )
 
 
-class AnyRollbackHandler:
+class AnyRollbackHandler(BaseRollbackTaskHandler):
     def __init__(self, snapshot_id):
         self.snapshot_id = snapshot_id
         self.runtime = BambooDjangoRuntime()
 
-    def start_pipeline(self, root_pipeline_id, target_node_id):
+    def start_pipeline(self, root_pipeline_id, target_node_id, process_id):
         """
         启动pipeline
         """
-
-        main_process = Process.objects.get(root_pipeline_id=root_pipeline_id, parent_id=-1)
-        main_process.current_node_id = target_node_id
-        main_process.save()
+        process = Process.objects.get(id=process_id)
+        process.current_node_id = target_node_id
+        process.dead = False
+        process.save()
 
         # 重置该节点的状态信息
         self.runtime.set_state(
@@ -253,7 +303,7 @@ class AnyRollbackHandler:
             clear_archived_time=True,
         )
 
-        process_info = self.runtime.get_process_info(main_process.id)
+        process_info = self.runtime.get_process_info(process.id)
 
         # 如果PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED为False, 那么则会重制流程为暂停状态
         if not getattr(settings, "PIPELINE_ENABLE_AUTO_EXECUTE_WHEN_ROLL_BACKED", True):
@@ -263,7 +313,7 @@ class AnyRollbackHandler:
             )
 
         self.runtime.execute(
-            process_id=process_info.process_id,
+            process_id=process_id,
             node_id=target_node_id,
             root_pipeline_id=process_info.root_pipeline_id,
             parent_pipeline_id=process_info.top_pipeline_id,
@@ -274,9 +324,13 @@ class AnyRollbackHandler:
             rollback_snapshot = RollbackSnapshot.objects.get(id=self.snapshot_id, is_expired=False)
             clearner = RollbackCleaner(rollback_snapshot)
             try:
+                # 清理数据前先得到当前回滚分支开始节点的所在的父process_id
+                process_id = self.get_current_process_id(rollback_snapshot)
                 clearner.clear_data()
                 self.start_pipeline(
-                    root_pipeline_id=rollback_snapshot.root_pipeline_id, target_node_id=rollback_snapshot.target_node_id
+                    root_pipeline_id=rollback_snapshot.root_pipeline_id,
+                    target_node_id=rollback_snapshot.target_node_id,
+                    process_id=process_id,
                 )
             except Exception as e:
                 logger.error(

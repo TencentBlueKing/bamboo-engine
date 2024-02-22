@@ -19,7 +19,7 @@ from pipeline.conf.default_settings import ROLLBACK_QUEUE
 from pipeline.contrib.exceptions import RollBackException
 from pipeline.contrib.rollback import constants
 from pipeline.contrib.rollback.constants import ANY, TOKEN
-from pipeline.contrib.rollback.graph import RollbackGraphHandler
+from pipeline.contrib.rollback.graph import CycleHandler, RollbackGraphHandler
 from pipeline.contrib.rollback.models import (
     RollbackPlan,
     RollbackSnapshot,
@@ -31,6 +31,7 @@ from pipeline.eri.models import Node, Process, State
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from bamboo_engine import states
+from bamboo_engine.engine import Engine
 
 
 class RollbackValidator:
@@ -123,6 +124,29 @@ class RollbackValidator:
             )
 
     @staticmethod
+    def validate_node_path(node_map, node_id, start_node_id):
+        node_map = CycleHandler(node_map).remove_cycle()
+
+        def is_node_in_same_path(node_map, node_id, start_node_id):
+            """
+            start_node_id 回滚开始的节点
+            node_id: 回滚的目标节点
+            """
+            if node_id == start_node_id:
+                return True
+            node_details = node_map.get(node_id)
+            if node_details is None:
+                return False
+            for node in node_details["targets"].values():
+                result = is_node_in_same_path(node_map, node, start_node_id)
+                if result:
+                    return result
+            return False
+
+        if not is_node_in_same_path(node_map, node_id, start_node_id):
+            raise RollBackException("rollback failed: the start node and the end node must be on the same path")
+
+    @staticmethod
     def validate_start_node_id(root_pipeline_id, start_node_id):
         """
         回滚的开始节点必须是流程的末尾节点
@@ -168,14 +192,16 @@ class BaseRollbackHandler:
 
         return nodes
 
-    def get_allowed_rollback_node_map(self):
+    def get_allowed_rollback_node_map(self, state_list=None):
         # 不需要遍历整颗树，获取到现在已经执行成功和失败节点的所有列表
-        finished_node_id_list = (
-            State.objects.filter(root_id=self.root_pipeline_id, name__in=[states.FINISHED, states.FAILED])
+        if state_list is None:
+            state_list = [states.FINISHED, states.FAILED]
+        node_id_list = (
+            State.objects.filter(root_id=self.root_pipeline_id, name__in=state_list)
             .exclude(node_id=self.root_pipeline_id)
             .values_list("node_id", flat=True)
         )
-        node_detail_list = Node.objects.filter(node_id__in=finished_node_id_list)
+        node_detail_list = Node.objects.filter(node_id__in=list(node_id_list))
         # 获取node_id 到 node_detail的映射
         return {n.node_id: json.loads(n.detail) for n in node_detail_list}
 
@@ -241,16 +267,42 @@ class BaseRollbackHandler:
 class AnyRollbackHandler(BaseRollbackHandler):
     mode = ANY
 
+    def find_paths_including_target(self, node_map, start, end, path=[]):
+        """
+        在node_map 中找到包含目标节点的路径,
+        回滚路径是:
+        开始节点-1-2-3-4-5-6, 集合可能有多个
+        该函数的作用是找到所有能从开始节点触达6的路径集合，return [[1,2,3,4,5,6]]
+        """
+        path = path + [start]
+        if start == end:
+            return [path]
+        if start not in node_map:
+            return []
+        paths = []
+        for node_id in node_map[start]["targets"].values():
+            if node_id not in path:
+                new_paths = self.find_paths_including_target(node_map, node_id, end, path)
+                for new_path in new_paths:
+                    paths.append(new_path)
+        return paths
+
     def get_allowed_rollback_node_id_list(self, start_node_id, **options):
         # 如果开启了token跳过检查这个选项，那么将返回所有运行过的节点作为回滚范围
-        if options.get("skip_check_token", False):
-            node_map = self.get_allowed_rollback_node_map()
-            service_activity_node_list = [
-                node_id
-                for node_id, node_detail in node_map.items()
-                if node_detail["type"] == PE.ServiceActivity and node_id != start_node_id
-            ]
-            return service_activity_node_list
+        if options.get("force", False):
+            node_map = self.get_allowed_rollback_node_map(state_list=[states.RUNNING, states.FAILED, states.FINISHED])
+            # 去环
+            node_map = CycleHandler(node_map).remove_cycle()
+            # 筛选出来开始节点
+            node_id = [
+                node_id for node_id, node_detail in node_map.items() if node_detail["type"] == PE.EmptyStartEvent
+            ][0]
+            paths_including_target = self.find_paths_including_target(node_map, node_id, start_node_id)
+            node_list = []
+            for path in paths_including_target:
+                node_list.extend([n for n in path if node_map[n]["type"] == PE.ServiceActivity])
+            node_list.remove(start_node_id)
+            return list(set(node_list))
         return super(AnyRollbackHandler, self).get_allowed_rollback_node_id_list(start_node_id, **options)
 
     def retry_rollback_failed_node(self, node_id, retry_data):
@@ -261,21 +313,56 @@ class AnyRollbackHandler(BaseRollbackHandler):
         """
         预约回滚
         """
-        if not options.get("skip_check_token", False):
+        if not options.get("force", False):
             RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
         self._reserve(start_node_id, target_node_id, **options)
 
+    def _force_fail_node(self, node_id_list):
+        engine = Engine(self.runtime)
+        for node_id in node_id_list:
+            engine.forced_fail_activity(
+                node_id, "The task will be rolled back, forcing failure of the running node on that path"
+            )
+
+    def get_nodes_in_path(self, node_map, target_node_id):
+        node_id_list = []
+        stack = [target_node_id]
+
+        while stack:
+            current_node_id = stack.pop()
+            node_detail = node_map.get(current_node_id)
+            if node_detail is not None:
+                node_id_list.append(current_node_id)
+                targets = node_detail.get("targets", {}).values()
+                stack.extend(targets)
+
+        return node_id_list
+
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None, **options):
         RollbackValidator.validate_start_node_id(self.root_pipeline_id, start_node_id)
-        RollbackValidator.validate_node(start_node_id, allow_failed=True)
         RollbackValidator.validate_node(target_node_id)
-        if not options.get("skip_check_token", False):
+        node_map = self.get_allowed_rollback_node_map()
+        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
+
+        if not options.get("force", False):
+            # 非强制状态才会校验
+            RollbackValidator.validate_node(start_node_id, allow_failed=True)
             RollbackValidator.validate_token(self.root_pipeline_id, start_node_id, target_node_id)
             # 相同token回滚时，不允许同一token路径上有正在运行的节点
             RollbackValidator.validate_node_state(self.root_pipeline_id, start_node_id)
 
-        node_map = self.get_allowed_rollback_node_map()
-        rollback_graph = RollbackGraphHandler(node_map=node_map, start_id=start_node_id, target_id=target_node_id)
+        need_force_node_id_list = []
+        if options.get("force", False):
+            node_map = self.get_allowed_rollback_node_map(state_list=[states.FINISHED, states.FAILED, states.RUNNING])
+            # 去环
+            node_map = CycleHandler(node_map).remove_cycle()
+            nodes = self.get_nodes_in_path(node_map, target_node_id)
+            need_force_node_id_list = State.objects.filter(node_id__in=nodes, name=states.RUNNING).values_list(
+                "node_id", flat=True
+            )
+            # 强制回滚时，要求目标节点和起始节点必须在同一条路径上
+            RollbackValidator.validate_node_path(node_map, target_node_id, start_node_id)
+            self._force_fail_node(need_force_node_id_list)
 
         graph, other_nodes = rollback_graph.build_rollback_graph()
         node_access_record = {node: 0 for node in graph.nodes}
@@ -286,7 +373,9 @@ class AnyRollbackHandler(BaseRollbackHandler):
             node_access_record=json.dumps(node_access_record),
             start_node_id=start_node_id,
             target_node_id=target_node_id,
-            other_nodes=json.dumps(other_nodes),
+            other_nodes=json.dumps(
+                list(set(other_nodes + list(need_force_node_id_list)))  # 当force为true时，需要额外增加平行分支上的运行的节点
+            ),
             skip_rollback_nodes=json.dumps([]),
         )
 
