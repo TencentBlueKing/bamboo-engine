@@ -11,10 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from mock import patch, MagicMock
-
 from django.test import TransactionTestCase
-
+from mock import MagicMock, patch
 from pipeline.eri.imp.task import TaskMixin
 from pipeline.eri.models import Process
 
@@ -42,6 +40,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
@@ -72,6 +71,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
@@ -102,6 +102,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
@@ -131,6 +132,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
@@ -162,6 +164,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
@@ -193,6 +196,7 @@ class StateMixinTestCase(TransactionTestCase):
                 )
 
         celery_app.tasks["pipeline.eri.celery.tasks.execute"].apply_async.assert_called_once_with(
+            ignore_result=True,
             kwargs={
                 "process_id": 1,
                 "node_id": "nid",
