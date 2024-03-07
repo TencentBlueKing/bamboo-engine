@@ -662,13 +662,9 @@ def preview_node_inputs(
 @_ensure_return_api_result
 def get_pipeline_execution_time(runtime: EngineRuntimeInterface, pipeline_id: str):
     """
-    获取节点或者流程的运行时间信息，
-    当entity_id 为节点id时，返回的是节点的运行时间信息，
-    当entity_id 为 root_pipeline_id 时, 返回的是pipeline任务实例的运行时间信息
-
     :param runtime: 引擎运行时实例
     :type runtime: EngineRuntimeInterface
-    :param pipeline_id: 实例id，node_id or pipeline_id
+    :param pipeline_id: pipeline_id
     :type pipeline_id: str
     :return: 执行结果
     :rtype: EngineAPIResult
@@ -689,13 +685,9 @@ def get_pipeline_execution_time(runtime: EngineRuntimeInterface, pipeline_id: st
 @_ensure_return_api_result
 def get_node_execution_time(runtime: EngineRuntimeInterface, node_id: str):
     """
-    获取节点或者流程的运行时间信息，
-    当entity_id 为节点id时，返回的是节点的运行时间信息，
-    当entity_id 为 root_pipeline_id 时, 返回的是pipeline任务实例的运行时间信息
-
     :param runtime: 引擎运行时实例
     :type runtime: EngineRuntimeInterface
-    :param node_id: 实例id，node_id or pipeline_id
+    :param node_id: node_id
     :type node_id: str
     :return: 执行结果
     :rtype: EngineAPIResult
