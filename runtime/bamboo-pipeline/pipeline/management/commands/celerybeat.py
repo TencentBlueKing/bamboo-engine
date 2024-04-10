@@ -1,36 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+Tencent is pleased to support the open source community by making 蓝鲸智云PaaS平台社区版 (BlueKing PaaS Community
+Edition) available.
+Copyright (C) 2017 THL A29 Limited, a Tencent company. All rights reserved.
+Licensed under the MIT License (the "License"); you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://opensource.org/licenses/MIT
+Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
 """
 
-Start the celery clock service from the Django management command.
+import celery
 
-"""
-from __future__ import absolute_import, unicode_literals
-
-from optparse import make_option as Option
-
-from celery.bin import beat
-
-from pipeline.management.commands.app import app
-from pipeline.management.commands.base import CeleryCommand
-
-beat = beat.beat(app=app)
+major_version = celery.VERSION.major
 
 
-class Command(CeleryCommand):
-    """Run the celery periodic task scheduler."""
+if major_version < 5:
+    from ..celery_version_adapter.celerybeat4 import Command
+else:
+    from ..celery_version_adapter.celerybeat5 import Command
 
-    help = 'Old alias to the "celery beat" command.'
-    options = (
-        Option("-A", "--app", default=None),
-        Option("--broker", default=None),
-        Option("--loader", default=None),
-        Option("--config", default=None),
-        Option("--workdir", default=None, dest="working_directory"),
-        Option("--result-backend", default=None),
-        Option("--no-color", "-C", action="store_true", default=None),
-        Option("--quiet", "-q", action="store_true"),
-    )
-    if beat.get_options() is not None:
-        options = options + CeleryCommand.options + beat.get_options()
-
-    def handle(self, *args, **options):
-        beat.run(*args, **options)
+Command = Command

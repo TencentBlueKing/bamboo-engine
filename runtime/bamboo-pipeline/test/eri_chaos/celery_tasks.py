@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
 import json
 from typing import Optional
 
-from celery import task
+from celery import current_app
 
 from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
 from bamboo_engine.engine import Engine
@@ -28,7 +28,7 @@ from bamboo_engine.interrupt import (
 from .runtime import ChoasBambooDjangoRuntime
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def chaos_execute(
     process_id: int,
     node_id: str,
@@ -70,7 +70,7 @@ def chaos_execute(
     )
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def chaos_schedule(
     process_id: int,
     node_id: str,
