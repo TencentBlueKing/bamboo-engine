@@ -2,7 +2,7 @@ name: PR check
 
 on:
   pull_request:
-    branches: [ master ]
+    branches: [ master, bamboo_pipeline_3.24_lts ]
 
 jobs:
   engine-lint:
