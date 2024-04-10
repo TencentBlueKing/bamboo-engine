@@ -17,7 +17,12 @@ import logging
 import traceback
 
 from celery import current_app
-from celery.task.control import revoke
+
+try:
+    from celery.task.control import revoke
+except ModuleNotFoundError:
+    revoke = current_app.control.revoke
+
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -89,10 +94,16 @@ class ProcessManager(models.Manager):
         """
         # init runtime info
         snapshot = ProcessSnapshot.objects.create_snapshot(
-            pipeline_stack=utils.Stack(), children=[], root_pipeline=pipeline, subprocess_stack=utils.Stack(),
+            pipeline_stack=utils.Stack(),
+            children=[],
+            root_pipeline=pipeline,
+            subprocess_stack=utils.Stack(),
         )
         process = self.create(
-            id=node_uniqid(), root_pipeline_id=pipeline.id, current_node_id=pipeline.start_event.id, snapshot=snapshot,
+            id=node_uniqid(),
+            root_pipeline_id=pipeline.id,
+            current_node_id=pipeline.start_event.id,
+            snapshot=snapshot,
         )
         process.push_pipeline(pipeline)
         process.save()
@@ -362,7 +373,9 @@ class PipelineProcess(models.Model):
         if node_state in {states.FAILED, states.SUSPENDED}:
             # if current node failed or suspended
             Status.objects.batch_transit(
-                id_list=self.subprocess_stack, state=states.BLOCKED, from_state=states.RUNNING,
+                id_list=self.subprocess_stack,
+                state=states.BLOCKED,
+                from_state=states.RUNNING,
             )
             Status.objects.transit(self.root_pipeline.id, to_state=states.BLOCKED, is_pipeline=True)
         elif states.SUSPENDED in set(subproc_states):
@@ -372,7 +385,9 @@ class PipelineProcess(models.Model):
         elif pipeline_state == states.SUSPENDED:
             # if root pipeline suspended
             Status.objects.batch_transit(
-                id_list=self.subprocess_stack, state=pipeline_state, from_state=states.RUNNING,
+                id_list=self.subprocess_stack,
+                state=pipeline_state,
+                from_state=states.RUNNING,
             )
 
     def wake_up(self):
@@ -475,10 +490,14 @@ class PipelineProcess(models.Model):
                 else:
                     if parent.blocked_by_failure_or_suspended():
                         Status.objects.batch_transit(
-                            id_list=self.subprocess_stack, state=states.BLOCKED, from_state=states.RUNNING,
+                            id_list=self.subprocess_stack,
+                            state=states.BLOCKED,
+                            from_state=states.RUNNING,
                         )
                         Status.objects.transit(
-                            id=self.root_pipeline.id, to_state=states.BLOCKED, is_pipeline=True,
+                            id=self.root_pipeline.id,
+                            to_state=states.BLOCKED,
+                            is_pipeline=True,
                         )
 
             parent.save(save_snapshot=False)
@@ -540,7 +559,8 @@ class PipelineProcess(models.Model):
         if not result.result:
             logger.error(
                 "process({process_id}) exit_gracefully status transit failed, current_node :{node_id}".format(
-                    process_id=self.id, node_id=current_node.id if current_node else self.current_node_id,
+                    process_id=self.id,
+                    node_id=current_node.id if current_node else self.current_node_id,
                 )
             )
         self.sleep(adjust_status=True)
@@ -615,7 +635,9 @@ class RelationshipManager(models.Manager):
         relationships = [NodeRelationship(ancestor_id=descendant_id, descendant_id=descendant_id, distance=0)]
         for ancestor in ancestors:
             rel = NodeRelationship(
-                ancestor_id=ancestor.ancestor_id, descendant_id=descendant_id, distance=ancestor.distance + 1,
+                ancestor_id=ancestor.ancestor_id,
+                descendant_id=descendant_id,
+                distance=ancestor.distance + 1,
             )
             relationships.append(rel)
         self.bulk_create(relationships)
@@ -630,12 +652,26 @@ class NodeRelationship(models.Model):
     objects = RelationshipManager()
 
     def __unicode__(self):
-        return str("#{} -({})-> #{}".format(self.ancestor_id, self.distance, self.descendant_id,))
+        return str(
+            "#{} -({})-> #{}".format(
+                self.ancestor_id,
+                self.distance,
+                self.descendant_id,
+            )
+        )
 
 
 class StatusManager(models.Manager):
     def transit(
-        self, id, to_state, is_pipeline=False, appoint=False, start=False, name="", version=None, unchanged_pass=False,
+        self,
+        id,
+        to_state,
+        is_pipeline=False,
+        appoint=False,
+        start=False,
+        name="",
+        version=None,
+        unchanged_pass=False,
     ):
         """
         尝试改变某个节点的状态
@@ -679,7 +715,10 @@ class StatusManager(models.Manager):
                 return ActionResult(result=True, message="success", extra=status)
 
             if states.can_transit(
-                from_state=status.state, to_state=to_state, is_pipeline=is_pipeline, appoint=appoint,
+                from_state=status.state,
+                to_state=to_state,
+                is_pipeline=is_pipeline,
+                appoint=appoint,
             ):
 
                 # 在冻结状态下不能改变 pipeline 的状态
@@ -688,11 +727,17 @@ class StatusManager(models.Manager):
                     if subprocess_rel:
                         process = PipelineProcess.objects.get(id=subprocess_rel[0].process_id)
                         if process.is_frozen:
-                            return ActionResult(result=False, message="engine is frozen, can not perform operation",)
+                            return ActionResult(
+                                result=False,
+                                message="engine is frozen, can not perform operation",
+                            )
 
                     processes = PipelineProcess.objects.filter(root_pipeline_id=id)
                     if processes and processes[0].is_frozen:
-                        return ActionResult(result=False, message="engine is frozen, can not perform operation",)
+                        return ActionResult(
+                            result=False,
+                            message="engine is frozen, can not perform operation",
+                        )
 
                 if name:
                     status.name = name
@@ -772,7 +817,9 @@ class StatusManager(models.Manager):
         cls_str = str(pipeline.__class__)
         cls_name = pipeline.__class__.__name__[:NAME_MAX_LENGTH]
         self.create(
-            id=pipeline.id, state=states.READY, name=cls_str if len(cls_str) <= NAME_MAX_LENGTH else cls_name,
+            id=pipeline.id,
+            state=states.READY,
+            name=cls_str if len(cls_str) <= NAME_MAX_LENGTH else cls_name,
         )
 
     def fail(self, node, ex_data):
@@ -1287,7 +1334,11 @@ class SendFailedCeleryTaskManager(models.Manager):
             save_kwargs = json.dumps(save_kwargs)
 
         return self.create(
-            name=name, kwargs=save_kwargs, type=type, extra_kwargs=save_extra_kwargs, exec_trace=exec_trace,
+            name=name,
+            kwargs=save_kwargs,
+            type=type,
+            extra_kwargs=save_extra_kwargs,
+            exec_trace=exec_trace,
         )
 
     def resend(self, id):
@@ -1341,7 +1392,10 @@ class SendFailedCeleryTask(models.Model):
                 )
             elif self.type == self.TASK_TYPE_NODE:
                 NodeCeleryTask.objects.start_task(
-                    node_id=self.extra_kwargs_dict["node_id"], task=task, kwargs=self.kwargs_dict, record_error=False,
+                    node_id=self.extra_kwargs_dict["node_id"],
+                    task=task,
+                    kwargs=self.kwargs_dict,
+                    record_error=False,
                 )
             elif self.type == self.TASK_TYPE_SCHEDULE:
                 ScheduleCeleryTask.objects.start_task(
@@ -1366,7 +1420,11 @@ class SendFailedCeleryTask(models.Model):
         except Exception:
             logger.exception("celery task({}) watcher catch error.".format(name))
             cls.objects.record(
-                name=name, kwargs=kwargs, type=type, extra_kwargs=extra_kwargs, exec_trace=traceback.format_exc(),
+                name=name,
+                kwargs=kwargs,
+                type=type,
+                extra_kwargs=extra_kwargs,
+                exec_trace=traceback.format_exc(),
             )
             # raise specific exception to indicate that send fail task have been catched
             raise exceptions.CeleryFailedTaskCatchException(name)
