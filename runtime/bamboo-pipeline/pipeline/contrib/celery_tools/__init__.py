@@ -10,15 +10,3 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-
-import celery
-
-major_version = celery.VERSION.major
-
-
-if major_version < 5:
-    from ..celery_version_adapter.celerybeat4 import Command
-else:
-    from ..celery_version_adapter.celerybeat5 import Command
-
-Command = Command

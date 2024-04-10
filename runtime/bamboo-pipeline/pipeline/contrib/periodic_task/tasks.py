@@ -16,7 +16,7 @@ import logging
 import traceback
 
 import pytz
-from celery import task
+from celery import current_app
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from bamboo_engine import api as bamboo_engine_api
@@ -35,7 +35,7 @@ from pipeline.contrib.periodic_task.context import (
 logger = logging.getLogger("celery")
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def periodic_task_start(*args, **kwargs):
     try:
         periodic_task = PeriodicTask.objects.get(id=kwargs["period_task_id"])
@@ -69,19 +69,28 @@ def periodic_task_start(*args, **kwargs):
         )
 
         result = instance.start(
-            periodic_task.creator, check_workers=False, priority=periodic_task.priority, queue=periodic_task.queue,
+            periodic_task.creator,
+            check_workers=False,
+            priority=periodic_task.priority,
+            queue=periodic_task.queue,
         )
     except Exception:
         et = traceback.format_exc()
         logger.error(et)
         PeriodicTaskHistory.objects.record_schedule(
-            periodic_task=periodic_task, pipeline_instance=None, ex_data=et, start_success=False,
+            periodic_task=periodic_task,
+            pipeline_instance=None,
+            ex_data=et,
+            start_success=False,
         )
         return
 
     if not result.result:
         PeriodicTaskHistory.objects.record_schedule(
-            periodic_task=periodic_task, pipeline_instance=None, ex_data=result.message, start_success=False,
+            periodic_task=periodic_task,
+            pipeline_instance=None,
+            ex_data=result.message,
+            start_success=False,
         )
         return
 
@@ -93,7 +102,7 @@ def periodic_task_start(*args, **kwargs):
     PeriodicTaskHistory.objects.record_schedule(periodic_task=periodic_task, pipeline_instance=instance, ex_data="")
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def bamboo_engine_periodic_task_start(*args, **kwargs):
     try:
         periodic_task = PeriodicTask.objects.get(id=kwargs["period_task_id"])
@@ -147,16 +156,24 @@ def bamboo_engine_periodic_task_start(*args, **kwargs):
         et = traceback.format_exc()
         logger.error(et)
         PeriodicTaskHistory.objects.record_schedule(
-            periodic_task=periodic_task, pipeline_instance=None, ex_data=et, start_success=False,
+            periodic_task=periodic_task,
+            pipeline_instance=None,
+            ex_data=et,
+            start_success=False,
         )
         return
 
     if not result.result:
         PipelineInstance.objects.filter(id=instance.instance_id).update(
-            start_time=None, is_started=False, executor="",
+            start_time=None,
+            is_started=False,
+            executor="",
         )
         PeriodicTaskHistory.objects.record_schedule(
-            periodic_task=periodic_task, pipeline_instance=None, ex_data=result.message, start_success=False,
+            periodic_task=periodic_task,
+            pipeline_instance=None,
+            ex_data=result.message,
+            start_success=False,
         )
         return
 

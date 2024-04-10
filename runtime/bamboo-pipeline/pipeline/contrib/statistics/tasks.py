@@ -16,7 +16,7 @@ import logging
 import ujson as json
 from copy import deepcopy
 
-from celery import task
+from celery import current_app
 from bamboo_engine import api as bamboo_engine_api
 
 from pipeline.component_framework.constants import LEGACY_PLUGINS_VERSION
@@ -112,7 +112,7 @@ def recursive_collect_components(activities, status_tree, instance_id, stack=Non
     return component_list
 
 
-@task
+@current_app.task
 def pipeline_post_save_statistics_task(instance_id):
     instance = PipelineInstance.objects.get(instance_id=instance_id)
     # 统计流程标准插件个数，子流程个数，网关个数
@@ -134,7 +134,7 @@ def pipeline_post_save_statistics_task(instance_id):
         )
 
 
-@task
+@current_app.task
 def pipeline_archive_statistics_task(instance_id):
     instance = PipelineInstance.objects.get(instance_id=instance_id)
     engine_ver = 1

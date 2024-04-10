@@ -11,14 +11,19 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import celery
+from celery.bin.celery import celery
+from click.exceptions import Exit
+from django.core.management import BaseCommand
 
-major_version = celery.VERSION.major
 
+class Command(BaseCommand):
+    """The celery command."""
 
-if major_version < 5:
-    from ..celery_version_adapter.celerybeat4 import Command
-else:
-    from ..celery_version_adapter.celerybeat5 import Command
+    help = "celery commands, see celery help"
 
-Command = Command
+    def run_from_argv(self, argv):
+        try:
+            celery.main(args=["beat", *argv[2:]], standalone_mode=False)
+        except Exit as e:
+            print(f"celery command error: {e}")
+            return e.exit_code
