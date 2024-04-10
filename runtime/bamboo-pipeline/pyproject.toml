@@ -26,11 +26,6 @@ Werkzeug = "^1"
 prometheus-client = "^0.9"
 boto3 = "^1.9.130"
 
-redis-py-cluster = { version = "2.1.0", optional = true }
-
-[tool.poetry.extras]
-redis3 = ["redis-py-cluster"]
-
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.2"
 black = "^20.8b1"
