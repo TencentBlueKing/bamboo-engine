@@ -45,4 +45,3 @@ class PipelinePeriodicTask(Task):
 def periodic_task(*args, **options):
     """Deprecated decorator, please use :setting:`beat_schedule`."""
     return current_app.task(**dict({'base': PipelinePeriodicTask}, **options))
-
