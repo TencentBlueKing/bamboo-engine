@@ -635,7 +635,7 @@ six = ">=1.5"
 
 [[package]]
 name = "pytz"
-version = "2019.3"
+version = "2024.1"
 description = "World timezone definitions, modern and historical"
 category = "main"
 optional = false
@@ -811,7 +811,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 3.8"
-content-hash = "eb86a9f33d55c3a3635154ceacfbca4bc6f187e648198008d3ee4021cc21fd66"
+content-hash = "6de32405ae96d403759023fdf8eef8037d9e33494765b9990d72606b687d586e"
 
 [metadata.files]
 amqp = []

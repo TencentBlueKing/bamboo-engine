@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bamboo-pipeline"
-version = "3.24.5"
+version = "3.24.6"
 description = "runtime for bamboo-engine base on Django and Celery"
 authors = ["homholueng <homholueng@gmail.com>"]
 license = "MIT"
@@ -15,7 +15,7 @@ Django = ">=2.2, <5"
 requests = "^2.22"
 django-celery-beat = "^2.1"
 Mako = "^1.1.4"
-pytz = "2019.3"
+pytz = ">=2019.3"
 bamboo-engine = "2.6.1"
 jsonschema = "^2.5.1"
 ujson = "^4"
