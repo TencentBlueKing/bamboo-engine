@@ -2,7 +2,7 @@
 import json
 import logging
 
-from celery import task
+from celery import current_app
 from django.conf import settings
 from django.db import transaction
 from pipeline.conf.default_settings import ROLLBACK_QUEUE
@@ -287,7 +287,7 @@ class AnyRollbackHandler:
                 raise e
 
 
-@task
+@current_app.task
 def token_rollback(snapshot_id, node_id, retry=False, retry_data=None):
     """
     snapshot_id 本次回滚的快照id
@@ -296,6 +296,6 @@ def token_rollback(snapshot_id, node_id, retry=False, retry_data=None):
     TokenRollbackTaskHandler(snapshot_id=snapshot_id, node_id=node_id, retry=retry, retry_data=retry_data).rollback()
 
 
-@task
+@current_app.task
 def any_rollback(snapshot_id):
     AnyRollbackHandler(snapshot_id=snapshot_id).rollback()

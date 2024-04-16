@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
 import logging
 import traceback
 
-from celery import task
+from celery import current_app
 from django.utils import timezone
 from pipeline.component_framework.library import ComponentLibrary
 from pipeline.conf.default_settings import PLUGIN_EXECUTE_QUEUE
@@ -25,7 +25,7 @@ from pipeline.core.data.base import DataObject
 logger = logging.getLogger("celery")
 
 
-@task
+@current_app.task
 def execute(task_id):
     try:
         plugin_execute_task = PluginExecuteTask.objects.get(id=task_id)
@@ -89,7 +89,7 @@ def execute(task_id):
         )
 
 
-@task
+@current_app.task
 def schedule(task_id):
     try:
         plugin_execute_task = PluginExecuteTask.objects.get(id=task_id)
