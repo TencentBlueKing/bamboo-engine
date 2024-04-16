@@ -14,7 +14,7 @@ import json
 import logging
 from typing import Any, Dict, List, Type, Union
 
-from celery import task
+from celery import current_app
 from pipeline.contrib.node_timer_event.adapter import NodeTimerEventBaseAdapter
 from pipeline.contrib.node_timer_event.handlers import ActionManager
 from pipeline.contrib.node_timer_event.models import ExpiredNodesRecord
@@ -24,7 +24,7 @@ from pipeline.eri.models import Process, State
 logger = logging.getLogger("celery")
 
 
-@task(acks_late=True)
+@current_app.task(acks_late=True)
 def dispatch_expired_nodes(record_id: int):
     record: ExpiredNodesRecord = ExpiredNodesRecord.objects.get(id=record_id)
     node_keys: List[str] = json.loads(record.nodes)
@@ -62,7 +62,7 @@ def dispatch_expired_nodes(record_id: int):
     logger.info("[dispatch_expired_nodes] record deleted: record -> %s", record_id)
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def execute_node_timer_event_action(node_id: str, version: str, index: int):
 
     adapter_class: Type[NodeTimerEventBaseAdapter] = node_timer_event_settings.adapter_class

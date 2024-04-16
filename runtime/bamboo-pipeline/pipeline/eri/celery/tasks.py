@@ -14,9 +14,9 @@ import time
 import logging
 from typing import Optional
 
-from celery import task
-from celery.decorators import periodic_task
+from celery import current_app
 from celery.schedules import crontab
+from pipeline.contrib.celery_tools.periodic import periodic_task
 from django.conf import settings
 
 from bamboo_engine import metrics
@@ -47,7 +47,7 @@ def _observe_message_delay(metric: metrics.Histogram, headers: dict):
         logger.exception("%s observe err" % metric)
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def execute(
     process_id: int,
     node_id: str,
@@ -86,7 +86,7 @@ def execute(
     )
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def schedule(
     process_id: int,
     node_id: str,

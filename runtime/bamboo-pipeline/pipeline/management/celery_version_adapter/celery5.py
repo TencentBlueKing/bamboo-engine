@@ -11,6 +11,19 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-default_app_config = "pipeline.apps.PipelineConfig"
+from celery.bin.celery import celery
+from click.exceptions import Exit
+from django.core.management import BaseCommand
 
-__version__ = "3.29.3"
+
+class Command(BaseCommand):
+    """The celery command."""
+
+    help = "celery commands, see celery help"
+
+    def run_from_argv(self, argv):
+        try:
+            celery.main(args=argv[2:], standalone_mode=False)
+        except Exit as e:
+            print(f"celery command error: {e}")
+            return e.exit_code

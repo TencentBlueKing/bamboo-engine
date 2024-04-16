@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 import json
 import logging
 
-from celery import task
+from celery import current_app
 
 from pipeline.contrib.node_timeout.settings import node_timeout_settings
 from pipeline.eri.models import State, Process
@@ -24,7 +24,7 @@ from pipeline.contrib.node_timeout.models import TimeoutNodeConfig, TimeoutNodes
 logger = logging.getLogger("celery")
 
 
-@task(acks_late=True)
+@current_app.task(acks_late=True)
 def dispatch_timeout_nodes(record_id: int):
     record = TimeoutNodesRecord.objects.get(id=record_id)
     nodes = json.loads(record.timeout_nodes)
@@ -40,7 +40,7 @@ def dispatch_timeout_nodes(record_id: int):
             )
 
 
-@task(ignore_result=True)
+@current_app.task(ignore_result=True)
 def execute_node_timeout_strategy(node_id, version):
     timeout_config = TimeoutNodeConfig.objects.filter(node_id=node_id).only("root_pipeline_id", "action").first()
     if timeout_config is None:
