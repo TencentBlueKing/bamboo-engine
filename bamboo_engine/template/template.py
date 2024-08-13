@@ -23,6 +23,7 @@ from mako.template import Template as MakoTemplate
 from mako import lexer, codegen
 from mako.exceptions import MakoException
 
+from bamboo_engine.config import Settings
 from bamboo_engine.utils.mako_utils.checker import check_mako_template_safety
 from bamboo_engine.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 from bamboo_engine.utils import mako_safety
@@ -34,6 +35,8 @@ from . import sandbox
 logger = logging.getLogger("root")
 # find mako template(format is ${xxx}，and ${}# not in xxx, # may raise memory error)
 TEMPLATE_PATTERN = re.compile(r"\${[^${}#]+}")
+NESTED_INDEX_STR_PATTERN = r'^(\w+)(?:\[(?:"\w+"|\'\w+\'|\d+)\])+$'
+INDEX_STR_PATTERN = r'\[("\w+"|\'\w+\'|\d+)\]'
 
 
 class Template:
@@ -143,8 +146,21 @@ class Template:
         templates = self._get_string_templates(string)
 
         # TODO keep render return object, here only process simple situation
-        if len(templates) == 1 and templates[0] == string and deformat_var_key(string) in context:
-            return context[deformat_var_key(string)]
+        if len(templates) == 1 and templates[0] == string:
+            deformat_string = deformat_var_key(string)
+
+            # directly get value from context
+            if deformat_string in context:
+                return context[deformat_var_key(string)]
+
+            # nested get value from tuple/list/dict
+            match = re.match(NESTED_INDEX_STR_PATTERN, deformat_string)
+            if Settings.ENABLE_RENDER_OBJ_BY_MAKO_STRING and match and match.group(1) in context:
+                try:
+                    return self._nested_get_value_from_context(context[match.group(1)], deformat_string)
+                except Exception as e:
+                    logger.exception("render obj from nested mako string failed: {}".format(e))
+                    pass
 
         for tpl in templates:
             try:
@@ -162,6 +178,21 @@ class Template:
             resolved = Template._render_template(tpl, context)
             string = string.replace(tpl, resolved)
         return string
+
+    @staticmethod
+    def _nested_get_value_from_context(context: Any, string: str) -> Any:
+        """
+        从上下文中获取嵌套数据的值，仅支持 list/tuple/dict，且需保证索引合法，外层需要处理异常
+        """
+        cur_context = context
+        for key in re.findall(INDEX_STR_PATTERN, string):
+            if isinstance(cur_context, dict):
+                cur_context = cur_context[key.strip("'\"")]
+            elif isinstance(cur_context, (list, tuple)):
+                cur_context = cur_context[int(key)]
+            else:
+                raise ValueError("invalid context type: {}".format(type(cur_context)))
+        return cur_context
 
     @staticmethod
     def _render_template(template: str, context: dict) -> Any:
