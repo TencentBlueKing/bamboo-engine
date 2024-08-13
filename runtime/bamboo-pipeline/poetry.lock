@@ -68,7 +68,7 @@ tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 
 [[package]]
 name = "bamboo-engine"
-version = "2.10.2"
+version = "2.11.0"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
