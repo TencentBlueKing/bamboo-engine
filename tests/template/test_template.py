@@ -66,6 +66,23 @@ def test_render():
     syntax_error_template = Template("${a:b}")
     assert syntax_error_template.render({}) == "${a:b}"
 
+    default_enable_value = Settings.ENABLE_RENDER_OBJ_BY_MAKO_STRING
+    Settings.ENABLE_RENDER_OBJ_BY_MAKO_STRING = True
+
+    simple_list_template = Template("${a}")
+    assert simple_list_template.render({"a": [1, 2, 3]}) == [1, 2, 3]
+
+    nested_list_template = Template("${a[0][3]}")
+    assert nested_list_template.render({"a": [[1, 2, 3, {"a": "b"}], [5, 6, 7, 8]]}) == {"a": "b"}
+
+    simple_dict_template = Template("${a}")
+    assert simple_dict_template.render({"a": {"a": "b"}}) == {"a": "b"}
+
+    nested_dict_template = Template("${a[0][3]['a']}")
+    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1,2,3]}], [5, 6, 7, 8]]}) == [1,2,3]
+
+    Settings.ENABLE_RENDER_OBJ_BY_MAKO_STRING = default_enable_value
+
 
 def test_render__with_sandbox():
 

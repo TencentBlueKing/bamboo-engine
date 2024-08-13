@@ -67,6 +67,9 @@ class Settings:
 
     RERUN_INDEX_OFFSET = 0
 
+    # 当字符串是纯mako字符串时，是否自动渲染成对象，默认还是会渲染成字符串
+    ENABLE_RENDER_OBJ_BY_MAKO_STRING = False
+
     PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC = default_expr_func
 
     PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value
