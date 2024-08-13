@@ -81,6 +81,9 @@ def test_render():
     nested_dict_template = Template("${a[0][3]['a']}")
     assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1,2,3]}], [5, 6, 7, 8]]}) == [1,2,3]
 
+    type_error_template = Template("${a[1]}")
+    assert type_error_template.render({"a": 1}) == "${a[1]}"
+
     Settings.ENABLE_RENDER_OBJ_BY_MAKO_STRING = default_enable_value
 
 
