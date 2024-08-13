@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bamboo-engine"
-version = "2.10.2"
+version = "2.11.0"
 description = "Bamboo-engine is a general-purpose workflow engine"
 authors = ["homholueng <homholueng@gmail.com>"]
 license = "MIT"
