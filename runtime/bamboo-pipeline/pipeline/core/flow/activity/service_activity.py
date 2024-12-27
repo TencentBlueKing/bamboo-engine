@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
 from pipeline.core.flow.io import (

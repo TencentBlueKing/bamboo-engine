@@ -21,7 +21,7 @@ import ujson as json
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from pipeline.conf import settings
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY

@@ -13,5 +13,5 @@ specific language governing permissions and limitations under the License.
 
 from django.dispatch import Signal
 
-post_pipeline_finish = Signal(providing_args=["instance_id"])
-post_pipeline_revoke = Signal(providing_args=["instance_id"])
+post_pipeline_finish = Signal()
+post_pipeline_revoke = Signal()
