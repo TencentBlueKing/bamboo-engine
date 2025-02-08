@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bamboo-pipeline"
-version = "4.0.0rc0"
+version = "4.0.0rc1"
 description = "runtime for bamboo-engine base on Django and Celery"
 authors = ["homholueng <homholueng@gmail.com>"]
 license = "MIT"
@@ -20,7 +20,7 @@ bamboo-engine = "3.0.0rc0"
 jsonschema = "^4.17.0"
 ujson = "^5.9"
 pyparsing = "^3"
-redis = ">=5.0.3, <6"
+redis = ">=4.0.0, <6"
 django-timezone-field = "^5"
 Werkzeug = "^3"
 prometheus-client = "^0.20.0"
