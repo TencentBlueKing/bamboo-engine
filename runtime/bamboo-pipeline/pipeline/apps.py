@@ -67,11 +67,15 @@ def get_single_client():
 
     if settings.REDIS.get("ssl_ca_certs"):
         kwargs["ssl"] = True
+        kwargs["ssl_check_hostname"] = True
+        kwargs["ssl_cert_reqs"] = "required"
         kwargs["ssl_ca_certs"] = settings.REDIS["ssl_ca_certs"]
     if settings.REDIS.get("ssl_certfile"):
         kwargs["ssl_certfile"] = settings.REDIS["ssl_certfile"]
     if settings.REDIS.get("ssl_keyfile"):
         kwargs["ssl_keyfile"] = settings.REDIS["ssl_keyfile"]
+    if settings.REDIS.get("ssl_cert_reqs"):
+        kwargs["ssl_cert_reqs"] = settings.REDIS["ssl_cert_reqs"]
     if settings.REDIS.get("ssl_check_hostname"):
         kwargs["ssl_check_hostname"] = settings.REDIS["ssl_check_hostname"]
 
