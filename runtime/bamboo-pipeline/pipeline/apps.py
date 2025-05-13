@@ -66,7 +66,7 @@ def get_single_client():
         kwargs["db"] = settings.REDIS["db"]
 
     if settings.REDIS.get("ssl_ca_certs"):
-        kwargs["ssl"] = True
+        kwargs["connection_class"] = redis.SSLConnection
         kwargs["ssl_check_hostname"] = True
         kwargs["ssl_cert_reqs"] = "required"
         kwargs["ssl_ca_certs"] = settings.REDIS["ssl_ca_certs"]
