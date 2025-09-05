@@ -18,6 +18,7 @@ import time
 
 from django.core.management import BaseCommand
 from django.db import connections
+
 from pipeline.contrib.node_timer_event.models import ExpiredNodesRecord
 from pipeline.contrib.node_timer_event.settings import node_timer_event_settings
 from pipeline.contrib.node_timer_event.tasks import dispatch_expired_nodes
@@ -38,7 +39,7 @@ class Command(BaseCommand):
                 start = time.time()
                 self._pop_expired_nodes(redis_inst, nodes_pool)
                 end = time.time()
-                logger.info(f"[node_timeout_process] time consuming: {end-start}")
+                logger.info(f"[node_timeout_process] time consuming: {end - start}")
             except Exception as e:
                 logger.exception(e)
             time.sleep(node_timer_event_settings.pool_scan_interval)
