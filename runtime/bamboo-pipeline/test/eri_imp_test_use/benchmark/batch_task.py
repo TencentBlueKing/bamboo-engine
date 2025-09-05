@@ -1,14 +1,13 @@
 import time
 
+import test_pipelines
 from bamboo_engine.engine import Engine
 from bamboo_engine.engine import states as STATES
-from pipeline.eri.runtime import BambooDjangoRuntime
 
-import test_pipelines
+from pipeline.eri.runtime import BambooDjangoRuntime
 
 
 def benchmark(batch_size):
-
     pipelines = []
     for i in range(batch_size):
         print("prepare %s pipieline" % (i + 1))

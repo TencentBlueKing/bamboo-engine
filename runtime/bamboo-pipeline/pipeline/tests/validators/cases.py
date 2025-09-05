@@ -416,7 +416,6 @@ def flow_valid_edge_case_2():
 
 
 def flow_valid_edge_case_3():
-
     start = EmptyStartEvent()
     end = EmptyEndEvent()
     eg_1 = ExclusiveGateway(id=exclusive_gw_id(1), conditions={0: "123", 1: "456"})

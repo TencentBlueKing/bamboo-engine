@@ -15,6 +15,7 @@ import logging
 from typing import Any, Dict, List, Type, Union
 
 from celery import current_app
+
 from pipeline.contrib.node_timer_event.adapter import NodeTimerEventBaseAdapter
 from pipeline.contrib.node_timer_event.handlers import ActionManager
 from pipeline.contrib.node_timer_event.models import ExpiredNodesRecord
@@ -64,7 +65,6 @@ def dispatch_expired_nodes(record_id: int):
 
 @current_app.task(ignore_result=True)
 def execute_node_timer_event_action(node_id: str, version: str, index: int):
-
     adapter_class: Type[NodeTimerEventBaseAdapter] = node_timer_event_settings.adapter_class
     adapter: NodeTimerEventBaseAdapter = adapter_class(node_id=node_id, version=version)
     if not adapter.is_ready() or (adapter.index__event_map and index not in adapter.index__event_map):

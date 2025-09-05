@@ -13,11 +13,11 @@ specific language governing permissions and limitations under the License.
 
 
 from django.db import migrations, models
+
 import pipeline.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0005_pipelineinstance_tree_info"),
     ]

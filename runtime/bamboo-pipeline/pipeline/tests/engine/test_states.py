@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 import itertools
 
 from django.test import TestCase
+
 from pipeline.engine import states
 from pipeline.engine.states import *  # noqa
 
@@ -103,7 +104,6 @@ class StatesTestCase(TestCase):
         )
 
     def test_can_transit(self):
-
         for is_pipeline, appoint_case in list(TRANSITION_MAP.items()):
             for is_appoint, from_to_map in list(appoint_case.items()):
                 for from_, to_set in list(from_to_map.items()):

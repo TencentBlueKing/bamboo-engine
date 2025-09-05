@@ -2,6 +2,7 @@
 
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
@@ -17,8 +18,6 @@ def test_executable_end_event_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [pipeline["id"], start.id, act.id, end.id]
     node_data_dict = {
@@ -41,8 +40,6 @@ def test_executable_end_event_raise():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_data_dict = {
         act.id: {"inputs": {"_loop": 1, "_inner_loop": 1}, "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True}},
@@ -72,8 +69,6 @@ def test_executable_end_event_in_subprocess():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     node_id_list = [pipeline["id"], start.id, subproc.id, end.id, sub_start.id, act.id, sub_end.id]
     node_data_dict = {
         pipeline["id"]: {"inputs": {}, "outputs": {}},
@@ -101,8 +96,6 @@ def test_executable_end_event_raise_in_subproc():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_data_dict = {
         act.id: {"inputs": {"_loop": 1, "_inner_loop": 1}, "outputs": {"_loop": 1, "_inner_loop": 1, "_result": True}},

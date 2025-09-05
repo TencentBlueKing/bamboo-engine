@@ -98,7 +98,6 @@ class ZombieProcHealerTestCase(TestCase):
             doctor_1.cure.assert_not_called()
 
     def test_heal(self):
-
         doctor_1 = MagicMock()
         doctor_1_confirm_count = {"count": 0}
 

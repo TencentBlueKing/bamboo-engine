@@ -1,16 +1,14 @@
 import time
 
-from pipeline.service import task_service
-from pipeline.parser.pipeline_parser import PipelineParser
+import test_pipelines
 
 from pipeline.engine import states as STATES
 from pipeline.engine.models import Status
-
-import test_pipelines
+from pipeline.parser.pipeline_parser import PipelineParser
+from pipeline.service import task_service
 
 
 def benchmark(batch_size):
-
     pipelines = []
     for i in range(batch_size):
         print("prepare %s pipieline" % (i + 1))

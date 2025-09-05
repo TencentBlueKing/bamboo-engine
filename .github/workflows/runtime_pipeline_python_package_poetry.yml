@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v2
         with:
-          python-version: 3.11.10
+          python-version: 3.12.10
 
       - name: Set up Poetry
         uses: abatilo/actions-poetry@v2.0.0

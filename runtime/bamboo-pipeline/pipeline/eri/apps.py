@@ -11,12 +11,12 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from django.apps import AppConfig
-from django.conf import settings
-from pipeline.exceptions import ConfigValidationError
-
 from bamboo_engine.handlers import register
 from bamboo_engine.utils.constants import ExclusiveGatewayStrategy
+from django.apps import AppConfig
+from django.conf import settings
+
+from pipeline.exceptions import ConfigValidationError
 
 
 class ERIConfig(AppConfig):
@@ -30,7 +30,6 @@ class ERIConfig(AppConfig):
 
         # 校验 PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC 配置
         if hasattr(settings, "PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC"):
-
             pipeline_exclusive_gateway_expr_func = getattr(settings, "PIPELINE_EXCLUSIVE_GATEWAY_EXPR_FUNC", None)
             if not callable(pipeline_exclusive_gateway_expr_func):
                 raise ConfigValidationError("config validate error, the expr func must be callable, please check it")

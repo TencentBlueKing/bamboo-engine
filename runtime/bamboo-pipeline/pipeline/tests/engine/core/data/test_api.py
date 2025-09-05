@@ -52,7 +52,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__without_candidate(self):
         for method in self.write_methods:
-
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
                 with patch(ENGINE_DATA_API_CANDIDATE_BACKEND, None):
                     getattr(self.api, method)(*self.method_params[method])
@@ -63,7 +62,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__without_candiate_raise_err(self):
         for method in self.write_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -76,7 +74,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__with_candidate(self):
         for method in self.write_methods:
-
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
                 with patch(ENGINE_DATA_API_CANDIDATE_BACKEND, self.candidate_backend):
                     getattr(self.api, method)(*self.method_params[method])
@@ -87,7 +84,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__with_candidate_main_raise_err(self):
         for method in self.write_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -100,7 +96,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__with_candidate_raise_err(self):
         for method in self.write_methods:
-
             setattr(self.candidate_backend, method, MagicMock(side_effect=Exception))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -113,7 +108,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_write__with_candidate_both_raise_err(self):
         for method in self.write_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
             setattr(self.candidate_backend, method, MagicMock(side_effect=Exception))
 
@@ -130,7 +124,6 @@ class EngineDataAPITestCase(TestCase):
         self.mock_settings.PIPELINE_DATA_BACKEND_AUTO_EXPIRE_SECONDS = 30
 
         for method in self.write_methods:
-
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
                 with patch(ENGINE_DATA_API_CANDIDATE_BACKEND, self.candidate_backend):
                     getattr(self.api, method)(*self.method_params[method])
@@ -147,7 +140,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__without_candidate(self):
         for method in self.read_methods:
-
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
                 with patch(ENGINE_DATA_API_CANDIDATE_BACKEND, None):
                     data = getattr(self.api, method)(*self.method_params[method])
@@ -159,7 +151,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__without_candidate_raise_err(self):
         for method in self.read_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -172,7 +163,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__with_candidate_not_use(self):
         for method in self.read_methods:
-
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
                 with patch(ENGINE_DATA_API_CANDIDATE_BACKEND, self.candidate_backend):
                     data = getattr(self.api, method)(*self.method_params[method])
@@ -184,7 +174,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__with_candidate_use(self):
         for method in self.read_methods:
-
             setattr(self.backend, method, MagicMock(return_value=None))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -198,7 +187,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__with_candidate_err(self):
         for method in self.read_methods:
-
             setattr(self.backend, method, MagicMock(return_value=None))
             setattr(self.candidate_backend, method, MagicMock(side_effect=Exception))
 
@@ -213,7 +201,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__with_candidate_main_raise_err(self):
         for method in self.read_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
 
             with patch(ENGINE_DATA_API_BACKEND, self.backend):
@@ -227,7 +214,6 @@ class EngineDataAPITestCase(TestCase):
 
     def test_read__with_candidate_both_raise_err(self):
         for method in self.read_methods:
-
             setattr(self.backend, method, MagicMock(side_effect=Exception))
             setattr(self.candidate_backend, method, MagicMock(side_effect=Exception))
 

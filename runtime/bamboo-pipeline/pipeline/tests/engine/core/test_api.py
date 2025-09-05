@@ -16,12 +16,13 @@ import socket
 import mock
 from celery import current_app
 from django.test import TestCase
+from redis.exceptions import ConnectionError
+
 from pipeline.conf import settings
 from pipeline.django_signal_valve import valve
 from pipeline.engine.core import api, data
 from pipeline.engine.exceptions import RabbitMQConnectionError
 from pipeline.engine.models import FunctionSwitch
-from redis.exceptions import ConnectionError
 
 
 class EngineCoreApiTestCase(TestCase):
@@ -58,7 +59,6 @@ class EngineCoreApiTestCase(TestCase):
     @mock.patch("celery.current_app.control.ping", mock.MagicMock())
     @mock.patch("pipeline.engine.core.data.expire_cache", mock.MagicMock())
     def test_workers(self):
-
         # throw error
         def throw_conn_error(*args, **kwargs):
             raise ConnectionError()

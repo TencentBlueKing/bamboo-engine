@@ -12,11 +12,11 @@ specific language governing permissions and limitations under the License.
 """
 import json
 
+from bamboo_engine.api import EngineAPIResult
 from django.http import JsonResponse
 from django.test import TestCase
 
-from bamboo_engine.api import EngineAPIResult
-from pipeline.contrib.engine_admin.views import _ensure_return_json_response, _check_api_permission
+from pipeline.contrib.engine_admin.views import _check_api_permission, _ensure_return_json_response
 from pipeline.engine.utils import ActionResult
 
 
@@ -29,7 +29,6 @@ def check_permission_success(request, *args, **kwargs):
 
 
 class EngineAdminTestCase(TestCase):
-
     def test_ensure_return_json_response(self):
         def func_return_json_response(*args, **kwargs):
             return JsonResponse({"result": True})

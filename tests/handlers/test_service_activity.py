@@ -27,18 +27,9 @@ from bamboo_engine.eri import (
     ScheduleType,
     ServiceActivity,
 )
-from bamboo_engine.eri.models.interrupt import (
-    HandlerExecuteData,
-    HandlerScheduleData,
-    ScheduleInterruptPoint,
-)
+from bamboo_engine.eri.models.interrupt import HandlerExecuteData, HandlerScheduleData, ScheduleInterruptPoint
 from bamboo_engine.handlers.service_activity import ServiceActivityHandler
-from bamboo_engine.interrupt import (
-    ExecuteInterrupter,
-    ExecuteKeyPoint,
-    ScheduleInterrupter,
-    ScheduleKeyPoint,
-)
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint
 
 
 @pytest.fixture
@@ -119,7 +110,6 @@ def schedule_interrupter():
     ],
 )
 def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -275,7 +265,6 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     ],
 )
 def test_context_hydrate__raise(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -338,7 +327,6 @@ def test_context_hydrate__raise(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -430,7 +418,6 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, loop_key):
-
     data = Data(
         {
             "k1": DataInput(need_render=True, value="${k4}"),
@@ -558,7 +545,6 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
     ],
 )
 def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -652,7 +638,6 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -734,7 +719,6 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     node.error_ignorable = True
 
     service_data = ExecutionData({}, {})
@@ -815,7 +799,6 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     ],
 )
 def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -898,7 +881,6 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
     ],
 )
 def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -988,7 +970,6 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     ],
 )
 def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1077,7 +1058,6 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.MULTIPLE_CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1251,7 +1231,6 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     ],
 )
 def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 

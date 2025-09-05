@@ -14,6 +14,7 @@ specific language governing permissions and limitations under the License.
 import traceback
 
 from bamboo_engine.exceptions import ConvergeMatchError
+
 from .cases import *  # noqa
 
 
@@ -161,7 +162,6 @@ def test_validate_gateway():
 
 
 def test_validate_stream():
-
     tree, gateway_validation_assert, stream_assert = flow_valid_case()
     validate_gateways(tree)
     data = validate_stream(tree)

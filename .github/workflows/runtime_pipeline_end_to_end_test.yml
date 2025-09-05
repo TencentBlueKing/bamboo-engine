@@ -13,7 +13,7 @@ jobs:
       DB_PASSWORD: root
     strategy:
       matrix:
-        python-version: [3.11.10]
+        python-version: [3.12.10]
         django-version: [4.2]
 
     steps:

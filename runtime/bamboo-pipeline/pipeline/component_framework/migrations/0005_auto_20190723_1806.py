@@ -17,7 +17,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("component_framework", "0004_auto_20180413_1800"),
     ]

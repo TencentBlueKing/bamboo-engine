@@ -14,7 +14,6 @@ def forward_func(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("periodic_task", "0004_auto_20191213_0828"),
     ]

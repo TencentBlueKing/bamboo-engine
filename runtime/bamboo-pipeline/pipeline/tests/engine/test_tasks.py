@@ -326,7 +326,6 @@ class EngineTaskTestCase(TestCase):
     @mock.patch(ENGINE_API_FORCED_FAIL, mock.MagicMock())
     @mock.patch(ENGINE_ACTIVITY_FAIL_SIGNAL, mock.MagicMock())
     def test_node_timeout_check(self):
-
         # state for return None
         with mock.patch(PIPELINE_STATUS_STATE_FOR, mock.MagicMock(return_value=None)):
             node_id = uniqid()

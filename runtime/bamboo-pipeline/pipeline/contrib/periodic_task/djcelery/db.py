@@ -30,7 +30,6 @@ else:
 try:
     from django.db.transaction import atomic  # noqa
 except ImportError:  # pragma: no cover
-
     try:
         from django.db.transaction import Transaction  # noqa
     except ImportError:

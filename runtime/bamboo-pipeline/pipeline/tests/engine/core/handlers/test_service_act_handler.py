@@ -38,7 +38,6 @@ class ServiceActivityHandlerTestCase(TestCase):
     @patch(ENGINE_SIGNAL_TIMEOUT_END_SEND, MagicMock())
     @patch(SIGNAL_VALVE_SEND, MagicMock())
     def test_handle__execute_raise_exception_and_not_ignore_error(self):
-
         for loop, timeout in itertools.product((1, 2), (5, None)):
             root_pipeline_data = "root_pipeline_data"
             ex_data = "ex_data"
@@ -55,7 +54,6 @@ class ServiceActivityHandlerTestCase(TestCase):
             status = MockStatus(loop=loop)
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
-
                 hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                 if loop > 1:
@@ -153,7 +151,6 @@ class ServiceActivityHandlerTestCase(TestCase):
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
                 with patch(PIPELINE_STATUS_FINISH, MagicMock(return_value=finish_call_success)):
-
                     hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                     if loop > 1:
@@ -246,7 +243,6 @@ class ServiceActivityHandlerTestCase(TestCase):
             status = MockStatus(loop=loop)
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
-
                 hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                 if loop > 1:
@@ -343,7 +339,6 @@ class ServiceActivityHandlerTestCase(TestCase):
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
                 with patch(PIPELINE_STATUS_FINISH, MagicMock(return_value=finish_call_success)):
-
                     hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                     if loop > 1:
@@ -439,7 +434,6 @@ class ServiceActivityHandlerTestCase(TestCase):
             status = MockStatus(loop=loop)
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
-
                 hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                 if loop > 1:
@@ -539,7 +533,6 @@ class ServiceActivityHandlerTestCase(TestCase):
 
             with patch(PIPELINE_STATUS_GET, MagicMock(return_value=status)):
                 with patch(PIPELINE_STATUS_FINISH, MagicMock(return_value=finish_call_success)):
-
                     hdl_result = handlers.service_activity_handler(process, service_act, status)
 
                     if loop > 1 and not on_retry:

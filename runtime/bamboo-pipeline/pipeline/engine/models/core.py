@@ -26,6 +26,7 @@ except ModuleNotFoundError:
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 from pipeline.conf import settings as pipeline_settings
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY
 from pipeline.core.data.base import DataObject
@@ -719,7 +720,6 @@ class StatusManager(models.Manager):
                 is_pipeline=is_pipeline,
                 appoint=appoint,
             ):
-
                 # 在冻结状态下不能改变 pipeline 的状态
                 if is_pipeline:
                     subprocess_rel = SubProcessRelationship.objects.filter(subprocess_id=id)
@@ -1345,7 +1345,6 @@ class SendFailedCeleryTaskManager(models.Manager):
 
 
 class SendFailedCeleryTask(models.Model):
-
     TASK_TYPE_EMPTY = 0
     TASK_TYPE_PROCESS = 1
     TASK_TYPE_NODE = 2

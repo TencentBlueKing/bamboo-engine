@@ -13,13 +13,13 @@ specific language governing permissions and limitations under the License.
 
 
 import django.db.models.deletion
-import pipeline.models
 import timezone_field.fields
 from django.db import migrations, models
 
+import pipeline.models
+
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0016_auto_20181220_0958"),
     ]
