@@ -44,7 +44,6 @@ class TestStatus(TestCase):
                 for is_pipeline, appoint_map in list(states.TRANSITION_MAP.items()):
                     for is_appoint, state_map in list(appoint_map.items()):
                         for from_state, to_state_set in list(state_map.items()):
-
                             # valid transit
                             for to_state in to_state_set:
                                 state_id = uniqid()
@@ -249,7 +248,6 @@ class TestStatus(TestCase):
 
     @patch(PIPELINE_DATA_WRITE_NODE_DATA, MagicMock())
     def test_fail(self):
-
         # success call test
         node = IdentifyObject()
         result = Status.objects.transit(id=node.id, to_state=states.RUNNING, start=True)
@@ -298,7 +296,6 @@ class TestStatus(TestCase):
 
     @patch(PIPELINE_DATA_WRITE_NODE_DATA, MagicMock())
     def test_finish(self):
-
         node = IdentifyObject()
         result = Status.objects.transit(id=node.id, to_state=states.RUNNING, start=True)
         self.assertTrue(result.result)
@@ -349,7 +346,6 @@ class TestStatus(TestCase):
     @patch(PIPELINE_STATUS_RECOVER_FROM_BLOCK, MagicMock())
     @patch(ENGINE_SIGNAL_NODE_SKIP_CALL, MagicMock())
     def test_skip(self):
-
         from pipeline.engine.signals import node_skip_call
 
         mock_record = MagicMock()
@@ -408,7 +404,6 @@ class TestStatus(TestCase):
     @patch(PIPELINE_STATUS_RECOVER_FROM_BLOCK, MagicMock())
     @patch(ENGINE_SIGNAL_NODE_RETRY_READY, MagicMock())
     def test_retry(self):
-
         from pipeline.engine.signals import node_retry_ready
 
         mock_record = MagicMock()

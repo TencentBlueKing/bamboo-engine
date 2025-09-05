@@ -11,19 +11,19 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import json
-import random
 import logging
-from typing import Any, Optional, List
+import random
+from typing import Any, List, Optional
 
-from celery import current_app
 from bamboo_engine.eri.models import ExecuteInterruptPoint, ScheduleInterruptPoint
+from celery import current_app
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 logger = logging.getLogger("bamboo_engine")
 
 
 class ChoasBambooDjangoRuntime(BambooDjangoRuntime):
-
     CHOAS_METHOD_RANGE = {
         "add_schedule_times",
         "apply_schedule_lock",

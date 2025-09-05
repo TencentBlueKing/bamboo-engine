@@ -12,12 +12,11 @@ specific language governing permissions and limitations under the License.
 """
 
 
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0018_auto_20190729_1041"),
     ]

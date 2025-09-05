@@ -2,6 +2,7 @@
 
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
@@ -23,8 +24,6 @@ def test_subprocess_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [pipeline["id"], subproc_start.id, subproc_act.id, subproc_end.id, start.id, subproc.id, end.id]
     node_data_dict = {
@@ -82,8 +81,6 @@ def test_parallel_subprocess_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list.extend(
         [
@@ -146,8 +143,6 @@ def test_nest_subprocess_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     node_id_list = [
         pipeline["id"],
         subproc_start.id,
@@ -204,8 +199,6 @@ def test_subprocess_preset_context():
     engine.run_pipeline(
         pipeline=pipeline, root_pipeline_data={}, subprocess_context={"${user}": "user00", "${password}": "password"}
     )
-
-    
 
     node_id_list = [
         pipeline["id"],

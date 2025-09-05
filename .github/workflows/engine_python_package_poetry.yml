@@ -13,7 +13,7 @@ jobs:
       - name: Build and publish to pypi
         uses: JRubics/poetry-publish@v2.0
         with:
-          python_version: "3.11"
+          python_version: "3.12"
           poetry_version: "==2.0.0"
           ignore_dev_requirements: "yes"
           repository_name: "bamboo-engine"

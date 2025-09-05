@@ -34,12 +34,7 @@ from bamboo_engine.eri import (
     Service,
 )
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
-from bamboo_engine.handler import (
-    ExecuteResult,
-    NodeHandler,
-    ScheduleResult,
-    register_handler,
-)
+from bamboo_engine.handler import ExecuteResult, NodeHandler, ScheduleResult, register_handler
 from bamboo_engine.interrupt import ExecuteKeyPoint, ScheduleKeyPoint
 from bamboo_engine.metrics import (
     ENGINE_EXECUTE_EXCEPTION_COUNT,
@@ -331,7 +326,6 @@ class ServiceActivityHandler(NodeHandler):
 
             # execute success
             if execute_success:
-
                 need_schedule = service.need_schedule()
                 next_node_id = None
 
@@ -367,7 +361,6 @@ class ServiceActivityHandler(NodeHandler):
                 )
 
             if not self.node.error_ignorable:
-
                 self.runtime.node_execute_fail(root_pipeline_id, self.node.id)
                 self.hook_dispatch(
                     hook=HookType.NODE_EXECUTE_FAIL,
@@ -638,7 +631,6 @@ class ServiceActivityHandler(NodeHandler):
 
             # schedule fail
             if not self.node.error_ignorable:
-
                 self.runtime.node_schedule_fail(root_pipeline_id, self.node.id)
                 self.hook_dispatch(
                     hook=HookType.NODE_SCHEDULE_FAIL,
@@ -691,7 +683,7 @@ class ServiceActivityHandler(NodeHandler):
         root_pipeline_data: ExecutionData,
         callback_data: Optional[CallbackData] = None,
         *args,
-        **kwargs
+        **kwargs,
     ) -> bool:
         """
         hook 分发逻辑

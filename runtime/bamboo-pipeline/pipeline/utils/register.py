@@ -12,11 +12,10 @@ specific language governing permissions and limitations under the License.
 """
 
 import logging
-import pkgutil
 import os
+import pkgutil
 import sys
 from importlib import import_module
-
 
 logger = logging.getLogger("root")
 
@@ -61,7 +60,6 @@ def autodiscover_collections(path):
     for app_config in apps.get_app_configs():
         # Attempt to import the app's module.
         try:
-
             _module = import_module("%s.%s" % (app_config.name, path))
             autodiscover_items(_module)
         except ImportError as e:

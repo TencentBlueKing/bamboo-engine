@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from os import pipe
-import pytest
 
+import pytest
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
 from eri_chaos.runtime import ChoasBambooDjangoRuntime

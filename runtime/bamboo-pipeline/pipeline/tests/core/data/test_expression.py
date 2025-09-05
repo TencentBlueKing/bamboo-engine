@@ -17,7 +17,7 @@ import datetime
 from django.test import TestCase
 
 from pipeline.core.data import expression, sandbox
-from pipeline.core.data.expression import format_constant_key, deformat_constant_key
+from pipeline.core.data.expression import deformat_constant_key, format_constant_key
 
 
 class TestConstantTemplate(TestCase):
@@ -95,7 +95,6 @@ class TestConstantTemplate(TestCase):
         self.assertEqual(cons_tmpl.resolve_template(template_syntax_error, {}), template_syntax_error)
 
     def test_resolve_template__with_sandbox(self):
-
         r1 = expression.ConstantTemplate.resolve_template("""${exec(print(''))}""", {})
         self.assertEqual(r1, """${exec(print(''))}""")
 

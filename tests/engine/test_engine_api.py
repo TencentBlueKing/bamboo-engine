@@ -46,7 +46,7 @@ def test_run_pipeline():
             root_pipeline_data=root_pipeline_data,
             root_pipeline_context=root_pipeline_context,
             subprocess_context=subprocess_context,
-            **options
+            **options,
         )
 
     validator.validate_and_process_pipeline.assert_called_once_with(pipeline, False)

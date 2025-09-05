@@ -14,11 +14,11 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict, Tuple
 
-from pipeline.core.data.base import DataObject
-from pipeline.eri.runtime import BambooDjangoRuntime
-
 from bamboo_engine import api as bamboo_engine_api
 from bamboo_engine.eri import ExecutionData
+
+from pipeline.core.data.base import DataObject
+from pipeline.eri.runtime import BambooDjangoRuntime
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,6 @@ class ExampleAction(BaseAction):
 
 
 class ForcedFailAction(BaseAction):
-
     TIMEOUT_NODE_OPERATOR = "bamboo_engine"
 
     def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:
@@ -142,7 +141,6 @@ class ForcedFailAction(BaseAction):
 
 
 class ForcedFailAndSkipAction(BaseAction):
-
     TIMEOUT_NODE_OPERATOR = "bamboo_engine"
 
     def do(self, data: DataObject, parent_data: DataObject, *args, **kwargs) -> bool:

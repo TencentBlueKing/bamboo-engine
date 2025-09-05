@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0008_auto_20180824_1115"),
     ]

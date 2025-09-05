@@ -15,14 +15,10 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
 from django.utils.translation import gettext_lazy as _
+
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
-from pipeline.core.flow.io import (
-    BooleanItemSchema,
-    InputItem,
-    IntItemSchema,
-    OutputItem,
-)
+from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
 from pipeline.utils.utils import convert_bytes_to_str
 
 
@@ -241,7 +237,6 @@ class ServiceActivity(Activity):
             self._prepared_outputs = self.data.outputs_copy()
 
     def __setstate__(self, state):
-
         for attr, obj in list(state.items()):
             # py2 pickle dumps data compatible
             if isinstance(attr, bytes):

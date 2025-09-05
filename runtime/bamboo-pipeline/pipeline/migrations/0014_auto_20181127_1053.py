@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0013_old_template_process"),
     ]

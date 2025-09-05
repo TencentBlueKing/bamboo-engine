@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "bamboo-engine"
-version = "3.0.1"
+version = "4.0.0rc0"
 description = "Bamboo-engine is a general-purpose workflow engine"
 authors = ["homholueng <homholueng@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.12,<3.13"
 Werkzeug = "^3"
 pyparsing = "^3"
 Mako = "^1.3"

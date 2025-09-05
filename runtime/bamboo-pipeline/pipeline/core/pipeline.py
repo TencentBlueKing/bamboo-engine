@@ -72,7 +72,6 @@ class PipelineSpec(object):
                 continue
 
             for out in node.outgoing:
-
                 self.flows.append(out)
 
                 if out.target.id not in new_objects:

@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("statistics", "0007_init_pipeline_data"),
     ]

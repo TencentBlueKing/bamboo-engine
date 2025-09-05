@@ -15,28 +15,20 @@ import datetime
 import json
 from typing import Any, Dict, List
 
+from bamboo_engine.eri import DataInput, ExecutionData
 from django.test import TestCase
 from mock import MagicMock, call, patch
-from pipeline.contrib.node_timer_event import constants, types, utils
-from pipeline.contrib.node_timer_event.models import (
-    ExpiredNodesRecord,
-    NodeTimerEventConfig,
-)
-from pipeline.contrib.node_timer_event.tasks import (
-    dispatch_expired_nodes,
-    execute_node_timer_event_action,
-)
-from pipeline.eri.models import Process, State
 
-from bamboo_engine.eri import DataInput, ExecutionData
+from pipeline.contrib.node_timer_event import constants, types, utils
+from pipeline.contrib.node_timer_event.models import ExpiredNodesRecord, NodeTimerEventConfig
+from pipeline.contrib.node_timer_event.tasks import dispatch_expired_nodes, execute_node_timer_event_action
+from pipeline.eri.models import Process, State
 
 
 class ParseTimerDefinedTestCase(TestCase):
-
     TIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
     def test_time_cycle(self):
-
         start: datetime.datetime = datetime.datetime.strptime("2022-01-01 00:00:00", self.TIME_FORMAT)
         cases: List[Dict[str, Any]] = [
             {
@@ -237,7 +229,6 @@ class NodeTimerEventTestCase(TestCase):
         )
 
     def test_parse_node_timer_event_configs_fail_and_ignore(self):
-
         timer_events_in_tree_act_1 = copy.deepcopy(self.timer_events_in_tree)
         timer_events_in_tree_act_1[1]["defined"] = "invalid defined"
 

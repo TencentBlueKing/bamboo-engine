@@ -47,7 +47,6 @@ class ComponentRunner:
         self.component_cls = component_cls
 
     def run(self, data, parent_data, callback_data=None):
-
         service = self.component_cls.bound_service()
 
         setattr(service, "id", uniqid())
@@ -82,11 +81,9 @@ class ComponentRunner:
             else:
                 logger.info("Schedule return [{}], finish running".format(result))
         else:
-
             schedue_times = 0
 
             while not service.is_schedule_finished():
-
                 schedue_times += 1
 
                 logger.info(

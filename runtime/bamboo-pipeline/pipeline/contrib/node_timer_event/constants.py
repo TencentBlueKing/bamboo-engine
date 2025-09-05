@@ -15,7 +15,6 @@ from enum import Enum
 
 
 class TimerType(Enum):
-
     # 时间日期（Time date）ISO 8601 组合日期和时间格式
     # 2019-10-01T12:00:00Z - UTC 时间
     # 2019-10-02T08:09:40+02:00 - UTC 加上两小时时区偏移

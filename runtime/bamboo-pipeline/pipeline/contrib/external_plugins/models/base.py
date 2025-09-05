@@ -18,6 +18,7 @@ from copy import deepcopy
 
 from django.db import IntegrityError, models
 from django.utils.translation import gettext_lazy as _
+
 from pipeline.component_framework.library import ComponentLibrary
 from pipeline.contrib.external_plugins import exceptions
 from pipeline.contrib.external_plugins.models.fields import JSONTextField
@@ -49,7 +50,6 @@ class SourceManager(models.Manager):
         source.delete()
 
     def update_source_from_config(self, configs):
-
         sources_from_config = self.filter(from_config=True).all()
         existing_source_names = {source.name for source in sources_from_config}
         source_name_in_config = {config["name"] for config in configs}

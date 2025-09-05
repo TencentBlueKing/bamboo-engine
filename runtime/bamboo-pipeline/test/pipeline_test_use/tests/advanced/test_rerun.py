@@ -67,7 +67,7 @@ class TestRerun(EngineTestCase):
                 },
                 "outputs": ["${output_a}"],
             },
-            params={"${a_i}": {"type": "splice", "value": u"${s_i}"}},
+            params={"${a_i}": {"type": "splice", "value": "${s_i}"}},
         )
         eg = ExclusiveGateway(conditions={0: "${s_i} < 4", 1: "${s_i} >= 4"})
 

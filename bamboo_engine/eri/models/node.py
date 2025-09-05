@@ -168,7 +168,7 @@ class ConditionalParallelGateway(Node):
         default_condition: DefaultCondition = None,
         extra_info: dict = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """
 
@@ -195,7 +195,7 @@ class ExclusiveGateway(Node):
         default_condition: DefaultCondition = None,
         extra_info: dict = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """
 

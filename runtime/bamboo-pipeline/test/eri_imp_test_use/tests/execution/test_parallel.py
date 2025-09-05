@@ -2,6 +2,7 @@
 
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
@@ -23,8 +24,6 @@ def test_parallel_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [pipeline["id"], start.id, pg.id, cg.id, end.id]
     node_id_list.extend([a.id for a in acts])
@@ -59,8 +58,6 @@ def test_nest_parallel_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [pipeline["id"], start.id, pg_1.id, pg_2.id, cg_1.id, cg_2.id, end.id]
     node_id_list.extend([a.id for a in acts_group_1])

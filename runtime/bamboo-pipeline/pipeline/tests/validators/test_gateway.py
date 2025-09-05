@@ -156,11 +156,10 @@ class TestStreamValidation(TestCase):
         # edge cases
         for i, c in enumerate(flow_valid_edge_cases):
             tree = c["case"]()
-            print(f"test gateway valid edge case {i+1}")
+            print(f"test gateway valid edge case {i + 1}")
             converged = validate_gateways(tree)
 
     def test_validate_stream(self):
-
         tree, gateway_validation_assert, stream_assert = flow_valid_case(self)
         validate_gateways(tree)
         data = validate_stream(tree)

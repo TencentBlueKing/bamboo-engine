@@ -8,17 +8,40 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        language_version: python3.11.10
+        language_version: python3.12.10
+        args: [
+          "--line-length=120"
+        ]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort-engine
+        files: ^(bamboo_engine/|tests/)
+        args: [
+          "--profile=black",
+          "--line-length=120",
+          "--project=bamboo_engine",
+          "--filter-files"
+        ]
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
       - id: isort
-        args: ["--profile", "black", "--filter-files"]
+        name: isort-pipeline
+        files: runtime/
+        args: [
+          "--profile=black",
+          "--line-length=120",
+          "--project=pipeline",
+          "--thirdparty=bamboo_engine",
+          "--filter-files"
+        ]
   - repo: https://github.com/pycqa/flake8
     rev: 6.1.0
     hooks:
       - id: flake8
-        language_version: python3.11.10
+        language_version: python3.12.10
   - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
     rev: v2.2.0
     hooks:

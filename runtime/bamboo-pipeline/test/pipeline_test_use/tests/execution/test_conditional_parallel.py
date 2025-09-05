@@ -56,7 +56,12 @@ class TestConditionalParallelExecution(EngineTestCase):
         self.assert_finished(start, cpg_1, cpg_2, acts_group_1[0], acts_group_1[1], acts_group_2[0], cg_1, cg_2, end)
 
         self.assert_not_execute(
-            acts_group_1[2], acts_group_1[3], acts_group_2[1], acts_group_2[2], acts_group_2[3], acts_group_2[4],
+            acts_group_1[2],
+            acts_group_1[3],
+            acts_group_2[1],
+            acts_group_2[2],
+            acts_group_2[3],
+            acts_group_2[4],
         )
 
         self.test_pass()

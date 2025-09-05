@@ -13,11 +13,11 @@ specific language governing permissions and limitations under the License.
 
 
 from django.db import migrations, models
+
 import pipeline.contrib.external_plugins.models.fields
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []

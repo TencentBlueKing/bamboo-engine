@@ -16,7 +16,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("periodic_task", "0001_initial"),
     ]

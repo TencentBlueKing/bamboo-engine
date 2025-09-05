@@ -13,18 +13,17 @@ specific language governing permissions and limitations under the License.
 import logging
 from typing import List, Optional, Type
 
+from bamboo_engine import states as bamboo_engine_states
 from django.dispatch import receiver
+
 from pipeline.contrib.node_timer_event.adapter import NodeTimerEventBaseAdapter
 from pipeline.contrib.node_timer_event.settings import node_timer_event_settings
 from pipeline.eri.signals import post_set_state
-
-from bamboo_engine import states as bamboo_engine_states
 
 logger = logging.getLogger(__name__)
 
 
 def _node_timer_event_info_update(redis_inst, to_state: str, node_id: str, version: str):
-
     adapter: Optional[NodeTimerEventBaseAdapter] = None
 
     if to_state in [
@@ -33,7 +32,6 @@ def _node_timer_event_info_update(redis_inst, to_state: str, node_id: str, versi
         bamboo_engine_states.FINISHED,
         bamboo_engine_states.SUSPENDED,
     ]:
-
         adapter_class: Type[NodeTimerEventBaseAdapter] = node_timer_event_settings.adapter_class
         adapter: NodeTimerEventBaseAdapter = adapter_class(node_id=node_id, version=version)
 

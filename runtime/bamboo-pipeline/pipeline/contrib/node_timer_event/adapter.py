@@ -29,7 +29,6 @@ EVENT_KEY_PATTERN = re.compile(r".*node:(?P<node_id>.+):version:(?P<version>.+):
 
 
 class NodeTimerEventBaseAdapter(abc.ABC):
-
     node_id: str = None
     version: str = None
     root_pipeline_id: Optional[str] = None
@@ -78,7 +77,6 @@ class NodeTimerEventBaseAdapter(abc.ABC):
         ]
 
     def add_to_pool(self, redis_inst, event: TimerEvent):
-
         key: str = self.get_event_key(event)
 
         expired_time: float = self.get_next_expired_time(event)

@@ -60,7 +60,6 @@ def _has_circle(graph, cur_node, marks, trace):
 
 
 def convert_bytes_to_str(obj):
-
     converted = set()
 
     def _convert(obj, converted):
@@ -68,7 +67,6 @@ def convert_bytes_to_str(obj):
             new_dict = obj.__class__()
 
             for attr, value in obj.items():
-
                 if isinstance(attr, bytes):
                     attr = attr.decode("utf-8")
 
@@ -87,14 +85,12 @@ def convert_bytes_to_str(obj):
             obj = new_list
 
         elif isinstance(obj, bytes):
-
             try:
                 obj = obj.decode("utf-8")
             except Exception:
                 pass
 
         elif hasattr(obj, "__dict__"):
-
             if id(obj) in converted:
                 return obj
             else:
@@ -103,7 +99,6 @@ def convert_bytes_to_str(obj):
             new__dict__ = {}
 
             for attr, value in obj.__dict__.items():
-
                 if isinstance(attr, bytes):
                     attr = attr.decode("utf-8")
 

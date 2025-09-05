@@ -14,11 +14,11 @@ specific language governing permissions and limitations under the License.
 
 
 from django.db import migrations
+
 import pipeline.engine.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0001_initial"),
     ]

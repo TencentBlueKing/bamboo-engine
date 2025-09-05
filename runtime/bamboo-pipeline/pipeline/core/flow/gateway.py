@@ -120,7 +120,6 @@ class ConditionalParallelGateway(Gateway):
         self.conditions.append(condition)
 
     def targets_meet_condition(self, data):
-
         targets = []
 
         logger.info("[{}] ready to resolve conditions: {}".format(self.id, [c.evaluate for c in self.conditions]))

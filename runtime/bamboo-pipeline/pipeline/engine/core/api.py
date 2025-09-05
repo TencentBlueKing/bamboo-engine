@@ -90,12 +90,10 @@ def stats():
     active_queues = inspect.active_queues()
 
     if worker_stats:
-
         for name, stat in worker_stats.items():
             stats["workers"].setdefault(name, {"stat": {}, "queues": {}})["stat"] = stat
 
     if active_queues:
-
         for name, queues in active_queues.items():
             stats["workers"].setdefault(name, {"stat": {}, "queues": {}})["queues"] = queues
 

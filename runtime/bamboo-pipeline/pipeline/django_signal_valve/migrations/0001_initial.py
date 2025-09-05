@@ -13,11 +13,11 @@ specific language governing permissions and limitations under the License.
 
 
 from django.db import migrations, models
+
 import pipeline.django_signal_valve.models
 
 
 class Migration(migrations.Migration):
-
     dependencies = []
 
     operations = [

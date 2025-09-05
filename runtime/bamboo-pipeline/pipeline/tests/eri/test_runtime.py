@@ -12,16 +12,14 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
+
+from bamboo_engine import builder, validator
+from bamboo_engine.builder import *  # noqa
+from bamboo_engine.eri import NodeType
+from django.test import TransactionTestCase
 from mock import MagicMock, patch
 
-from django.test import TransactionTestCase
-
-from bamboo_engine.eri import NodeType
-from bamboo_engine import builder
-from bamboo_engine import validator
-from bamboo_engine.builder import *  # noqa
-
-from pipeline.eri.models import Process, Node, Data, ContextValue, ContextOutputs
+from pipeline.eri.models import ContextOutputs, ContextValue, Data, Node, Process
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 
@@ -34,7 +32,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
         self.assertEqual(self.runtime.node_rerun_limit("1", "2"), 100)
 
     def test_prepare_run_pipeline_simple(self):
-
         # struct
         start = EmptyStartEvent(id="start")
         pg = ParallelGateway(id="pg")

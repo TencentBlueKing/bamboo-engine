@@ -66,7 +66,6 @@ def _write_operation(method, *args, **kwargs):
     propagate = False
 
     try:
-
         if settings.PIPELINE_DATA_BACKEND_AUTO_EXPIRE and method == "set_object":
             # change set_object to expire_cache
             getattr(_backend, "expire_cache")(

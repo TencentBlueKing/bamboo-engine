@@ -126,7 +126,6 @@ def match_converge(
 
     # find closest converge recursively
     for i in range(len(target)):
-
         # do not process prev blocks nodes
         if matched_in_prev_blocks(target[i], block_start, block_nodes):
             target[i] = None
@@ -136,7 +135,6 @@ def match_converge(
 
         # do not find self's converge node again
         while target[i] in gateways and target[i] != current_gateway["id"]:
-
             if target[i] in stack_id_set:
                 # return to previous gateway
 
@@ -191,7 +189,6 @@ def match_converge(
 
     # gateway match validation
     for i in range(len(target)):
-
         # mark first converge
         if target[i] in converges and not converge_id:
             converge_id = target[i]
@@ -457,7 +454,6 @@ def flowing(where, to, parallel_converges):
             stream = "{}_{}".format(where["id"], i)
 
         if target_id in parallel_converges:
-
             is_valid_branch = where[STREAM].issubset(parallel_converges[target_id][P_STREAM])
             is_direct_connect = where.get("converge_gateway_id") == target_id
 
@@ -502,7 +498,6 @@ def validate_stream(tree):
     node_queue = queue.Queue()
     node_queue.put(nodes[start_event_id])
     while not node_queue.empty():
-
         # get node
         node = node_queue.get()
 

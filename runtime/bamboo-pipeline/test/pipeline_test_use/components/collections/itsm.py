@@ -31,7 +31,7 @@ class ItsmService(Service):
 
 
 class ITSMComponent(Component):
-    name = u"工单"
+    name = "工单"
     code = "itsm_node"
     bound_service = ItsmService
     form = "index.html"
@@ -47,7 +47,6 @@ class MockItsmService(Service):
     def schedule(self, data, parent_data, callback_data=None):
         # 扩展多种操作的事情
         try:
-
             next_step = callback_data
             print("next_step is " + next_step)
             data.set_outputs("next_step", next_step)
@@ -63,7 +62,7 @@ class MockItsmService(Service):
 
 
 class MockITSMComponent(Component):
-    name = u"模拟工单"
+    name = "模拟工单"
     code = "mock_itsm_node"
     bound_service = MockItsmService
     form = "index.html"

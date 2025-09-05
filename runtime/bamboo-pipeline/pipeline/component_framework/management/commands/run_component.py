@@ -22,7 +22,6 @@ from pipeline.exceptions import ComponentNotExistException
 
 
 class Command(BaseCommand):
-
     help = "Run the specified component"
 
     def add_arguments(self, parser):

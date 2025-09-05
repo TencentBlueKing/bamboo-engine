@@ -23,17 +23,17 @@ Misc variables:
 
 """
 
-from types import FunctionType
-from copyreg import dispatch_table
-from copyreg import _extension_registry, _inverted_registry, _extension_cache
-from itertools import islice
-from functools import partial
-import sys
-from sys import maxsize
-from struct import pack, unpack
-import re
-import io
 import codecs
+import io
+import re
+import sys
+from copyreg import _extension_cache, _extension_registry, _inverted_registry, dispatch_table
+from functools import partial
+from itertools import islice
+from struct import pack, unpack
+from sys import maxsize
+from types import FunctionType
+
 import _compat_pickle
 
 __all__ = ["PickleError", "PicklingError", "UnpicklingError", "Pickler", "Unpickler", "dump", "dumps", "load", "loads"]
@@ -192,7 +192,6 @@ __all__.extend([x for x in dir() if re.match("[A-Z][A-Z0-9_]+$", x)])
 
 
 class _Framer:
-
     _FRAME_SIZE_TARGET = 64 * 1024
 
     def __init__(self, file_write):

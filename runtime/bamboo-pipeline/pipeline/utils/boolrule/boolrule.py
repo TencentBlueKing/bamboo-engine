@@ -65,7 +65,6 @@ class SubstituteVal(object):
 
 
 def get_bool_expression():
-
     # Grammar definition
     # match gcloud's variable
     identifier = Combine(Optional("${") + Optional("_") + Word(alphas, alphanums + "_") + Optional("}"))
@@ -196,7 +195,6 @@ class BoolRule(object):
 
     def _compile(self):
         if not self._compiled:
-
             # special case match-all query
             if self._is_match_all():
                 return
@@ -225,7 +223,6 @@ class BoolRule(object):
         passed = False
 
         for token in tokens:
-
             if not isinstance(token, ParseResults):
                 if token == "or" and passed:
                     return True

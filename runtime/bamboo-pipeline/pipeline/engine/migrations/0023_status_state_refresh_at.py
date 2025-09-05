@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0022_scheduleservice_multi_callback_enabled"),
     ]
