@@ -12,17 +12,16 @@ specific language governing permissions and limitations under the License.
 """
 import json
 
-from bamboo_engine import states
-from bamboo_engine.utils.string import unique_id
 from django.test import TestCase
-
+from pipeline.contrib.mock import api
 from pipeline.eri.imp.context import ContextMixin
 from pipeline.eri.models import ContextValue, ExecutionData, State
-from pipeline.contrib.mock import api
+
+from bamboo_engine import states
+from bamboo_engine.utils.string import unique_id
 
 
 class TestMockNodeOutPutDataBase(TestCase):
-
     def assert_exception(self, pipeline_id, node_id, context_values, message):
         result = api.update_node_outputs(pipeline_id, node_id, context_values=context_values)
         self.assertFalse(result.result)
@@ -32,9 +31,7 @@ class TestMockNodeOutPutDataBase(TestCase):
         pipeline_id = unique_id("n")
         node_id = unique_id("n")
 
-        context_values = {
-            "${code}": 2
-        }
+        context_values = {"${code}": 2}
 
         message = "update context values failed: pipeline state not exist, root_pipeline_id={}".format(pipeline_id)
         self.assert_exception(pipeline_id, node_id, context_values, message)
@@ -44,26 +41,26 @@ class TestMockNodeOutPutDataBase(TestCase):
             root_id=pipeline_id,
             parent_id=pipeline_id,
             name=states.FINISHED,
-            version=unique_id("v")
+            version=unique_id("v"),
         )
 
-        message = "update context values failed: the task of non-running state is not allowed update, " \
-                  "root_pipeline_id={}".format(pipeline_id)
+        message = (
+            "update context values failed: the task of non-running state is not allowed update, "
+            "root_pipeline_id={}".format(pipeline_id)
+        )
         self.assert_exception(pipeline_id, node_id, context_values, message)
 
         node_state = State.objects.create(
-            node_id=node_id,
-            root_id=pipeline_id,
-            parent_id=pipeline_id,
-            name=states.FINISHED,
-            version=unique_id("v")
+            node_id=node_id, root_id=pipeline_id, parent_id=pipeline_id, name=states.FINISHED, version=unique_id("v")
         )
 
         pipeline_state.name = states.RUNNING
         pipeline_state.save()
 
-        message = "update context values failed: the task of non-failed state is not allowed to update, node_id={}" \
-            .format(node_id)
+        message = "update context values failed: \
+              the task of non-failed state is not allowed to update, node_id={}".format(
+            node_id
+        )
         self.assert_exception(pipeline_id, node_id, context_values, message)
 
         node_state.name = states.FAILED
@@ -89,9 +86,7 @@ class TestMockNodeOutPutDataBase(TestCase):
             outputs_serializer=ContextMixin.JSON_SERIALIZER,
         )
 
-        api.update_node_outputs(pipeline_id, node_id, context_values={
-            "${code}": 2
-        })
+        api.update_node_outputs(pipeline_id, node_id, context_values={"${code}": 2})
 
         cv.refresh_from_db()
         ed.refresh_from_db()

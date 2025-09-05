@@ -13,24 +13,20 @@ specific language governing permissions and limitations under the License.
 
 import json
 
+from bamboo_engine import states
 from django.db import transaction
 from django.db.models import Q
+
 from pipeline.conf.default_settings import ROLLBACK_QUEUE
 from pipeline.contrib.exceptions import RollBackException
 from pipeline.contrib.rollback import constants
 from pipeline.contrib.rollback.constants import ANY, TOKEN
 from pipeline.contrib.rollback.graph import RollbackGraphHandler
-from pipeline.contrib.rollback.models import (
-    RollbackPlan,
-    RollbackSnapshot,
-    RollbackToken,
-)
+from pipeline.contrib.rollback.models import RollbackPlan, RollbackSnapshot, RollbackToken
 from pipeline.contrib.rollback.tasks import any_rollback, token_rollback
 from pipeline.core.constants import PE
 from pipeline.eri.models import Node, Process, State
 from pipeline.eri.runtime import BambooDjangoRuntime
-
-from bamboo_engine import states
 
 
 class RollbackValidator:
@@ -355,7 +351,6 @@ class TokenRollbackHandler(BaseRollbackHandler):
         return failed_skip_node_id_list
 
     def rollback(self, start_node_id, target_node_id, skip_rollback_nodes=None, **options):
-
         if skip_rollback_nodes is None:
             skip_rollback_nodes = []
 

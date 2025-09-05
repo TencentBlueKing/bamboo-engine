@@ -51,14 +51,12 @@ class ZombieProcHealer(object):
         self.doctors = doctors
 
     def heal(self):
-
         if not self.doctors:
             return
 
         proc_ids = self._get_process_ids()
 
         for proc_id in proc_ids:
-
             # get proc every time for latest state
             proc = PipelineProcess.objects.get(id=proc_id)
 

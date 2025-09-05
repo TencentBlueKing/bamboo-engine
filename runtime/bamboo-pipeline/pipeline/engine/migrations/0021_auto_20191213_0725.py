@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0020_pipelinemodel_priority"),
     ]
@@ -19,7 +18,9 @@ class Migration(migrations.Migration):
             field=models.CharField(default="", max_length=512, verbose_name="流程使用的队列名"),
         ),
         migrations.AlterField(
-            model_name="functionswitch", name="description", field=models.TextField(default="", verbose_name="功能描述"),
+            model_name="functionswitch",
+            name="description",
+            field=models.TextField(default="", verbose_name="功能描述"),
         ),
         migrations.AlterField(
             model_name="history",
@@ -64,6 +65,8 @@ class Migration(migrations.Migration):
             field=models.CharField(default="", max_length=40, verbose_name="celery 任务 ID"),
         ),
         migrations.AlterField(
-            model_name="status", name="name", field=models.CharField(default="", max_length=64, verbose_name="节点名称"),
+            model_name="status",
+            name="name",
+            field=models.CharField(default="", max_length=64, verbose_name="节点名称"),
         ),
     ]

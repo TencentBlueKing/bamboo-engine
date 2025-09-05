@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []
@@ -68,7 +67,10 @@ class Migration(migrations.Migration):
                 ("dead", models.BooleanField(default=False, verbose_name="是否已经死亡")),
                 ("last_heartbeat", models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="上次心跳时间")),
                 ("destination_id", models.CharField(default="", max_length=33, verbose_name="执行终点 ID")),
-                ("current_node_id", models.CharField(db_index=True, default="", max_length=33, verbose_name="当前节点 ID")),
+                (
+                    "current_node_id",
+                    models.CharField(db_index=True, default="", max_length=33, verbose_name="当前节点 ID"),
+                ),
                 ("root_pipeline_id", models.CharField(max_length=33, verbose_name="根流程 ID")),
                 (
                     "suspended_by",
@@ -110,7 +112,9 @@ class Migration(migrations.Migration):
                 ("version", models.CharField(max_length=33, verbose_name="状态版本")),
                 ("schedule_times", models.IntegerField(default=0, verbose_name="被调度次数")),
             ],
-            options={"unique_together": {("node_id", "version")},},
+            options={
+                "unique_together": {("node_id", "version")},
+            },
         ),
         migrations.CreateModel(
             name="LogEntry",
@@ -123,7 +127,9 @@ class Migration(migrations.Migration):
                 ("message", models.TextField(null=True, verbose_name="日志内容")),
                 ("logged_at", models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="输出时间")),
             ],
-            options={"index_together": {("node_id", "loop")},},
+            options={
+                "index_together": {("node_id", "loop")},
+            },
         ),
         migrations.CreateModel(
             name="ExecutionHistory",
@@ -141,7 +147,9 @@ class Migration(migrations.Migration):
                 ("inputs", models.TextField(verbose_name="节点执行输入数据")),
                 ("outputs", models.TextField(verbose_name="节点执行输出数据")),
             ],
-            options={"index_together": {("node_id", "loop")},},
+            options={
+                "index_together": {("node_id", "loop")},
+            },
         ),
         migrations.CreateModel(
             name="ContextValue",
@@ -155,6 +163,8 @@ class Migration(migrations.Migration):
                 ("value", models.TextField(verbose_name="变量值")),
                 ("references", models.TextField(verbose_name="所有对其他变量直接或间接的引用")),
             ],
-            options={"unique_together": {("pipeline_id", "key")},},
+            options={
+                "unique_together": {("pipeline_id", "key")},
+            },
         ),
     ]

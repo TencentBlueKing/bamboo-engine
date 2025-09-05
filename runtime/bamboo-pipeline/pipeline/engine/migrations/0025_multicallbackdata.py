@@ -3,11 +3,11 @@
 from __future__ import unicode_literals
 
 from django.db import migrations, models
+
 import pipeline.engine.models.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0024_auto_20200224_0308"),
     ]

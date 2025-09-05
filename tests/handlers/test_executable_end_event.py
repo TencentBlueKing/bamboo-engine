@@ -15,13 +15,7 @@ import pytest
 from mock import MagicMock, call
 
 from bamboo_engine import states
-from bamboo_engine.eri import (
-    ProcessInfo,
-    NodeType,
-    ExecutableEndEvent,
-    ContextValue,
-    ContextValueType,
-)
+from bamboo_engine.eri import ContextValue, ContextValueType, ExecutableEndEvent, NodeType, ProcessInfo
 from bamboo_engine.eri.models.interrupt import ExecuteInterruptPoint
 from bamboo_engine.handlers.executable_end_event import ExecutableEndEventHandler
 
@@ -60,7 +54,6 @@ def node():
     ],
 )
 def test_executable_end_event_handler__event_execute_error(pi, node, recover_point):
-
     event = MagicMock()
     event.execute = MagicMock(side_effect=Exception)
 
@@ -101,7 +94,6 @@ def test_executable_end_event_handler__event_execute_error(pi, node, recover_poi
     ],
 )
 def test_executable_end_event_handler__event_execute_success(pi, node, recover_point):
-
     event = MagicMock()
     event.execute = MagicMock()
 

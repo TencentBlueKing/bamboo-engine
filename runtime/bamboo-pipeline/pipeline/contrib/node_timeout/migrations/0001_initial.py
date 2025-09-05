@@ -4,36 +4,37 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='TimeoutNodesRecord',
+            name="TimeoutNodesRecord",
             fields=[
-                ('id', models.BigAutoField(primary_key=True, serialize=False, verbose_name='ID')),
-                ('timeout_nodes', models.TextField(verbose_name='超时节点信息')),
+                ("id", models.BigAutoField(primary_key=True, serialize=False, verbose_name="ID")),
+                ("timeout_nodes", models.TextField(verbose_name="超时节点信息")),
             ],
             options={
-                'verbose_name': '超时节点数据记录 TimeoutNodesRecord',
-                'verbose_name_plural': '超时节点数据记录 TimeoutNodesRecord',
+                "verbose_name": "超时节点数据记录 TimeoutNodesRecord",
+                "verbose_name_plural": "超时节点数据记录 TimeoutNodesRecord",
             },
         ),
         migrations.CreateModel(
-            name='TimeoutNodeConfig',
+            name="TimeoutNodeConfig",
             fields=[
-                ('root_pipeline_id', models.CharField(max_length=64, verbose_name='root pipeline id')),
-                ('action', models.CharField(max_length=32, verbose_name='action')),
-                ('node_id', models.CharField(max_length=64, primary_key=True, serialize=False, verbose_name='task node id')),
-                ('timeout', models.IntegerField(verbose_name='node timeout time')),
+                ("root_pipeline_id", models.CharField(max_length=64, verbose_name="root pipeline id")),
+                ("action", models.CharField(max_length=32, verbose_name="action")),
+                (
+                    "node_id",
+                    models.CharField(max_length=64, primary_key=True, serialize=False, verbose_name="task node id"),
+                ),
+                ("timeout", models.IntegerField(verbose_name="node timeout time")),
             ],
             options={
-                'verbose_name': '节点超时配置 TimeoutNodeConfig',
-                'verbose_name_plural': '节点超时配置 TimeoutNodeConfig',
-                'index_together': {('root_pipeline_id', 'node_id')},
+                "verbose_name": "节点超时配置 TimeoutNodeConfig",
+                "verbose_name_plural": "节点超时配置 TimeoutNodeConfig",
+                "index_together": {("root_pipeline_id", "node_id")},
             },
         ),
     ]

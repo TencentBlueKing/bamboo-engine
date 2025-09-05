@@ -15,7 +15,6 @@ from __future__ import absolute_import, unicode_literals
 from optparse import make_option as Option
 
 from celery.bin import celery
-
 from pipeline.management.commands.app import app
 from pipeline.management.commands.base import CeleryCommand
 
@@ -41,4 +40,6 @@ class Command(CeleryCommand):
 
     def run_from_argv(self, argv):
         argv = self.handle_default_options(argv)
-        base.execute_from_commandline(["{0[0]} {0[1]}".format(argv)] + argv[2:],)
+        base.execute_from_commandline(
+            ["{0[0]} {0[1]}".format(argv)] + argv[2:],
+        )

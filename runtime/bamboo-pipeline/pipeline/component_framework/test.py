@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from mock import MagicMock, call, patch
 
 from pipeline.core.data.base import DataObject
-from pipeline.core.flow.io import SimpleItemSchema, ArrayItemSchema, ObjectItemSchema, ItemSchema
+from pipeline.core.flow.io import ArrayItemSchema, ItemSchema, ObjectItemSchema, SimpleItemSchema
 from pipeline.utils.uniqid import uniqid
 
 
@@ -108,7 +108,6 @@ class ComponentTestMixin(object):
         )
 
     def _do_case_assert(self, service, method, assertion, no, name, args=None, kwargs=None):
-
         args = args or [service]
         kwargs = kwargs or {}
 
@@ -186,11 +185,9 @@ class ComponentTestMixin(object):
 
         for no, case in enumerate(self._cases):
             try:
-
                 patchers = [patcher.mock_patcher() for patcher in case.patchers]
 
                 with patch_context(patchers):
-
                     bound_service = component.service()
 
                     setattr(bound_service, "root_pipeline_id", case.root_pipeline_id)
@@ -218,7 +215,6 @@ class ComponentTestMixin(object):
                         continue
 
                     if bound_service.need_schedule():
-
                         if bound_service.interval is None:
                             # callback case
                             self._do_case_assert(

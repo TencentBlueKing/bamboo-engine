@@ -45,7 +45,6 @@ def run_loop(process):
     """
     with runtime_exception_handler(process):
         while True:
-
             current_node = process.top_pipeline.node(process.current_node_id)
             celery_logger.info(
                 "[pipeline-trace](root_pipeline: %s) execute node %s" % (process.root_pipeline_id, current_node.id)

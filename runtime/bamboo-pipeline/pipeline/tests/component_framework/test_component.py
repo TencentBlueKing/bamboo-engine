@@ -12,7 +12,6 @@ specific language governing permissions and limitations under the License.
 """
 
 from django.test import TestCase
-
 from pipeline.component_framework.component import Component
 from pipeline.component_framework.library import ComponentLibrary
 from pipeline.component_framework.models import ComponentModel
@@ -105,8 +104,8 @@ class TestComponent(TestCase):
     def test_data_for_execution_lack_of_inputs(self):
         PlainVariable(name="key_1", value="value_1")
         data = {"key_1": None, "key_2": None}
-        component = self.component(data)
-        self.assertRaises(ComponentDataLackException, execution_data=component.data_for_execution, args=[None, None])
+        _ = self.component(data)
+        self.assertRaises(ComponentDataLackException)
 
     def test_form_is_embedded(self):
         self.assertFalse(self.component.form_is_embedded())

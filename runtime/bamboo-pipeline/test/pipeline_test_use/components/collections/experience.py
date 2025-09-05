@@ -8,7 +8,6 @@ from pipeline.core.flow.activity import Service, StaticIntervalGenerator
 
 class TheService(Service):
     def execute(self, data, parent_data):
-
         if data.inputs.get("fail", False):
             return False
 
@@ -26,7 +25,7 @@ class TheService(Service):
 
 
 class TheComponent(Component):
-    name = u"the component"
+    name = "the component"
     code = "the_component"
     bound_service = TheService
 
@@ -36,7 +35,6 @@ class TheScheduleService(Service):
     interval = StaticIntervalGenerator(1)
 
     def execute(self, data, parent_data):
-
         if data.inputs.get("fail", False):
             return False
 
@@ -50,7 +48,6 @@ class TheScheduleService(Service):
         return True
 
     def schedule(self, data, parent_data, callback_data=None):
-
         if data.inputs.get("schedule_fail", False):
             return False
 
@@ -67,7 +64,7 @@ class TheScheduleService(Service):
 
 
 class TheScheduleComponent(Component):
-    name = u"the schedule component"
+    name = "the schedule component"
     code = "the_schedule_component"
     bound_service = TheScheduleService
 
@@ -93,7 +90,6 @@ class TheCallbackService(Service):
         return True
 
     def schedule(self, data, parent_data, callback_data=None):
-
         if not callback_data:
             return False
 
@@ -143,7 +139,6 @@ class TheCallAssertionService(Service):
     interval = StaticIntervalGenerator(1)
 
     def execute(self, data, parent_data):
-
         if data.inputs.get("e_call_1", False):
             need_patch_1()
 
@@ -153,7 +148,6 @@ class TheCallAssertionService(Service):
         return True
 
     def schedule(self, data, parent_data, callback_data=None):
-
         if data.inputs.get("s_call_1", False):
             need_patch_1()
 

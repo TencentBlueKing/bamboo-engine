@@ -13,8 +13,9 @@ specific language governing permissions and limitations under the License.
 
 import ujson as json
 from django.db import models
-from django.utils.translation import ugettext_lazy as _
-
+from django.utils.translation import gettext_lazy as _
+from django_celery_beat.models import CrontabSchedule as DjangoCeleryBeatCrontabSchedule
+from django_celery_beat.models import PeriodicTask as DjangoCeleryBeatPeriodicTask
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY
 from pipeline.contrib.periodic_task.signals import periodic_task_start_failed
 from pipeline.exceptions import InvalidOperationException
@@ -25,12 +26,8 @@ from pipeline.models import (
     Snapshot,
 )
 from pipeline.utils.uniqid import uniqid
-from django_celery_beat.models import (
-    PeriodicTask as DjangoCeleryBeatPeriodicTask,
-    CrontabSchedule as DjangoCeleryBeatCrontabSchedule,
-)
 
-from pipeline.contrib.periodic_task.djcelery.models import *  # noqa
+from pipeline.contrib.periodic_task.djcelery.models import *  # noqa # isort: skip
 
 BAMBOO_ENGINE_TRIGGER_TASK = "pipeline.contrib.periodic_task.tasks.bamboo_engine_periodic_task_start"
 
@@ -97,10 +94,16 @@ class PeriodicTask(models.Model):
     )
     cron = models.CharField(_("调度策略"), max_length=128)
     celery_task = models.ForeignKey(
-        DjangoCeleryBeatPeriodicTask, verbose_name=_("celery 周期任务实例"), null=True, on_delete=models.SET_NULL,
+        DjangoCeleryBeatPeriodicTask,
+        verbose_name=_("celery 周期任务实例"),
+        null=True,
+        on_delete=models.SET_NULL,
     )
     snapshot = models.ForeignKey(
-        Snapshot, related_name="periodic_tasks", verbose_name=_("用于创建流程实例的结构数据"), on_delete=models.DO_NOTHING,
+        Snapshot,
+        related_name="periodic_tasks",
+        verbose_name=_("用于创建流程实例的结构数据"),
+        on_delete=models.DO_NOTHING,
     )
     total_run_count = models.PositiveIntegerField(_("执行次数"), default=0)
     last_run_at = models.DateTimeField(_("上次运行时间"), null=True)
@@ -190,7 +193,11 @@ class PeriodicTaskHistoryManager(models.Manager):
 
 class PeriodicTaskHistory(models.Model):
     periodic_task = models.ForeignKey(
-        PeriodicTask, related_name="instance_rel", verbose_name=_("周期任务"), null=True, on_delete=models.DO_NOTHING,
+        PeriodicTask,
+        related_name="instance_rel",
+        verbose_name=_("周期任务"),
+        null=True,
+        on_delete=models.DO_NOTHING,
     )
     pipeline_instance = models.ForeignKey(
         PipelineInstance,

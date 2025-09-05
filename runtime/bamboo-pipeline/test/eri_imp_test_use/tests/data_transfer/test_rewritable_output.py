@@ -2,6 +2,7 @@
 
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
@@ -34,8 +35,6 @@ def test_rewrite_output():
     runtime = BambooDjangoRuntime()
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     assert_all_finish([pipeline["id"]])
 

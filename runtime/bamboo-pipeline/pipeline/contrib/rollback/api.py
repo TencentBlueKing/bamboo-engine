@@ -22,7 +22,7 @@ def rollback(
     target_node_id: str,
     skip_rollback_nodes: list = None,
     mode: str = TOKEN,
-    **options
+    **options,
 ):
     """
     :param root_pipeline_id: pipeline id

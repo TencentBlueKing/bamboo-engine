@@ -6,13 +6,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline_external_plugins", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name="s3source", name="source_dir", field=models.TextField(default="", verbose_name="源目录名"),
+            model_name="s3source",
+            name="source_dir",
+            field=models.TextField(default="", verbose_name="源目录名"),
         ),
     ]

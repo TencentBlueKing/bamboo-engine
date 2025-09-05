@@ -16,13 +16,15 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0008_auto_20180824_1115"),
     ]
 
     operations = [
-        migrations.RemoveField(model_name="templaterelationship", name="refer_sum",),
+        migrations.RemoveField(
+            model_name="templaterelationship",
+            name="refer_sum",
+        ),
         migrations.AddField(
             model_name="templaterelationship",
             name="subprocess_node_id",

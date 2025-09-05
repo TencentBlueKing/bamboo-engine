@@ -12,8 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 from django.contrib import admin
-from django.utils.translation import ugettext_lazy as _
-
+from django.utils.translation import gettext_lazy as _
 from pipeline.engine import models
 from pipeline.engine.conf.function_switch import FREEZE_ENGINE
 from pipeline.engine.core import api

@@ -27,7 +27,7 @@ class ServiceActivity(Element):
         skippable=True,
         retryable=True,
         *args,
-        **kwargs
+        **kwargs,
     ):
         self.component = FancyDict({"code": component_code, "inputs": FancyDict({})})
         self.failure_handler = (
@@ -61,7 +61,7 @@ class SubProcess(Element):
         replace_id=False,
         template_id=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         self.start = start
         self.data = data

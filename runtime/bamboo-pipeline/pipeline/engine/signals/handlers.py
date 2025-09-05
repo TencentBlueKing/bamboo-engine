@@ -11,11 +11,11 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import logging
 import contextlib
+import logging
 
 from pipeline.celery.settings import QueueResolver
-from pipeline.engine import tasks, exceptions
+from pipeline.engine import exceptions, tasks
 from pipeline.engine.models import (
     NodeCeleryTask,
     PipelineModel,
@@ -65,7 +65,9 @@ def pipeline_ready_handler(sender, process_id, **kwargs):
 
     with celery_task_send_fail_pass():
         ProcessCeleryTask.objects.start_task(
-            process_id=process_id, task=task, kwargs={"args": [process_id], **args_resolver.resolve_args(task)},
+            process_id=process_id,
+            task=task,
+            kwargs={"args": [process_id], **args_resolver.resolve_args(task)},
         )
 
 
@@ -79,12 +81,13 @@ def child_process_ready_handler(sender, child_id, **kwargs):
 
     with celery_task_send_fail_pass():
         ProcessCeleryTask.objects.start_task(
-            process_id=child_id, task=task, kwargs={"args": [child_id], **args_resolver.resolve_args(task)},
+            process_id=child_id,
+            task=task,
+            kwargs={"args": [child_id], **args_resolver.resolve_args(task)},
         )
 
 
 def process_ready_handler(sender, process_id, current_node_id=None, call_from_child=False, **kwargs):
-
     task = tasks.process_wake_up
     args_resolver = CeleryTaskArgsResolver(process_id)
 
@@ -97,7 +100,6 @@ def process_ready_handler(sender, process_id, current_node_id=None, call_from_ch
 
 
 def batch_process_ready_handler(sender, process_id_list, pipeline_id, **kwargs):
-
     task = tasks.batch_wake_up
     task_args = PipelineModel.objects.task_args_for_pipeline(pipeline_id)
     priority = task_args["priority"]
@@ -112,13 +114,15 @@ def batch_process_ready_handler(sender, process_id_list, pipeline_id, **kwargs):
 
     with celery_task_send_fail_pass():
         with SendFailedCeleryTask.watch(
-            name=task.name, kwargs=kwargs, type=SendFailedCeleryTask.TASK_TYPE_EMPTY, extra_kwargs={},
+            name=task.name,
+            kwargs=kwargs,
+            type=SendFailedCeleryTask.TASK_TYPE_EMPTY,
+            extra_kwargs={},
         ):
             task.apply_async(**kwargs)
 
 
 def wake_from_schedule_handler(sender, process_id, activity_id, **kwargs):
-
     task = tasks.wake_from_schedule
     args_resolver = CeleryTaskArgsResolver(process_id)
 
@@ -136,7 +140,9 @@ def process_unfreeze_handler(sender, process_id, **kwargs):
 
     with celery_task_send_fail_pass():
         ProcessCeleryTask.objects.start_task(
-            process_id=process_id, task=task, kwargs={"args": [process_id], **args_resolver.resolve_args(task)},
+            process_id=process_id,
+            task=task,
+            kwargs={"args": [process_id], **args_resolver.resolve_args(task)},
         )
 
 

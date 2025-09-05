@@ -7,14 +7,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
       - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v1.13
+        uses: JRubics/poetry-publish@v2.0
         with:
-          python_version: "3.7"
-          poetry_version: "==1.2.1"
+          python_version: "3.12"
+          poetry_version: "==2.0.0"
           ignore_dev_requirements: "yes"
           repository_name: "bamboo-engine"
           pypi_token: ${{ secrets.ENGINE_PYPI_TOKEN }}

@@ -12,15 +12,18 @@ specific language governing permissions and limitations under the License.
 """
 
 
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0003_auto_20180717_1148"),
     ]
 
     operations = [
-        migrations.RenameField(model_name="pipelineprocess", old_name="is_froze", new_name="is_frozen",),
+        migrations.RenameField(
+            model_name="pipelineprocess",
+            old_name="is_froze",
+            new_name="is_frozen",
+        ),
     ]

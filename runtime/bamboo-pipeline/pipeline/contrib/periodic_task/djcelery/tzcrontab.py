@@ -27,7 +27,14 @@ class TzAwareCrontab(schedules.crontab):
     """Timezone Aware Crontab."""
 
     def __init__(
-        self, minute="*", hour="*", day_of_week="*", day_of_month="*", month_of_year="*", tz=pytz.utc, app=None,
+        self,
+        minute="*",
+        hour="*",
+        day_of_week="*",
+        day_of_month="*",
+        month_of_year="*",
+        tz=pytz.utc,
+        app=None,
     ):
         """Overwrite Crontab constructor to include a timezone argument."""
         self.tz = tz

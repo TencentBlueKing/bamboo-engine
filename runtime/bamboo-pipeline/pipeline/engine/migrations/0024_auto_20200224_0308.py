@@ -8,7 +8,6 @@ import pipeline.engine.models.fields
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("engine", "0023_status_state_refresh_at"),
     ]

@@ -18,12 +18,11 @@ from celery import schedules
 from django.core.exceptions import MultipleObjectsReturned, ValidationError
 from django.db import models
 from django.db.models import signals
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from pipeline.contrib.periodic_task.djcelery import managers
+from pipeline.contrib.periodic_task.djcelery.compat import python_2_unicode_compatible
 from pipeline.contrib.periodic_task.djcelery.tzcrontab import TzAwareCrontab
 from pipeline.contrib.periodic_task.djcelery.utils import now
-from pipeline.contrib.periodic_task.djcelery.compat import python_2_unicode_compatible
-
 
 PERIOD_CHOICES = (
     ("days", _("Days")),
@@ -37,7 +36,11 @@ PERIOD_CHOICES = (
 @python_2_unicode_compatible
 class IntervalSchedule(models.Model):
     every = models.IntegerField(_("every"), null=False)
-    period = models.CharField(_("period"), max_length=24, choices=PERIOD_CHOICES,)
+    period = models.CharField(
+        _("period"),
+        max_length=24,
+        choices=PERIOD_CHOICES,
+    )
 
     class Meta:
         verbose_name = _("interval")
@@ -77,9 +80,21 @@ def cronexp(field):
 class CrontabSchedule(models.Model):
     minute = models.CharField(_("minute"), max_length=64, default="*")
     hour = models.CharField(_("hour"), max_length=64, default="*")
-    day_of_week = models.CharField(_("day of week"), max_length=64, default="*",)
-    day_of_month = models.CharField(_("day of month"), max_length=64, default="*",)
-    month_of_year = models.CharField(_("month of year"), max_length=64, default="*",)
+    day_of_week = models.CharField(
+        _("day of week"),
+        max_length=64,
+        default="*",
+    )
+    day_of_month = models.CharField(
+        _("day of month"),
+        max_length=64,
+        default="*",
+    )
+    month_of_year = models.CharField(
+        _("month of year"),
+        max_length=64,
+        default="*",
+    )
     timezone = timezone_field.TimeZoneField(default="UTC")
 
     class Meta:
@@ -147,10 +162,19 @@ class DjCeleryPeriodicTasks(models.Model):
 
 @python_2_unicode_compatible
 class DjCeleryPeriodicTask(models.Model):
-    name = models.CharField(_("name"), max_length=200, unique=True, help_text=_("Useful description"),)
+    name = models.CharField(
+        _("name"),
+        max_length=200,
+        unique=True,
+        help_text=_("Useful description"),
+    )
     task = models.CharField(_("task name"), max_length=200)
     interval = models.ForeignKey(
-        IntervalSchedule, null=True, blank=True, verbose_name=_("interval"), on_delete=models.CASCADE,
+        IntervalSchedule,
+        null=True,
+        blank=True,
+        verbose_name=_("interval"),
+        on_delete=models.CASCADE,
     )
     crontab = models.ForeignKey(
         CrontabSchedule,
@@ -160,19 +184,60 @@ class DjCeleryPeriodicTask(models.Model):
         on_delete=models.CASCADE,
         help_text=_("Use one of interval/crontab"),
     )
-    args = models.TextField(_("Arguments"), blank=True, default="[]", help_text=_("JSON encoded positional arguments"),)
+    args = models.TextField(
+        _("Arguments"),
+        blank=True,
+        default="[]",
+        help_text=_("JSON encoded positional arguments"),
+    )
     kwargs = models.TextField(
-        _("Keyword arguments"), blank=True, default="{}", help_text=_("JSON encoded keyword arguments"),
+        _("Keyword arguments"),
+        blank=True,
+        default="{}",
+        help_text=_("JSON encoded keyword arguments"),
     )
     queue = models.CharField(
-        _("queue"), max_length=200, blank=True, null=True, default=None, help_text=_("Queue defined in CELERY_QUEUES"),
+        _("queue"),
+        max_length=200,
+        blank=True,
+        null=True,
+        default=None,
+        help_text=_("Queue defined in CELERY_QUEUES"),
     )
-    exchange = models.CharField(_("exchange"), max_length=200, blank=True, null=True, default=None,)
-    routing_key = models.CharField(_("routing key"), max_length=200, blank=True, null=True, default=None,)
-    expires = models.DateTimeField(_("expires"), blank=True, null=True,)
-    enabled = models.BooleanField(_("enabled"), default=True,)
-    last_run_at = models.DateTimeField(auto_now=False, auto_now_add=False, editable=False, blank=True, null=True,)
-    total_run_count = models.PositiveIntegerField(default=0, editable=False,)
+    exchange = models.CharField(
+        _("exchange"),
+        max_length=200,
+        blank=True,
+        null=True,
+        default=None,
+    )
+    routing_key = models.CharField(
+        _("routing key"),
+        max_length=200,
+        blank=True,
+        null=True,
+        default=None,
+    )
+    expires = models.DateTimeField(
+        _("expires"),
+        blank=True,
+        null=True,
+    )
+    enabled = models.BooleanField(
+        _("enabled"),
+        default=True,
+    )
+    last_run_at = models.DateTimeField(
+        auto_now=False,
+        auto_now_add=False,
+        editable=False,
+        blank=True,
+        null=True,
+    )
+    total_run_count = models.PositiveIntegerField(
+        default=0,
+        editable=False,
+    )
     date_changed = models.DateTimeField(auto_now=True)
     description = models.TextField(_("description"), blank=True)
 

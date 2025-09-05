@@ -14,7 +14,6 @@ specific language governing permissions and limitations under the License.
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-
 from pipeline.core.constants import PE
 from pipeline.core.pipeline import Pipeline
 from pipeline.engine.signals import pipeline_end, pipeline_revoke
@@ -55,9 +54,7 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
             version = sp.get("version") or PipelineTemplate.objects.get(template_id=sp["template_id"]).version
             always_use_latest = sp.get("always_use_latest", False)
 
-            template_scheme_dict.update({
-                sp["template_id"]: sp.get("scheme_id_list", [])
-            })
+            template_scheme_dict.update({sp["template_id"]: sp.get("scheme_id_list", [])})
 
             rs.append(
                 TemplateRelationship(
@@ -65,7 +62,7 @@ def pipeline_template_post_save_handler(sender, instance, created, **kwargs):
                     descendant_template_id=sp["template_id"],
                     subprocess_node_id=sp["id"],
                     version=version,
-                    always_use_latest=always_use_latest
+                    always_use_latest=always_use_latest,
                 )
             )
         if rs:

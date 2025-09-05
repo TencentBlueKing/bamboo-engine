@@ -15,7 +15,7 @@ import os
 import sys
 
 from django.core.management import base, call_command
-from django.template import Template, Context
+from django.template import Context, Template
 
 from pipeline.templates.create_plugins_app import js_file, plugins, py_file
 
@@ -41,7 +41,6 @@ class Command(base.BaseCommand):
         parser.add_argument("app_name", nargs=1, type=str)
 
     def handle(self, *args, **options):
-
         app_name = options["app_name"][0]
         if os.path.isdir(app_name):
             sys.stdout.write("the directory [%s] already exists, please try another name.\n")

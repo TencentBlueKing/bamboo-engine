@@ -21,17 +21,17 @@ import ujson as json
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from pipeline.conf import settings
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY
 from pipeline.core.constants import PE
-from pipeline.signals import post_pipeline_finish, post_pipeline_revoke
 from pipeline.engine.utils import ActionResult, calculate_elapsed_time
 from pipeline.exceptions import SubprocessRefError
 from pipeline.parser.context import get_pipeline_context
 from pipeline.parser.utils import replace_all_id
 from pipeline.service import task_service
+from pipeline.signals import post_pipeline_finish, post_pipeline_revoke
 from pipeline.utils.graph import Graph
 from pipeline.utils.uniqid import node_uniqid, uniqid
 
@@ -514,7 +514,9 @@ class TemplateScheme(models.Model):
     edit_time = models.DateTimeField(_("修改时间"), auto_now=True)
     data = CompressJSONField(verbose_name=_("方案数据"))
 
-    subprocess_scheme_relation = models.ManyToManyField(verbose_name=_("子流程节点引用执行方案的关系"), to=TemplateRelationship)
+    subprocess_scheme_relation = models.ManyToManyField(
+        verbose_name=_("子流程节点引用执行方案的关系"), to=TemplateRelationship
+    )
 
 
 class InstanceManager(models.Manager):

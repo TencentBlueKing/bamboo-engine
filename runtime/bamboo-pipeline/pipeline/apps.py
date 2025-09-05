@@ -11,14 +11,15 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import sys
 import logging
+import sys
 import traceback
 
 import redis
 from django.apps import AppConfig
 from django.conf import settings
 from redis.sentinel import Sentinel
+
 try:
     from redis.cluster import RedisCluster
 except ImportError:
@@ -36,7 +37,12 @@ def get_client_through_sentinel():
         kwargs["password"] = settings.REDIS["password"]
     host = settings.REDIS["host"]
     port = settings.REDIS["port"]
-    sentinels = list(zip([h.strip() for h in host.split(",")], [p.strip() for p in str(port).split(",")],))
+    sentinels = list(
+        zip(
+            [h.strip() for h in host.split(",")],
+            [p.strip() for p in str(port).split(",")],
+        )
+    )
     rs = Sentinel(sentinels, **kwargs)
     # avoid None value in settings.REDIS
     r = rs.master_for(settings.REDIS.get("service_name") or "mymaster")
@@ -81,8 +87,12 @@ class PipelineConfig(AppConfig):
     verbose_name = "Pipeline"
 
     def ready(self):
-        from pipeline.signals.handlers import pipeline_template_post_save_handler  # noqa
-        from pipeline.validators.handlers import post_new_end_event_register_handler  # noqa
+        from pipeline.signals.handlers import (  # noqa
+            pipeline_template_post_save_handler,
+        )
+        from pipeline.validators.handlers import (  # noqa
+            post_new_end_event_register_handler,
+        )
 
         # init redis pool
         if hasattr(settings, "REDIS"):

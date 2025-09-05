@@ -4,13 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("eri", "0003_logentry_version"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name="state", name="inner_loop", field=models.IntegerField(default=1, verbose_name="子流程内部循环次数"),
+            model_name="state",
+            name="inner_loop",
+            field=models.IntegerField(default=1, verbose_name="子流程内部循环次数"),
         ),
     ]

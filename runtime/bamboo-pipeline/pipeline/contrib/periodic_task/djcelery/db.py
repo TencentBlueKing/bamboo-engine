@@ -21,7 +21,6 @@ if django.VERSION < (1, 6):  # pragma: no cover
     def get_queryset(s):
         return s.get_query_set()
 
-
 else:
 
     def get_queryset(s):  # noqa
@@ -31,7 +30,6 @@ else:
 try:
     from django.db.transaction import atomic  # noqa
 except ImportError:  # pragma: no cover
-
     try:
         from django.db.transaction import Transaction  # noqa
     except ImportError:

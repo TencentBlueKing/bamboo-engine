@@ -14,7 +14,6 @@ specific language governing permissions and limitations under the License.
 import copy
 
 from django.test import TestCase
-
 from django_celery_beat.models import PeriodicTask
 from pipeline.contrib.periodic_task.models import PeriodicTask as PipelinePeriodicTask
 from pipeline.exceptions import InvalidOperationException
@@ -39,7 +38,12 @@ class PeriodicTestCase(TestCase):
 
     def create_a_task(self):
         return PipelinePeriodicTask.objects.create_task(
-            name=self.name, template=None, cron={}, data=self.data, creator=self.creator, extra_info=self.extra_info,
+            name=self.name,
+            template=None,
+            cron={},
+            data=self.data,
+            creator=self.creator,
+            extra_info=self.extra_info,
         )
 
     def test_create_task(self):

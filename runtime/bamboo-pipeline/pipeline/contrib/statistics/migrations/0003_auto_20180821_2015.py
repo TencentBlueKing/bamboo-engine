@@ -16,15 +16,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("statistics", "0002_auto_20180817_1212"),
     ]
 
     operations = [
-        migrations.RenameField(model_name="componentexecutedata", old_name="end_time", new_name="archived_time",),
-        migrations.RenameField(model_name="componentexecutedata", old_name="elapse_time", new_name="elapsed_time",),
-        migrations.RenameField(model_name="componentexecutedata", old_name="begin_time", new_name="started_time",),
+        migrations.RenameField(
+            model_name="componentexecutedata",
+            old_name="end_time",
+            new_name="archived_time",
+        ),
+        migrations.RenameField(
+            model_name="componentexecutedata",
+            old_name="elapse_time",
+            new_name="elapsed_time",
+        ),
+        migrations.RenameField(
+            model_name="componentexecutedata",
+            old_name="begin_time",
+            new_name="started_time",
+        ),
         migrations.AddField(
             model_name="componentexecutedata",
             name="is_retry",

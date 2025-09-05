@@ -116,7 +116,6 @@ class NonstandardModuleImporter(object, metaclass=ABCMeta):
             return mod
 
         except Exception:
-
             with hook_sandbox(fullname=fullname, hook=self.import_error_hook):
                 self.import_error_hook(fullname)
 

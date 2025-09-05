@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import abc
+
 try:
     from collections.abc import Mapping
 except ImportError:

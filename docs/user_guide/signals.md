@@ -8,7 +8,7 @@ pipeline runtime 提供了以下 django signal，可作为流程运行生命周�
 ### post_set_state
 
 ```python
-post_set_state = Signal(providing_args=["node_id", "to_state", "version", "root_id", "parent_id", "loop"])
+post_set_state = Signal()  # providing_args=["node_id", "to_state", "version", "root_id", "parent_id", "loop"]
 ```
 
 某个节点的状态修改后触发的信号
@@ -27,7 +27,7 @@ sender 为 `pipeline.eri.models.State`
 ### execute_interrupt
 
 ```python
-execute_interrupt = Signal(providing_args=["event"])
+execute_interrupt = Signal()  # providing_args=["event"]
 ```
 
 发生 execute 中断后触发的信号
@@ -41,7 +41,7 @@ sender 为 `bamboo_engine.eri.models.ExecuteInterruptEvent` 的实例
 ### schedule_interrupt
 
 ```python
-schedule_interrupt = Signal(providing_args=["event"])
+schedule_interrupt = Signal()  # providing_args=["event"]
 ```
 
 发生 schedule 中断后触发的信号
@@ -55,7 +55,7 @@ sender 为 `bamboo_engine.eri.models.ScheduleInterruptEvent` 的实例
 ### pre_service_execute
 
 ```python
-pre_service_execute = Signal(providing_args=["service", "data", "parent_data"])
+pre_service_execute = Signal()  # providing_args=["service", "data", "parent_data"]
 ```
 
 ServiceActivity 对应的 Service execute 前触发的信号
@@ -71,7 +71,7 @@ sender 为 `pipeline.eri.imp.service.ServiceWrapper`
 ### pre_service_schedule
 
 ```python
-pre_service_schedule = Signal(providing_args=["service", "data", "parent_data", "callback_data"])
+pre_service_schedule = Signal()  # providing_args=["service", "data", "parent_data", "callback_data"]
 ```
 
 ServiceActivity 对应的 Service schedule 前触发的信号

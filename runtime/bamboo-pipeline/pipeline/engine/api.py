@@ -18,12 +18,18 @@ import traceback
 
 from celery import current_app
 from django.db import transaction
-from redis.exceptions import ConnectionError as RedisConnectionError
-
 from pipeline.celery.queues import ScalableQueues
-from pipeline.constants import PIPELINE_DEFAULT_PRIORITY, PIPELINE_MAX_PRIORITY, PIPELINE_MIN_PRIORITY
+from pipeline.constants import (
+    PIPELINE_DEFAULT_PRIORITY,
+    PIPELINE_MAX_PRIORITY,
+    PIPELINE_MIN_PRIORITY,
+)
 from pipeline.core.flow.activity import ServiceActivity
-from pipeline.core.flow.gateway import ExclusiveGateway, ParallelGateway, ConditionalParallelGateway
+from pipeline.core.flow.gateway import (
+    ConditionalParallelGateway,
+    ExclusiveGateway,
+    ParallelGateway,
+)
 from pipeline.engine import exceptions, states
 from pipeline.engine.core.api import workers
 from pipeline.engine.models import (
@@ -43,6 +49,7 @@ from pipeline.engine.signals import pipeline_revoke
 from pipeline.engine.utils import ActionResult, calculate_elapsed_time
 from pipeline.exceptions import PipelineException
 from pipeline.utils import uniqid
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 logger = logging.getLogger("celery")
 
@@ -443,7 +450,7 @@ def get_status_tree(node_id, max_depth=1):
         status_map[status["id"]] = status
 
     relationships = [(s.ancestor_id, s.descendant_id) for s in rel_qs]
-    for (parent_id, child_id) in relationships:
+    for parent_id, child_id in relationships:
         if parent_id not in status_map:
             return
 

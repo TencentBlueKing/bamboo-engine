@@ -13,7 +13,6 @@ specific language governing permissions and limitations under the License.
 
 import mock
 from django.test import TestCase
-
 from pipeline.models import PipelineTemplate
 from pipeline.signals import handlers
 
@@ -94,7 +93,7 @@ class PipelineSignalHandlerTestCase(TestCase):
             TemplateRelationship.objects.filter.assert_has_calls(
                 [
                     mock.call(ancestor_template_id="f7ec3227634c90871a4a62e02ea3c6c7"),
-                    mock.call(ancestor_template_id="f7ec3227634c90871a4a62e02ea3c6c7")
+                    mock.call(ancestor_template_id="f7ec3227634c90871a4a62e02ea3c6c7"),
                 ]
             )
             relation.templatescheme_set.add.assert_called_once_with(1, 2, 3)

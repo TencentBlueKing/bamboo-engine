@@ -12,11 +12,10 @@ specific language governing permissions and limitations under the License.
 """
 
 
-from django.db import models, migrations
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = []
 
     operations = [

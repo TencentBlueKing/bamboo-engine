@@ -259,7 +259,12 @@ def flow_valid_case():
     acts[_(5)].extend(egs[_(7)]).connect(cgs[_(3)], acts[_(8)]).to(acts[_(8)]).extend(egs[_(8)]).connect(
         acts[_(8)], acts[_(11)]
     ).to(acts[_(11)]).extend(cgs[_(3)])
-    acts[_(6)].extend(egs[_(2)]).connect(acts[_(9)], acts[_(10)],).converge(cgs[_(2)]).extend(acts[_(12)]).extend(
+    acts[_(6)].extend(egs[_(2)]).connect(
+        acts[_(9)],
+        acts[_(10)],
+    ).converge(
+        cgs[_(2)]
+    ).extend(acts[_(12)]).extend(
         egs[_(6)]
     ).connect(acts[_(6)], cgs[_(3)], cgs[_(2)]).to(egs[_(2)]).connect(acts[_(6)])
 
@@ -415,7 +420,6 @@ def flow_valid_edge_case_2():
 
 
 def flow_valid_edge_case_3():
-
     start = EmptyStartEvent()
     end = EmptyEndEvent()
     eg_1 = ExclusiveGateway(id=exclusive_gw_id(1), conditions={0: "123", 1: "456"})

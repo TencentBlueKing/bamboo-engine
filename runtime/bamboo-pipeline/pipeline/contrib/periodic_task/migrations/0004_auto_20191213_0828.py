@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("periodic_task", "0003_auto_20191213_0819"),
     ]

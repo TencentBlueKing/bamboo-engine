@@ -16,7 +16,6 @@ import logging
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
-
 from pipeline.contrib.external_plugins.utils.importer.base import (
     AutoInstallRequirementsImporter,
 )
@@ -45,11 +44,7 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
         elif not secure_only:
             logger.warning("Using not secure protocol is extremely dangerous!!")
 
-        self.service_address = (
-            service_address
-            if service_address.endswith("/")
-            else "%s/" % service_address
-        )
+        self.service_address = service_address if service_address.endswith("/") else "%s/" % service_address
         # 支持virtual_path模式，bucket形如xxx$virtual_path即判定为该模式
         bucket_partitions = bucket.split("$")
         if len(bucket_partitions) > 1 and bucket_partitions[-1] == "virtual_path":
@@ -65,11 +60,7 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
             self.bucket = bucket
             s3_config = CONFIG
             self.virtual_path = False
-        self.source_dir = (
-            source_dir
-            if source_dir == "" or source_dir.endswith("/")
-            else "%s/" % source_dir
-        )
+        self.source_dir = source_dir if source_dir == "" or source_dir.endswith("/") else "%s/" % source_dir
         self.use_cache = use_cache
         self.s3 = boto3.resource(
             "s3",
@@ -87,9 +78,7 @@ class S3ModuleImporter(AutoInstallRequirementsImporter):
         return compile(self.get_source(fullname), self.get_file(fullname), "exec")
 
     def get_source(self, fullname):
-        source_code = self._fetch_obj_content(
-            self._obj_key(fullname, is_pkg=self.is_package(fullname))
-        )
+        source_code = self._fetch_obj_content(self._obj_key(fullname, is_pkg=self.is_package(fullname)))
 
         if source_code is None:
             raise ImportError(

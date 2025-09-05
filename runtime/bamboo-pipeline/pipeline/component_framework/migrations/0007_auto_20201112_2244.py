@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("component_framework", "0006_auto_20200213_0743"),
     ]
@@ -32,5 +31,8 @@ class Migration(migrations.Migration):
             name="version",
             field=models.CharField(db_index=True, default="legacy", max_length=64, verbose_name="组件版本"),
         ),
-        migrations.AlterUniqueTogether(name="componentmodel", unique_together=set([("code", "version")]),),
+        migrations.AlterUniqueTogether(
+            name="componentmodel",
+            unique_together=set([("code", "version")]),
+        ),
     ]

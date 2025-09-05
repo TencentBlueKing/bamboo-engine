@@ -35,13 +35,7 @@ from .eri import (
 )
 from .exceptions import InvalidOperationError, NotFoundError
 from .handler import HandlerFactory
-from .interrupt import (
-    ExecuteInterrupter,
-    ExecuteKeyPoint,
-    InterruptException,
-    ScheduleInterrupter,
-    ScheduleKeyPoint,
-)
+from .interrupt import ExecuteInterrupter, ExecuteKeyPoint, InterruptException, ScheduleInterrupter, ScheduleKeyPoint
 from .local import CurrentNodeInfo, clear_node_info, set_node_info
 from .metrics import (
     ENGINE_EXECUTE_POST_PROCESS_DURATION,
@@ -95,7 +89,7 @@ class Engine:
         root_pipeline_data: Optional[dict] = None,
         root_pipeline_context: Optional[dict] = None,
         subprocess_context: Optional[dict] = None,
-        **options
+        **options,
     ):
         """
         运行流程
@@ -671,7 +665,7 @@ class Engine:
         service: Optional[Service] = None,
         callback_data: Optional[CallbackData] = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """
         Hook 分发

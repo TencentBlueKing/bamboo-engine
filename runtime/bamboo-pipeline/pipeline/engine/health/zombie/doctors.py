@@ -43,7 +43,6 @@ class RunningNodeZombieDoctor(ZombieProcDoctor):
         self.detect_wait_callback_proc = detect_wait_callback_proc
 
     def confirm(self, proc):
-
         # do not process none current node
         if not proc.current_node_id:
             logger.warning("Process({}) with current_node({}), skip".format(proc.id, proc.current_node_id))
@@ -88,7 +87,6 @@ class RunningNodeZombieDoctor(ZombieProcDoctor):
         return False
 
     def cure(self, proc):
-
         current_node_id = proc.current_node_id
 
         # try to transit current node to FAILURE

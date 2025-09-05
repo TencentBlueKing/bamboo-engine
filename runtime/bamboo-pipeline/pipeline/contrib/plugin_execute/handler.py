@@ -106,7 +106,6 @@ class PluginExecuteHandler:
 
     @classmethod
     def callback(cls, task_id: int, callback_data: dict = None):
-
         if callback_data is None:
             callback_data = {}
 
@@ -137,7 +136,6 @@ class PluginExecuteHandler:
 
     @classmethod
     def retry_node(cls, task_id: int, inputs: dict = None, contexts: dict = None, runtime_attrs: dict = None):
-
         plugin_execute_task = PluginExecuteTask.objects.get(id=task_id)
         if plugin_execute_task.state != State.FAILED:
             raise PluginExecuteException(

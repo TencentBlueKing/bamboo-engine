@@ -22,8 +22,8 @@ try:
 except ImportError:
     import djcelery
 
-from kombu.utils.encoding import str_to_bytes
 from django.core.management.base import BaseCommand
+from kombu.utils.encoding import str_to_bytes
 
 DB_SHARED_THREAD = """\
 DatabaseWrapper objects created in a thread can only \
@@ -59,7 +59,9 @@ def patch_thread_ident():
 
             def _validate_thread_sharing(self):
                 if not self.allow_thread_sharing and self._thread_ident != _get_ident():
-                    raise DatabaseError(DB_SHARED_THREAD % (self.alias, self._thread_ident, _get_ident()),)
+                    raise DatabaseError(
+                        DB_SHARED_THREAD % (self.alias, self._thread_ident, _get_ident()),
+                    )
 
             BaseDatabaseWrapper.__init__ = _init
             BaseDatabaseWrapper.validate_thread_sharing = _validate_thread_sharing
@@ -103,10 +105,14 @@ class CeleryCommand(BaseCommand):
         def get_version(self):
             try:
                 version = "celery {c.__version__}\ndjango-celery-beat {d.__version__}".format(
-                    c=celery, d=django_celery_beat,
+                    c=celery,
+                    d=django_celery_beat,
                 )
             except ImportError:
-                version = "celery {c.__version__}\ndjango-celery {d.__version__}".format(c=celery, d=djcelery,)
+                version = "celery {c.__version__}\ndjango-celery {d.__version__}".format(
+                    c=celery,
+                    d=djcelery,
+                )
             return version
 
     def execute(self, *args, **options):

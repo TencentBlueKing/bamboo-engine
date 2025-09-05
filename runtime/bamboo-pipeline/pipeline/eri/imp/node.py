@@ -13,8 +13,6 @@ specific language governing permissions and limitations under the License.
 
 import json
 
-from pipeline.eri.models import Node as DBNode
-
 from bamboo_engine import metrics
 from bamboo_engine.eri import (
     Condition,
@@ -31,6 +29,8 @@ from bamboo_engine.eri import (
     ServiceActivity,
     SubProcess,
 )
+
+from pipeline.eri.models import Node as DBNode
 
 
 class NodeMixin:
@@ -57,7 +57,7 @@ class NodeMixin:
                 code=node_detail["code"],
                 version=node_detail["version"],
                 error_ignorable=node_detail["error_ignorable"],
-                **common_args
+                **common_args,
             )
 
         elif node_type == NodeType.SubProcess.value:
@@ -70,7 +70,7 @@ class NodeMixin:
                 conditions=[Condition(**c) for c in node_detail["conditions"]],
                 default_condition=DefaultCondition(**default_condition) if default_condition else None,
                 extra_info=node_detail.get("extra_info"),
-                **common_args
+                **common_args,
             )
 
         elif node_type == NodeType.ParallelGateway.value:
@@ -86,7 +86,7 @@ class NodeMixin:
                 conditions=[Condition(**c) for c in node_detail["conditions"]],
                 default_condition=DefaultCondition(**default_condition) if default_condition else None,
                 extra_info=node_detail.get("extra_info"),
-                **common_args
+                **common_args,
             )
 
         elif node_type == NodeType.ConvergeGateway.value:

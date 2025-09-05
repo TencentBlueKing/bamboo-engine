@@ -14,5 +14,5 @@ from django.apps import AppConfig
 
 
 class EngineAdminConfig(AppConfig):
-    name = 'pipeline.contrib.engine_admin'
-    verbose_name = 'PipelineEngineAdmin'
+    name = "pipeline.contrib.engine_admin"
+    verbose_name = "PipelineEngineAdmin"

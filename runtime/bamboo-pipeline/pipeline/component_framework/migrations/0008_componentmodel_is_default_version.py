@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('component_framework', '0007_auto_20201112_2244'),
+        ("component_framework", "0007_auto_20201112_2244"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='componentmodel',
-            name='is_default_version',
-            field=models.BooleanField(default=False, verbose_name='是否是默认版本'),
+            model_name="componentmodel",
+            name="is_default_version",
+            field=models.BooleanField(default=False, verbose_name="是否是默认版本"),
         ),
     ]

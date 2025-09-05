@@ -140,7 +140,7 @@ class TestRollBackBase(TestCase):
             root_id=pipeline_id,
             parent_id=pipeline_id,
             name=states.RUNNING,
-            version=unique_id("v")
+            version=unique_id("v"),
             # noqa
         )
 
@@ -235,7 +235,7 @@ class TestRollBackBase(TestCase):
             root_id=pipeline_id,
             parent_id=pipeline_id,
             name=states.RUNNING,
-            version=unique_id("v")
+            version=unique_id("v"),
             # noqa
         )
         start_node_id = unique_id("n")

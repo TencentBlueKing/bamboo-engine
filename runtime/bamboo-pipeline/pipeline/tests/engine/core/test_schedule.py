@@ -387,15 +387,12 @@ class ScheduleTestCase(TestCase):
             mock_parent_data = MockData(get_outputs_return=parent_data_return)
 
             with mock.patch(SCHEDULE_GET_SCHEDULE_PARENT_DATA, mock.MagicMock(return_value=mock_parent_data)):
-
                 with mock.patch(PIPELINE_SCHEDULE_SERVICE_GET, mock.MagicMock(return_value=mock_ss)):
-
                     with mock.patch(PIPELINE_STATUS_GET, mock.MagicMock(return_value=mock_status)):
-
                         with mock.patch(
-                            PIPELINE_PROCESS_GET, mock.MagicMock(return_value=process),
+                            PIPELINE_PROCESS_GET,
+                            mock.MagicMock(return_value=process),
                         ):
-
                             process_id = uniqid()
 
                             schedule.schedule(process_id, mock_ss.id)
@@ -522,15 +519,12 @@ class ScheduleTestCase(TestCase):
             mock_parent_data = MockData(get_outputs_return=parent_data_return)
 
             with mock.patch(SCHEDULE_GET_SCHEDULE_PARENT_DATA, mock.MagicMock(return_value=mock_parent_data)):
-
                 with mock.patch(PIPELINE_SCHEDULE_SERVICE_GET, mock.MagicMock(return_value=mock_ss)):
-
                     with mock.patch(PIPELINE_STATUS_GET, mock.MagicMock(return_value=mock_status)):
-
                         with mock.patch(
-                            PIPELINE_PROCESS_GET, mock.MagicMock(return_value=process),
+                            PIPELINE_PROCESS_GET,
+                            mock.MagicMock(return_value=process),
                         ):
-
                             process_id = uniqid()
 
                             schedule.schedule(process_id, mock_ss.id)
@@ -625,15 +619,12 @@ class ScheduleTestCase(TestCase):
             mock_parent_data = MockData(get_outputs_return=parent_data_return)
             with mock.patch(PIPELINE_PROCESS_GET, mock.MagicMock(return_value=process)):
                 with mock.patch(SCHEDULE_GET_SCHEDULE_PARENT_DATA, mock.MagicMock(return_value=mock_parent_data)):
-
                     with mock.patch(PIPELINE_SCHEDULE_SERVICE_GET, mock.MagicMock(return_value=mock_ss)):
-
                         with mock.patch(PIPELINE_STATUS_GET, mock.MagicMock(return_value=mock_status)):
-
                             with mock.patch(
-                                PIPELINE_PROCESS_GET, mock.MagicMock(return_value=process),
+                                PIPELINE_PROCESS_GET,
+                                mock.MagicMock(return_value=process),
                             ):
-
                                 schedule.schedule(process.id, mock_ss.id)
 
                                 mock_ss.service_act.schedule.assert_called_once_with(
@@ -740,7 +731,6 @@ class ScheduleTestCase(TestCase):
 
             schedule_calls, set_schedule_data_calls = [], []
             for schedule_times in range(1, 5):
-
                 schedule.schedule(process_id, mock_ss.id)
 
                 schedule_calls.append(call(PARENT_DATA, mock_ss.callback_data))

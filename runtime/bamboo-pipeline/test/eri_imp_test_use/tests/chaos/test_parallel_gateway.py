@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
 from eri_chaos.runtime import ChoasBambooDjangoRuntime

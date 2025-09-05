@@ -79,7 +79,7 @@ def test_render():
     assert simple_dict_template.render({"a": {"a": "b"}}) == {"a": "b"}
 
     nested_dict_template = Template("${a[0][3]['a']}")
-    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1,2,3]}], [5, 6, 7, 8]]}) == [1,2,3]
+    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1, 2, 3]}], [5, 6, 7, 8]]}) == [1, 2, 3]
 
     type_error_template = Template("${a[1]}")
     assert type_error_template.render({"a": 1}) == "${a[1]}"
@@ -88,7 +88,6 @@ def test_render():
 
 
 def test_render__with_sandbox():
-
     r1 = Template("""${exec(print(''))}""").render({})
     assert r1 == """${exec(print(''))}"""
 

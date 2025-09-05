@@ -2,6 +2,7 @@
 
 from bamboo_engine.builder import *  # noqa
 from bamboo_engine.engine import Engine
+
 from pipeline.eri.runtime import BambooDjangoRuntime
 
 from ..utils import *  # noqa
@@ -19,8 +20,6 @@ def test_exclusive_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [pipeline["id"], start.id, eg.id, acts[0].id, cg.id, end.id]
     node_data_dict = {
@@ -54,8 +53,6 @@ def test_nest_exclusive_execution():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [
         pipeline["id"],
@@ -100,8 +97,6 @@ def test_template_exclusive_execution():
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    
-
     node_id_list = [pipeline["id"], start.id, eg.id, acts[0].id, cg.id, end.id]
     node_data_dict = {
         pipeline["id"]: {"inputs": {}, "outputs": {}},
@@ -131,8 +126,6 @@ def test_exclusive_execution_no_match():
     pipeline = build_tree(start)
     engine = Engine(BambooDjangoRuntime())
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
-
-    
 
     node_id_list = [start.id]
     node_data_dict = {eg.id: {"inputs": {}, "outputs": {"ex_data": "all conditions of branches are not meet"}}}

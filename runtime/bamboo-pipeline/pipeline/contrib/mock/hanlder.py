@@ -15,22 +15,20 @@ import json
 import re
 
 from django.db import transaction
-
-from pipeline.eri.models import State
+from pipeline.contrib.exceptions import UpdatePipelineContextException
 from pipeline.eri.models import ContextValue
 from pipeline.eri.models import ExecutionData as DBExecutionData
-from bamboo_engine import states, api
-from bamboo_engine.eri import ContextValue as ContextValueInfo, ContextValueType
-
-from pipeline.contrib.exceptions import UpdatePipelineContextException
-
+from pipeline.eri.models import State
 from pipeline.eri.runtime import BambooDjangoRuntime
+
+from bamboo_engine import api, states
+from bamboo_engine.eri import ContextValue as ContextValueInfo
+from bamboo_engine.eri import ContextValueType
 
 FORMATTED_KEY_PATTERN = re.compile(r"^\${(.*?)}$")
 
 
 class MockHandler:
-
     def __init__(self, root_pipeline_id, node_id, context_values):
         self.root_pipeline_id = root_pipeline_id
         self.node_id = node_id
@@ -51,37 +49,49 @@ class MockHandler:
         if not pipeline_state:
             raise UpdatePipelineContextException(
                 "update context values failed: pipeline state not exist, root_pipeline_id={}".format(
-                    self.root_pipeline_id))
+                    self.root_pipeline_id
+                )
+            )
 
         if pipeline_state.name != states.RUNNING:
             raise UpdatePipelineContextException(
                 "update context values failed: the task of non-running state is not allowed update, "
-                "root_pipeline_id={}".format(self.root_pipeline_id))
+                "root_pipeline_id={}".format(self.root_pipeline_id)
+            )
 
         node_state = State.objects.filter(node_id=self.node_id).first()
         if not node_state:
             raise UpdatePipelineContextException(
-                "update context values failed: node state not exist, root_pipeline_id={}".format(self.root_pipeline_id))
+                "update context values failed: node state not exist, root_pipeline_id={}".format(self.root_pipeline_id)
+            )
 
         if node_state.name != states.FAILED:
             raise UpdatePipelineContextException(
-                "update context values failed: the task of non-failed state is not allowed to update, node_id={}"
-                .format(self.node_id))
+                "update context values failed: \
+              the task of non-failed state is not allowed to update, node_id={}".format(
+                    self.node_id
+                )
+            )
 
         if "${_system}" in self.context_values.keys():
             raise UpdatePipelineContextException("${_system} is built-in variable that is not allowed to be updated")
 
         # 获取流程内满足上下文的key
-        context_value_queryset = ContextValue.objects.filter(pipeline_id=self.root_pipeline_id,
-                                                             key__in=self.context_values.keys())
+        context_value_queryset = ContextValue.objects.filter(
+            pipeline_id=self.root_pipeline_id, key__in=self.context_values.keys()
+        )
         context_value_list = []
 
         for context_value in context_value_queryset:
             if context_value.key in self.context_values.keys():
                 context_value_list.append(
-                    ContextValueInfo(key=context_value.key, type=ContextValueType(context_value.type),
-                                     value=self.context_values.get(context_value.key),
-                                     code=context_value.code))
+                    ContextValueInfo(
+                        key=context_value.key,
+                        type=ContextValueType(context_value.type),
+                        value=self.context_values.get(context_value.key),
+                        code=context_value.code,
+                    )
+                )
 
         with transaction.atomic():
             try:
@@ -104,4 +114,5 @@ class MockHandler:
 
             except Exception as e:
                 raise UpdatePipelineContextException(
-                    "update node outputs value failed, please check it,outputs={}, error={}".format(outputs, e))
+                    "update node outputs value failed, please check it,outputs={}, error={}".format(outputs, e)
+                )

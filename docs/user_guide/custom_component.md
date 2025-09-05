@@ -27,7 +27,25 @@ act = ServiceActivity(component_code='example_component')
 
 #### 1. 使用 APP 统一管理你的组件
 
-组件开发的最佳实践是创建一个独立的 APP，并在这个 APP 中单独管理自定义的组件和组件需要使用到的一些公共逻辑。pipeline 提供了快捷命令，能够让我们快速的创建一个用于存放自定义组件的 APP，在 Django 工程根目录下执行以下命令：
+组件开发的最佳实践是创建一个独立的 APP，并在这个 APP 中单独管理自定义的组件和组件需要使用到的一些公共逻辑。pipeline 提供了快捷命令，能够让我们快速的创建一个用于存放自定义组件的 APP。
+
+在创建独立APP前，假设已经通过django-admin命令创建了Django工程，且修改了settings.py：
+
+```python
+# 增加如下APP
+INSTALLED_APPS = [
+    ...
+    'pipeline.component_framework',
+    'pipeline.eri',
+    'pipeline',
+    'pipeline.engine',
+    ...
+]
+```
+
+
+
+接着在 Django 工程根目录下执行以下命令：
 
 ```bash
 $ python manage.py create_plugins_app custom_plugins
@@ -37,17 +55,26 @@ $ python manage.py create_plugins_app custom_plugins
 
 ```text
 custom_plugins
-├── __init__.py
+├── apps.py
 ├── components
-│   ├── __init__.py
-│   └── collections
-│       ├── __init__.py
-│       └── plugins.py
+│     ├── collections
+│     │     ├── __init__.py
+│     │     └── plugins.py
+│     └── __init__.py
+├── __init__.py
 ├── migrations
-│   └── __init__.py
-└── static
-    └── custom_plugins
-        └── plugins.js
+│     └── __init__.py
+├── static
+│     └── custom_plugins
+│         └── plugins.js
+└── tests
+    ├── components
+    │     ├── collections
+    │     │     ├── __init__.py
+    │     │     └── plugins_test
+    │     │         └── __init__.py
+    │     └── __init__.py
+    └── __init__.py
 ```
 
 别忘了把新创建的 APP 添加到 Django 配置的 `INSTALLED_APPS` 中：
@@ -236,7 +263,7 @@ class ScheduleService(Service):
 ```
 
 让我们来拆分一下这个组件服务的定义，一个周期性轮询组件服务必须包含两个类属性：
- 
+
  - `__need_schedule__`： 表示当前组件服务是否需要调度，周期性轮询的方式下必须将该字段设置为 `True`
  - `interval`：轮询间隔生成器，周期性轮询方式下该字段必须为 `AbstractIntervalGenerator` 的子类。
 

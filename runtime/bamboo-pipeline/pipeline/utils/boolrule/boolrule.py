@@ -65,7 +65,6 @@ class SubstituteVal(object):
 
 
 def get_bool_expression():
-
     # Grammar definition
     # match gcloud's variable
     identifier = Combine(Optional("${") + Optional("_") + Word(alphas, alphanums + "_") + Optional("}"))
@@ -98,7 +97,7 @@ def get_bool_expression():
         realNumber.setParseAction(lambda toks: float(toks[0]))
         | integer.setParseAction(lambda toks: int(toks[0]))
         | str_
-        | bool_.setParseAction(lambda toks: toks[0] == "true")
+        | bool_.setParseAction(lambda toks: toks[0].lower() == "true")
         | propertyPath.setParseAction(lambda toks: SubstituteVal(toks))
     )  # need to add support for alg expressions
 
@@ -196,7 +195,6 @@ class BoolRule(object):
 
     def _compile(self):
         if not self._compiled:
-
             # special case match-all query
             if self._is_match_all():
                 return
@@ -209,7 +207,7 @@ class BoolRule(object):
             self._compiled = True
 
     def _expand_val(self, val, context):
-        if type(val) == list:
+        if isinstance(val, list):
             val = [self._expand_val(v, context) for v in val]
 
         if isinstance(val, SubstituteVal):
@@ -225,7 +223,6 @@ class BoolRule(object):
         passed = False
 
         for token in tokens:
-
             if not isinstance(token, ParseResults):
                 if token == "or" and passed:
                     return True

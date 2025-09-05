@@ -14,9 +14,13 @@ specific language governing permissions and limitations under the License.
 import json
 from typing import List, Optional, Tuple
 
+from bamboo_engine import states
+from bamboo_engine.eri import ContextValueType, EngineRuntimeInterface, NodeType, interfaces
+from bamboo_engine.template import Template
 from django.conf import settings
 from django.db import transaction
 from kombu import Connection, Exchange, Queue
+
 from pipeline.eri import codec
 from pipeline.eri.celery.queues import QueueResolver
 from pipeline.eri.imp.config import ConfigMixin
@@ -33,26 +37,8 @@ from pipeline.eri.imp.rollback import RollbackMixin
 from pipeline.eri.imp.schedule import ScheduleMixin
 from pipeline.eri.imp.state import StateMixin
 from pipeline.eri.imp.task import TaskMixin
-from pipeline.eri.models import (
-    ContextOutputs,
-    ContextValue,
-    Data,
-    ExecutionHistory,
-    LogEntry,
-    Node,
-    Process,
-    State,
-)
+from pipeline.eri.models import ContextOutputs, ContextValue, Data, ExecutionHistory, LogEntry, Node, Process, State
 from pipeline.eri.utils import CONTEXT_VALUE_TYPE_MAP, caculate_final_references
-
-from bamboo_engine import states
-from bamboo_engine.eri import (
-    ContextValueType,
-    EngineRuntimeInterface,
-    NodeType,
-    interfaces,
-)
-from bamboo_engine.template import Template
 
 
 class BambooDjangoRuntime(
@@ -145,9 +131,11 @@ class BambooDjangoRuntime(
                 {
                     "id": event["id"],
                     "type": event["type"],
-                    "targets": {event["outgoing"]: pipeline["flows"][event["outgoing"]]["target"]}
-                    if event["type"] == NodeType.EmptyStartEvent.value
-                    else {},
+                    "targets": (
+                        {event["outgoing"]: pipeline["flows"][event["outgoing"]]["target"]}
+                        if event["type"] == NodeType.EmptyStartEvent.value
+                        else {}
+                    ),
                     "root_pipeline_id": root_id,
                     "parent_pipeline_id": parent_id,
                     "can_skip": event["type"] == NodeType.EmptyStartEvent.value,
@@ -268,7 +256,6 @@ class BambooDjangoRuntime(
     def _prepare(
         self, pipeline: dict, root_id: str, subprocess_context: dict, parent_id: Optional[str] = None
     ) -> Tuple[List[Node], List[Data], List[ContextValue], List[ContextOutputs]]:
-
         parent_id = parent_id or root_id
 
         nodes = []

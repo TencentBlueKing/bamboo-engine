@@ -17,7 +17,7 @@ import typing
 from typing import Any, Dict, List, Optional
 
 from django.db import models
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from pipeline.contrib.node_timer_event.types import TimeDefined
 from pipeline.contrib.node_timer_event.utils import parse_timer_defined
 from pipeline.core.constants import PE

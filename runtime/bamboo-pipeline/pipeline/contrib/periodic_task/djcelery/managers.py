@@ -18,7 +18,6 @@ from itertools import count
 from django.conf import settings
 from django.db import connection, models
 from django.db.models.query import QuerySet
-
 from pipeline.contrib.periodic_task.djcelery.db import (
     commit_on_success,
     get_queryset,
@@ -131,7 +130,8 @@ class ResultManager(ExtendedManager):
             self.get_all_expired(expires).update(hidden=True)
             cursor = self.connection_for_write().cursor()
             cursor.execute(
-                "DELETE FROM {0.db_table} WHERE hidden=%s".format(meta), (True,),
+                "DELETE FROM {0.db_table} WHERE hidden=%s".format(meta),
+                (True,),
             )
 
 

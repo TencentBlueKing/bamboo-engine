@@ -12,7 +12,6 @@ specific language governing permissions and limitations under the License.
 """
 
 from django.test import TestCase
-
 from pipeline.engine.models import ProcessCeleryTask, SendFailedCeleryTask
 
 from ..mock import *  # noqa
@@ -54,7 +53,9 @@ class TestProcessCeleryTask(TestCase):
         ProcessCeleryTask.objects.bind(process_id=process_id, celery_task_id=celery_task_id)
         ProcessCeleryTask.objects.destroy(process_id)
         self.assertRaises(
-            ProcessCeleryTask.DoesNotExist, ProcessCeleryTask.objects.get, process_id=process_id,
+            ProcessCeleryTask.DoesNotExist,
+            ProcessCeleryTask.objects.get,
+            process_id=process_id,
         )
 
     def test_start_task__record_error(self):

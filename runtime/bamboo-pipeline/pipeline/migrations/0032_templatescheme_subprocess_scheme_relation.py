@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('pipeline', '0031_auto_20210624_2317'),
+        ("pipeline", "0031_auto_20210624_2317"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='templatescheme',
-            name='subprocess_scheme_relation',
-            field=models.ManyToManyField(to='pipeline.TemplateRelationship', verbose_name='子流程节点引用执行方案的关系'),
+            model_name="templatescheme",
+            name="subprocess_scheme_relation",
+            field=models.ManyToManyField(
+                to="pipeline.TemplateRelationship", verbose_name="子流程节点引用执行方案的关系"
+            ),
         ),
     ]
