@@ -18,6 +18,7 @@ import time
 
 from django.core.management import BaseCommand
 from django.db import connections
+
 from pipeline.contrib.node_timeout.models import TimeoutNodesRecord
 from pipeline.contrib.node_timeout.settings import node_timeout_settings
 from pipeline.contrib.node_timeout.tasks import dispatch_timeout_nodes
@@ -38,7 +39,7 @@ class Command(BaseCommand):
                 start = time.time()
                 self._pop_timeout_nodes(redis_inst, nodes_pool)
                 end = time.time()
-                logger.info(f"[node_timeout_process] time consuming: {end-start}")
+                logger.info(f"[node_timeout_process] time consuming: {end - start}")
             except Exception as e:
                 logger.exception(e)
             time.sleep(1)
