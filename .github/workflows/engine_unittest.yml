@@ -10,13 +10,12 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.6, 3.7]
+        python-version: [3.6.12, 3.7.16]
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }} with pyenv
+        run: .github/scripts/setup_pyenv_python.sh ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           set -xe
