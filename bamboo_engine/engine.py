@@ -78,10 +78,30 @@ class Engine:
     """
 
     PURE_SKIP_ENABLE_NODE_TYPE = {NodeType.ServiceActivity, NodeType.EmptyStartEvent}
+    CALLBACK_LOCK_RETRY_HEADER = "callback_lock_retry_times"
+    CALLBACK_LOCK_RETRY_LIMIT = 3
 
     def __init__(self, runtime: EngineRuntimeInterface):
         self.runtime = runtime
         self._hostname = get_hostname()
+
+    def _schedule_lock_retry_count(self, headers: Optional[dict]) -> int:
+        if not headers:
+            return 0
+
+        try:
+            return int(headers.get(self.CALLBACK_LOCK_RETRY_HEADER, 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _callback_lock_retry_context(self, node_id: str, callback_data_id: Optional[int]):
+        if not callback_data_id:
+            return None, False
+
+        callback_data = self.runtime.get_callback_data(callback_data_id)
+        node = self.runtime.get_node(node_id)
+        service = self.runtime.get_service(code=node.code, version=node.version)
+        return callback_data, service.callback_lock_retryable(callback_data=callback_data.data)
 
     # api
     def run_pipeline(
@@ -993,25 +1013,52 @@ class Engine:
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
-                # only retry at multiple calback type
-                if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
+                callback_data = None
+                # only retry at multiple callback type
+                should_retry = schedule.type is ScheduleType.MULTIPLE_CALLBACK
+                if not should_retry:
+                    callback_data, should_retry = self._callback_lock_retry_context(node_id, callback_data_id)
+                    retry_count = self._schedule_lock_retry_count(headers)
+                    if should_retry and retry_count >= self.CALLBACK_LOCK_RETRY_LIMIT:
+                        logger.error(
+                            "root pipeline[%s] schedule(%s) %s with version %s callback data(%s) retry exhausted "
+                            "after %s attempts, callback_data=%s",
+                            root_pipeline_id,
+                            schedule_id,
+                            node_id,
+                            schedule.version,
+                            callback_data_id,
+                            retry_count,
+                            callback_data.data if callback_data else None,
+                        )
+                        return
+
+                if not should_retry:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, will not retry to get lock",  # noqa
+                        "root pipeline[%s] schedule(%s) %s with version %s callback data(%s) "
+                        "will not retry to get lock",
                         root_pipeline_id,
                         schedule_id,
                         node_id,
                         schedule.version,
+                        callback_data_id,
                     )
                     return
 
                 try_after = random.randint(1, 5)
+                retry_headers = dict(headers or {})
+                if schedule.type is ScheduleType.CALLBACK:
+                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = self._schedule_lock_retry_count(headers) + 1
                 logger.info(
-                    "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s",
+                    "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s, "
+                    "retry_count=%s, callback_data=%s",
                     root_pipeline_id,
                     node_id,
                     schedule_id,
                     callback_data_id,
                     try_after,
+                    retry_headers.get(self.CALLBACK_LOCK_RETRY_HEADER, 0),
+                    callback_data.data if callback_data else None,
                 )
                 self.runtime.set_next_schedule(
                     process_id=process_id,
@@ -1019,7 +1066,7 @@ class Engine:
                     schedule_id=schedule_id,
                     callback_data_id=callback_data_id,
                     schedule_after=try_after,
-                    headers=headers,
+                    headers=retry_headers,
                 )
                 return
 

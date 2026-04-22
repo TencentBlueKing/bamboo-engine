@@ -10,18 +10,16 @@ jobs:
 
     strategy:
       matrix:
-        python-version: [3.6, 3.7]
+        python-version: [3.6.12, 3.7.16]
 
     steps:
     - uses: actions/checkout@v2
-    - name: Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
+    - name: Set up Python ${{ matrix.python-version }} with pyenv
+      run: .github/scripts/setup_pyenv_python.sh ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black
+        pip install flake8==4.0.1 black==20.8b1
     - name: Lint with flake8
       run: |
         cd runtime/bamboo-pipeline

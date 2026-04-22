@@ -101,6 +101,9 @@ class Service(object, metaclass=ABCMeta):
     def multi_callback_enabled(self):
         return getattr(self, self.multi_callback_determine_attr, False)
 
+    def callback_lock_retryable(self, callback_data=None):
+        return False
+
     def clean_status(self):
         setattr(self, self.schedule_result_attr, False)
 
