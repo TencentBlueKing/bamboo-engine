@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "bamboo-engine"
-version = "2.6.1"
+version = "2.6.2"
 description = "Bamboo-engine is a general-purpose workflow engine"
-authors = ["homholueng <homholueng@gmail.com>"]
+authors = ["blueking <blueking@tencent.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
@@ -20,7 +20,7 @@ coverage = {extras = ["toml"], version = "^5.5"}
 flake8 = "^4.0.1"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core==1.6.1"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]

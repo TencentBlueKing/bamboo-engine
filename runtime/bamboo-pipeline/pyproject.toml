@@ -2,7 +2,7 @@
 name = "bamboo-pipeline"
 version = "3.24.9"
 description = "runtime for bamboo-engine base on Django and Celery"
-authors = ["homholueng <homholueng@gmail.com>"]
+authors = ["blueking <blueking@tencent.com>"]
 license = "MIT"
 packages = [
   { include = "pipeline" },
@@ -36,7 +36,7 @@ mysqlclient = "2.0.3"
 coverage = {extras = ["toml"], version = "^5.5"}
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core==1.6.1"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
