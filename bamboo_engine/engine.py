@@ -1048,9 +1048,7 @@ class Engine:
                 try_after = random.randint(1, 5)
                 retry_headers = dict(headers or {})
                 if schedule.type is ScheduleType.CALLBACK:
-                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = (
-                        self._schedule_lock_retry_count(headers) + 1
-                    )
+                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = self._schedule_lock_retry_count(headers) + 1
                 logger.info(
                     "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s, "
                     "retry_count=%s, callback_data=%s",

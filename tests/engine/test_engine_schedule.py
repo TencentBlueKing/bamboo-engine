@@ -214,7 +214,9 @@ def test_schedule__lock_get_failed_and_retry_enabled_callback(node_id, schedule_
     runtime.get_service = MagicMock(return_value=service)
 
     engine = Engine(runtime=runtime)
-    engine.schedule(pi.process_id, node_id, schedule_id, interrupter, callback_data_id=callback_data.id, headers=interrupter.headers)
+    engine.schedule(
+        pi.process_id, node_id, schedule_id, interrupter, callback_data_id=callback_data.id, headers=interrupter.headers
+    )
 
     runtime.get_callback_data.assert_called_once_with(callback_data.id)
     runtime.get_node.assert_called_once_with(node_id)
