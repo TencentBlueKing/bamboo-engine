@@ -114,6 +114,16 @@ class Service(metaclass=ABCMeta):
         """
 
     @abstractmethod
+    def callback_lock_retryable(self, callback_data=None) -> bool:
+        """
+        回调调度锁冲突时是否允许重试
+
+        :param callback_data: 回调数据
+        :return: 是否允许重试
+        :rtype: bool
+        """
+
+    @abstractmethod
     def schedule_after(
         self,
         schedule: Optional[Schedule],
