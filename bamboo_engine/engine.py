@@ -80,6 +80,7 @@ class Engine:
     PURE_SKIP_ENABLE_NODE_TYPE = {NodeType.ServiceActivity, NodeType.EmptyStartEvent}
     CALLBACK_LOCK_RETRY_HEADER = "callback_lock_retry_times"
     CALLBACK_LOCK_RETRY_LIMIT = 3
+    CALLBACK_LOCK_RETRY_DELAY_RANGES = ((1, 3), (3, 6), (6, 10))
 
     def __init__(self, runtime: EngineRuntimeInterface):
         self.runtime = runtime
@@ -102,6 +103,12 @@ class Engine:
         node = self.runtime.get_node(node_id)
         service = self.runtime.get_service(code=node.code, version=node.version)
         return callback_data, service.callback_lock_retryable(callback_data=callback_data.data)
+
+    def _callback_lock_retry_delay(self, retry_count: int) -> int:
+        delay_range = self.CALLBACK_LOCK_RETRY_DELAY_RANGES[
+            min(retry_count, len(self.CALLBACK_LOCK_RETRY_DELAY_RANGES) - 1)
+        ]
+        return random.randint(*delay_range)
 
     # api
     def run_pipeline(
@@ -1045,10 +1052,13 @@ class Engine:
                     )
                     return
 
-                try_after = random.randint(1, 5)
                 retry_headers = dict(headers or {})
                 if schedule.type is ScheduleType.CALLBACK:
-                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = self._schedule_lock_retry_count(headers) + 1
+                    current_retry_count = self._schedule_lock_retry_count(headers)
+                    try_after = self._callback_lock_retry_delay(current_retry_count)
+                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = current_retry_count + 1
+                else:
+                    try_after = random.randint(1, 5)
                 logger.info(
                     "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s, "
                     "retry_count=%s, callback_data=%s",
