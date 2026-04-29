@@ -52,11 +52,18 @@ class NodeMixin:
         )
 
         if node_type == NodeType.ServiceActivity.value:
+            loop_config = node_detail.get("loop_config", {})
             return ServiceActivity(
                 type=NodeType.ServiceActivity,
                 code=node_detail["code"],
                 version=node_detail["version"],
                 error_ignorable=node_detail["error_ignorable"],
+                loop_strategy=loop_config.get("enable", False),
+                loop_times=loop_config.get("loop_times"),
+                loop_fail_skip=loop_config.get("fail_skip", False),
+                loop_retryable=loop_config.get("retryable", False),
+                loop_skippable=loop_config.get("skippable", False),
+                loop_outputs_key=loop_config.get("outputs_key"),
                 **common_args
             )
 
@@ -116,3 +123,29 @@ class NodeMixin:
         """
         node = DBNode.objects.get(node_id=node_id)
         return self._get_node(node)
+
+    @metrics.setup_histogram(metrics.ENGINE_RUNTIME_NODE_READ_TIME)
+    def update_node_loop_times(self, node_id: str, loop_times: int):
+        """
+        更新某个节点的 loop_config.loop_times 配置
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param loop_times: 新的循环次数
+        :type loop_times: int
+        """
+        if not isinstance(loop_times, int) or loop_times < 0:
+            raise ValueError("loop_times must be a non-negative integer, got: {}".format(loop_times))
+
+        try:
+            node = DBNode.objects.get(node_id=node_id)
+        except DBNode.DoesNotExist:
+            raise DBNode.DoesNotExist("Node with node_id({}) does not exist".format(node_id))
+
+        node_detail = json.loads(node.detail)
+
+        loop_config = node_detail.get("loop_config") or {}
+        loop_config["loop_times"] = loop_times
+        node_detail["loop_config"] = loop_config
+
+        DBNode.objects.filter(node_id=node_id).update(detail=json.dumps(node_detail))

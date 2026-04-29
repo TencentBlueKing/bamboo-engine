@@ -16,15 +16,17 @@ specific language governing permissions and limitations under the License.
 
 
 import logging
+from typing import Any, Dict, List
 from weakref import WeakValueDictionary
-from typing import List, Dict, Any
 
 from bamboo_engine.eri import (
     ContextValue,
+    ContextValueType,
     EngineRuntimeInterface,
     Variable,
-    ContextValueType,
 )
+
+from .eri import Node
 from .template.template import Template
 from .utils.string import deformat_var_key
 
@@ -79,10 +81,7 @@ class Context:
     """
 
     def __init__(
-        self,
-        runtime: EngineRuntimeInterface,
-        values: List[ContextValue],
-        additional_data: dict,
+        self, runtime: EngineRuntimeInterface, values: List[ContextValue], additional_data: dict, inner_loop: int = -1
     ):
         """
 
@@ -111,6 +110,7 @@ class Context:
                     key=v.key,
                     value=SpliceVariable(key=v.key, value=v.value, pool=self.pool),
                     additional_data=self.additional_data,
+                    inner_loop=inner_loop,
                 )
 
         for k, var in self.variables.items():
@@ -140,10 +140,7 @@ class Context:
         return hydrated
 
     def extract_outputs(
-        self,
-        pipeline_id: str,
-        data_outputs: Dict[str, str],
-        execution_data_outputs: Dict[str, Any],
+        self, pipeline_id: str, data_outputs: Dict[str, str], execution_data_outputs: Dict[str, Any], node: Node
     ):
         """
         将某个节点的输出提取到流程上下文中
@@ -154,16 +151,60 @@ class Context:
         :type data_outputs: Dict[str, str]
         :param execution_data_outputs: 节点执行数据输出
         :type execution_data_outputs: Dict[str, Any]
+        :param loop_strategy: 是否是循环节点
+        :type loop_strategy: bool
         """
         update = {}
-        for origin_key, target_key in data_outputs.items():
-            if origin_key not in execution_data_outputs:
-                continue
+        if not node.loop_strategy or not node.loop_outputs_key:
+            # 非循环节点：保持原有逻辑
+            for origin_key, target_key in data_outputs.items():
+                if origin_key not in execution_data_outputs:
+                    continue
+                update[target_key] = ContextValue(
+                    key=target_key,
+                    type=ContextValueType.PLAIN,
+                    value=execution_data_outputs[origin_key],
+                )
+        else:
+            # 循环节点：使用列表结构存储所有循环节点输出
+            loop_outputs_key = node.loop_outputs_key
 
-            update[target_key] = ContextValue(
-                key=target_key,
+            # 从执行数据中取子流程插件已打包好的 outputs 字典
+            current_outputs = execution_data_outputs.get("outputs")
+            current_outputs["result"] = execution_data_outputs["_result"]
+            current_outputs["inner_loop"] = execution_data_outputs["_inner_loop"]
+
+            # 获取现有的循环输出列表，追加本次结果
+            existing_loop_outputs = self._get_existing_context_value(pipeline_id, loop_outputs_key)
+            if existing_loop_outputs is None or not isinstance(existing_loop_outputs.value, list):
+                loop_outputs_list = []
+            else:
+                loop_outputs_list = existing_loop_outputs.value.copy()
+
+            loop_outputs_list.append(current_outputs)
+
+            # 更新循环输出列表
+            update[loop_outputs_key] = ContextValue(
+                key=loop_outputs_key,
                 type=ContextValueType.PLAIN,
-                value=execution_data_outputs[origin_key],
+                value=loop_outputs_list,
             )
 
         self.runtime.upsert_plain_context_values(pipeline_id=pipeline_id, update=update)
+
+    def _get_existing_context_value(self, pipeline_id: str, key: str) -> ContextValue:
+        """
+        获取现有的上下文值
+
+        :param pipeline_id: 流程 ID
+        :type pipeline_id: str
+        :param key: 键名
+        :type key: str
+        :return: 上下文值，如果不存在则返回 None
+        :rtype: ContextValue
+        """
+        try:
+            context_values = self.runtime.get_context_values(pipeline_id, {key})
+            return context_values[0] if context_values else None
+        except Exception:
+            return None

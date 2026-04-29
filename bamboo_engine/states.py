@@ -22,6 +22,7 @@ from .utils.collections import ConstantDict
 
 class StateType(Enum):
     CREATED = "CREATED"
+    LOOP_READY = "LOOP_READY"
     READY = "READY"
     RUNNING = "RUNNING"
     SUSPENDED = "SUSPENDED"
@@ -36,6 +37,7 @@ class StateType(Enum):
 
 CREATED = StateType.CREATED.value
 READY = StateType.READY.value
+LOOP_READY = StateType.LOOP_READY.value
 RUNNING = StateType.RUNNING.value
 SUSPENDED = StateType.SUSPENDED.value
 BLOCKED = StateType.BLOCKED.value
@@ -52,16 +54,17 @@ ARCHIVED_STATES = frozenset([FINISHED, FAILED, REVOKED])
 SLEEP_STATES = frozenset([SUSPENDED, REVOKED])
 CHILDREN_IGNORE_STATES = frozenset([BLOCKED])
 
-INVERTED_TRANSITION = ConstantDict({RUNNING: frozenset([READY, FINISHED])})
+INVERTED_TRANSITION = ConstantDict({RUNNING: frozenset([READY, FINISHED, LOOP_READY])})
 
 TRANSITION = ConstantDict(
     {
         READY: frozenset([RUNNING, SUSPENDED]),
+        LOOP_READY: frozenset([RUNNING, SUSPENDED]),
         RUNNING: frozenset([FINISHED, FAILED, REVOKED, SUSPENDED, ROLLING_BACK]),
         SUSPENDED: frozenset([READY, REVOKED, RUNNING, ROLLING_BACK]),
         BLOCKED: frozenset([]),
         FINISHED: frozenset([RUNNING, FAILED, ROLLING_BACK]),
-        FAILED: frozenset([READY, FINISHED]),
+        FAILED: frozenset([READY, FINISHED, LOOP_READY]),
         REVOKED: frozenset([]),
         ROLLING_BACK: frozenset([ROLL_BACK_SUCCESS, ROLL_BACK_FAILED]),
         ROLL_BACK_SUCCESS: frozenset([READY, FINISHED]),

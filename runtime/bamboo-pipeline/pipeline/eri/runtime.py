@@ -244,6 +244,7 @@ class BambooDjangoRuntime(
                     "version": act["component"].get("version", "legacy"),
                     "error_ignorable": act["error_ignorable"],
                     "can_retry": act["retryable"],
+                    "loop_config": act.get("loop_config", {}),
                 }
             ),
         )

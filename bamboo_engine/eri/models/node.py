@@ -51,6 +51,12 @@ class Node(Representable):
         can_retry: bool = True,
         name: str = None,
         reserve_rollback: bool = False,
+        loop_strategy: str = None,
+        loop_times: int = None,
+        loop_fail_skip: bool = False,
+        loop_retryable: bool = False,
+        loop_skippable: bool = False,
+        loop_outputs_key: str = None,
     ):
         """
 
@@ -72,6 +78,18 @@ class Node(Representable):
         :type can_skip: bool
         :param can_retry: 节点是否能够重试
         :type can_retry: bool
+        :param loop_strategy: 是否开启循环
+        :type loop_strategy: bool
+        :param loop_times: 循环次数
+        :type loop_times: int
+        :param loop_fail_skip: 循环失败是否跳过
+        :type loop_fail_skip: bool
+        :param loop_retryable: 循环是否可重试
+        :type loop_retryable: bool
+        :param loop_skippable: 循环是否可跳过
+        :type loop_skippable: bool
+        :param loop_outputs_key: 循环输出 key
+        :type loop_outputs_key: str
         """
         self.id = id
         self.type = type
@@ -84,6 +102,12 @@ class Node(Representable):
         self.can_retry = can_retry
         self.name = name
         self.reserve_rollback = reserve_rollback
+        self.loop_strategy = loop_strategy
+        self.loop_times = loop_times
+        self.loop_fail_skip = loop_fail_skip
+        self.can_loop_retryable = loop_retryable
+        self.can_loop_skippable = loop_skippable
+        self.loop_outputs_key = loop_outputs_key
 
 
 class EmptyStartEvent(Node):
