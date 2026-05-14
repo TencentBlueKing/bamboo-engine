@@ -7,14 +7,19 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Build and publish to pypi
-        uses: JRubics/poetry-publish@v1.13
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v5
         with:
-          python_version: "3.7"
-          poetry_version: "==1.2.1"
-          ignore_dev_requirements: "yes"
-          repository_name: "bamboo-engine"
-          pypi_token: ${{ secrets.ENGINE_PYPI_TOKEN }}
+          python-version: "3.7"
+
+      - name: Install Poetry
+        run: python -m pip install "poetry==1.5.1"
+
+      - name: Build and publish to pypi
+        run: |
+          poetry build -vvv
+          poetry config pypi-token.pypi ${{ secrets.ENGINE_PYPI_TOKEN }}
+          poetry publish
