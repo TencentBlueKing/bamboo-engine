@@ -226,6 +226,7 @@ print(result.data)
 ## Roadmap
 
 - [版本日志](release.md)
+- [发包流程](./docs/release_process.md)
 
 ## Support
 
