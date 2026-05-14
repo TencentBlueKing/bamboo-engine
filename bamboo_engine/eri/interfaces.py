@@ -214,7 +214,7 @@ class PluginManagerMixin:
     """
 
     @abstractmethod
-    def get_service(self, code: str, version: str, name: str = None) -> Service:
+    def get_service(self, code: str, version: str, name: str = None, inner_loop: int = -1) -> Service:
         """
         根据代号与版本获取特定服务对象实例
 
@@ -224,6 +224,8 @@ class PluginManagerMixin:
         :type version: str
         :param name: 服务名
         :type version: str
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 服务对象实例
         :rtype: Service
         """
@@ -246,6 +248,7 @@ class PluginManagerMixin:
         key: str,
         value: Variable,
         additional_data: dict,
+        inner_loop: int = -1,
     ) -> Variable:
         """
         根据代号获取变量实例
@@ -258,6 +261,8 @@ class PluginManagerMixin:
         :type value: Any
         :param additional_data: 额外数据字典
         :type additional_data: dict
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 变量实例
         :rtype: Variable
         """
@@ -1142,6 +1147,17 @@ class NodeMixin:
         :type node_id: str
         :return: Node 实例
         :rtype: Node
+        """
+
+    @abstractmethod
+    def update_node_loop_times(self, node_id: str, loop_times: int):
+        """
+        更新节点的循环次数
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param loop_times: 循环次数
+        :type loop_times: int
         """
 
 

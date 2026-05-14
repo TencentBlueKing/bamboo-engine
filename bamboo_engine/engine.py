@@ -271,7 +271,7 @@ class Engine:
 
         self.runtime.post_resume_node(node_id)
 
-    def retry_node(self, node_id: str, data: Optional[dict] = None):
+    def retry_node(self, node_id: str, data: Optional[dict] = None, loop_retry: bool = False):
         """
         重试节点
 
@@ -279,12 +279,20 @@ class Engine:
         :type node_id: str
         :param data: 重试时使用的输入数据, defaults to None
         :type data: Optional[dict], optional
+        :param loop_retry: 是否循环重试
+        :type loop_retry: bool
         """
         node = self.runtime.get_node(node_id)
         escape_render_keys = data.pop("_escape_render_keys", []) if data else []
 
-        if not node.can_retry:
-            raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can_retry))
+        if loop_retry:
+            # 循环重试：只校验 can_loop_retryable
+            if not node.can_loop_retryable or not node.loop_times:
+                raise InvalidOperationError("node({}) is not loop retryable".format(node_id))
+        else:
+            # 普通重试：校验 can_retry
+            if not node.can_retry:
+                raise InvalidOperationError("can not retry node({}) with can_retry({})".format(node_id, node.can_retry))
 
         state = self.runtime.get_state(node_id)
 
@@ -300,6 +308,34 @@ class Engine:
             )
 
         self._add_history(node_id, state)
+        loop_outputs_key = node.loop_outputs_key
+        # 判断当前节点是否是循环节点
+        if node.loop_enabled and loop_outputs_key:
+            pipeline_id = process_info.top_pipeline_id
+            # 兼容 loop_outputs_key 是字符串或列表的情况
+            loop_outputs = self.runtime.get_context_values(pipeline_id, {loop_outputs_key})
+
+            # 如果有输出参数，根据重试类型进行不同的处理
+            if loop_outputs:
+                from bamboo_engine.eri.models.runtime import (
+                    ContextValue,
+                    ContextValueType,
+                )
+
+                updated_context_values = []
+                # 如果是循环重试，删除列表中的最后一个元素
+                if loop_retry:
+                    new_value = loop_outputs[:-1]
+                # 如果是节点重试，将列表清空
+                else:
+                    new_value = []
+
+                # 创建更新后的ContextValue
+                updated_context_values.append(
+                    ContextValue(key=loop_outputs_key, type=ContextValueType.PLAIN, value=new_value)
+                )
+
+                self.runtime.update_context_values(pipeline_id, updated_context_values)
 
         self.runtime.pre_retry_node(node_id, data)
         self.hook_dispatch(
@@ -312,8 +348,8 @@ class Engine:
 
         self.runtime.set_state(
             node_id=node_id,
-            to_state=states.READY,
-            is_retry=True,
+            to_state=states.LOOP_READY if loop_retry else states.READY,
+            is_retry=False if loop_retry else True,
             refresh_version=True,
             clear_started_time=True,
             clear_archived_time=True,
@@ -378,19 +414,27 @@ class Engine:
 
         self.runtime.post_retry_subprocess(node_id)
 
-    def skip_node(self, node_id: str):
+    def skip_node(self, node_id: str, loop_skip: bool = False):
         """
         跳过失败的节点继续执行
 
         :param node_id: 节点 ID
         :type node_id: str
+        :param loop_skip: 是否循环跳过
+        :type loop_skip: bool
         :raises InvalidOperationError: [description]
         :raises InvalidOperationError: [description]
         """
         node = self.runtime.get_node(node_id)
 
-        if not node.can_skip:
-            raise InvalidOperationError("can not skip this node")
+        if loop_skip:
+            # 循环跳过：只校验 can_loop_skippable 和 loop_times
+            if not node.can_loop_skippable or not node.loop_times:
+                raise InvalidOperationError("node({}) can not loop skip".format(node_id))
+        else:
+            # 普通跳过：校验 can_skip
+            if not node.can_skip:
+                raise InvalidOperationError("can not skip this node")
 
         if node.type not in self.PURE_SKIP_ENABLE_NODE_TYPE:
             raise InvalidOperationError("can not use skip_node api for {}".format(node.type))
@@ -409,7 +453,10 @@ class Engine:
         )
 
         # pure skip node type only has 1 next node
-        next_node_id = node.target_nodes[0]
+        if loop_skip and node.should_continue_loop(state.inner_loop):
+            next_node_id = node.id
+        else:
+            next_node_id = node.target_nodes[0]
 
         self._add_history(node_id, state)
 
@@ -932,6 +979,9 @@ class Engine:
                             reset_mark_bit = True
                             # 重入前记录历史
                             self._add_history(node_id=current_node_id, state=node_state)
+                        elif node.loop_enabled and node_state.name == states.READY:
+                            loop = 1
+                            inner_loop = 1
                         else:
                             loop = node_state.loop
                             inner_loop = node_state.inner_loop
@@ -953,7 +1003,7 @@ class Engine:
                         parent_id=process_info.top_pipeline_id,
                         set_started_time=True,
                         reset_skip=reset_mark_bit,
-                        reset_retry=reset_mark_bit,
+                        reset_retry=reset_mark_bit if not node.loop_enabled else False,
                         reset_error_ignored=reset_mark_bit,
                         refresh_version=reset_mark_bit,
                         ignore_boring_set=ignore_boring_set,

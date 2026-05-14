@@ -230,7 +230,12 @@ class ServiceActivityHandler(NodeHandler):
             root_pipeline_data = ExecutionData(inputs=root_pipeline_inputs, outputs={})
 
             # execute
-            service = self.runtime.get_service(code=self.node.code, version=self.node.version, name=self.node.name)
+            service = self.runtime.get_service(
+                code=self.node.code,
+                version=self.node.version,
+                name=self.node.name,
+                inner_loop=inner_loop,
+            )
             service.setup_runtime_attributes(
                 id=self.node.id,
                 version=version,
@@ -348,8 +353,9 @@ class ServiceActivityHandler(NodeHandler):
                         pipeline_id=top_pipeline_id,
                         data_outputs=data.outputs,
                         execution_data_outputs=service_data.outputs,
+                        node=self.node,
                     )
-                    next_node_id = self.node.target_nodes[0]
+                    next_node_id = self.node.next_node_id_in_loop(inner_loop)
 
                 self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
@@ -366,8 +372,18 @@ class ServiceActivityHandler(NodeHandler):
                     next_node_id=next_node_id,
                 )
 
-            if not self.node.error_ignorable:
+            if self.node.error_ignorable:
+                # 如果开启了失败跳过，则直接进入下一节点
+                next_node_id = self.node.target_nodes[0]
+            elif not self.node.loop_times:
+                next_node_id = None
+            elif self.node.loop_enabled and self.node.loop_fail_skip:
+                # 如果开启了循环并允许失败跳过，则判断是否达到循环次数，如果未达到则继续执行，否则进入下一节点
+                next_node_id = self.node.next_node_id_in_loop(inner_loop)
+            else:
+                next_node_id = None
 
+            if next_node_id is None:
                 self.runtime.node_execute_fail(root_pipeline_id, self.node.id)
                 self.hook_dispatch(
                     hook=HookType.NODE_EXECUTE_FAIL,
@@ -391,6 +407,7 @@ class ServiceActivityHandler(NodeHandler):
                     pipeline_id=top_pipeline_id,
                     data_outputs=data.outputs,
                     execution_data_outputs=service_data.outputs,
+                    node=self.node,
                 )
 
                 return ExecuteResult(
@@ -418,6 +435,7 @@ class ServiceActivityHandler(NodeHandler):
                 pipeline_id=top_pipeline_id,
                 data_outputs=data.outputs,
                 execution_data_outputs=service_data.outputs,
+                node=self.node,
             )
 
             return ExecuteResult(
@@ -426,7 +444,7 @@ class ServiceActivityHandler(NodeHandler):
                 schedule_type=None,
                 schedule_after=-1,
                 dispatch_processes=[],
-                next_node_id=self.node.target_nodes[0],
+                next_node_id=next_node_id,
             )
 
     def _finish_schedule(
@@ -437,6 +455,7 @@ class ServiceActivityHandler(NodeHandler):
         execution_data: ExecutionData,
         error_ignored: bool,
         root_pipeline_inputs: dict,
+        next_node_id: str,
         recover_point: Optional[ScheduleInterruptPoint] = None,
     ) -> ScheduleResult:
         self.runtime.set_state(
@@ -453,13 +472,14 @@ class ServiceActivityHandler(NodeHandler):
             pipeline_id=process_info.top_pipeline_id,
             data_outputs=data_outputs,
             execution_data_outputs=execution_data.outputs,
+            node=self.node,
         )
 
         return ScheduleResult(
             has_next_schedule=False,
             schedule_after=-1,
             schedule_done=True,
-            next_node_id=self.node.target_nodes[0],
+            next_node_id=next_node_id,
         )
 
     def schedule(
@@ -609,6 +629,7 @@ class ServiceActivityHandler(NodeHandler):
                         execution_data=service_data,
                         error_ignored=False,
                         root_pipeline_inputs=root_pipeline_inputs,
+                        next_node_id=self.node.next_node_id_in_loop(inner_loop),
                         recover_point=recover_point,
                     )
                 else:
@@ -621,6 +642,7 @@ class ServiceActivityHandler(NodeHandler):
                             execution_data=service_data,
                             error_ignored=False,
                             root_pipeline_inputs=root_pipeline_inputs,
+                            next_node_id=self.node.next_node_id_in_loop(inner_loop),
                             recover_point=recover_point,
                         )
 
@@ -637,8 +659,18 @@ class ServiceActivityHandler(NodeHandler):
                     )
 
             # schedule fail
-            if not self.node.error_ignorable:
+            if self.node.error_ignorable:
+                # 如果开启了失败跳过，则直接进入下一节点
+                next_node_id = self.node.target_nodes[0]
+            elif not self.node.loop_times:
+                next_node_id = None
+            elif self.node.loop_enabled and self.node.loop_fail_skip:
+                # 如果开启了循环并允许失败跳过，则判断是否达到循环次数，如果未达到则继续执行，否则进入下一节点
+                next_node_id = self.node.next_node_id_in_loop(inner_loop)
+            else:
+                next_node_id = None
 
+            if next_node_id is None:
                 self.runtime.node_schedule_fail(root_pipeline_id, self.node.id)
                 self.hook_dispatch(
                     hook=HookType.NODE_SCHEDULE_FAIL,
@@ -662,6 +694,7 @@ class ServiceActivityHandler(NodeHandler):
                     pipeline_id=process_info.top_pipeline_id,
                     data_outputs=data_outputs,
                     execution_data_outputs=service_data.outputs,
+                    node=self.node,
                 )
 
                 return ScheduleResult(
@@ -679,6 +712,7 @@ class ServiceActivityHandler(NodeHandler):
                 execution_data=service_data,
                 error_ignored=True,
                 root_pipeline_inputs=root_pipeline_inputs,
+                next_node_id=next_node_id,
                 recover_point=recover_point,
             )
 

@@ -11,19 +11,18 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from bamboo_engine.eri import Service, ExecutableEvent, Variable
-
 from pipeline.component_framework.library import ComponentLibrary
-from pipeline.core.flow import FlowNodeClsFactory
 from pipeline.core.data.library import VariableLibrary
-
-from pipeline.eri.imp.service import ServiceWrapper
+from pipeline.core.flow import FlowNodeClsFactory
 from pipeline.eri.imp.executable_event import ExecutableEndEventWrapper
+from pipeline.eri.imp.service import ServiceWrapper
 from pipeline.eri.imp.variable import VariableWrapper
+
+from bamboo_engine.eri import ExecutableEvent, Service, Variable
 
 
 class PipelinePluginManagerMixin:
-    def get_service(self, code: str, version: str, name: str = None) -> Service:
+    def get_service(self, code: str, version: str, name: str = None, inner_loop: int = -1) -> Service:
         """
         根据代号与版本获取特定服务对象实例
 
@@ -33,12 +32,14 @@ class PipelinePluginManagerMixin:
         :type version: str
         :param name: 服务名
         :type version: str
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 服务对象实例
         :rtype: Service
         """
         comp_cls = ComponentLibrary.get_component_class(code, version)
         service = comp_cls.bound_service(name=name)
-        return ServiceWrapper(service)
+        return ServiceWrapper(service, inner_loop=inner_loop)
 
     def get_executable_end_event(self, code: str) -> ExecutableEvent:
         """
@@ -53,7 +54,9 @@ class PipelinePluginManagerMixin:
         event = event_cls(id=None)
         return ExecutableEndEventWrapper(event)
 
-    def get_compute_variable(self, code: str, key: str, value: Variable, additional_data: dict) -> Variable:
+    def get_compute_variable(
+        self, code: str, key: str, value: Variable, additional_data: dict, inner_loop: int = -1
+    ) -> Variable:
         """
         根据代号获取变量实例
 
@@ -65,8 +68,12 @@ class PipelinePluginManagerMixin:
         :type value: Any
         :param additional_data: 额外数据字典
         :type additional_data: dict
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 变量实例
         :rtype: Variable
         """
         var_cls = VariableLibrary.get_var_class(code=code)
-        return VariableWrapper(original_value=value, var_cls=var_cls, additional_data=additional_data)
+        return VariableWrapper(
+            original_value=value, var_cls=var_cls, additional_data=additional_data, inner_loop=inner_loop
+        )
