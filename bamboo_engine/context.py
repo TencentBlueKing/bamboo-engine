@@ -140,7 +140,7 @@ class Context:
         return hydrated
 
     def extract_outputs(
-        self, pipeline_id: str, data_outputs: Dict[str, str], execution_data_outputs: Dict[str, Any], node: Node
+        self, pipeline_id: str, data_outputs: Dict[str, str], execution_data_outputs: Dict[str, Any], node: Node = None
     ):
         """
         将某个节点的输出提取到流程上下文中
@@ -151,11 +151,11 @@ class Context:
         :type data_outputs: Dict[str, str]
         :param execution_data_outputs: 节点执行数据输出
         :type execution_data_outputs: Dict[str, Any]
-        :param loop_strategy: 是否是循环节点
-        :type loop_strategy: bool
+        :param node: 节点对象，用于判断是否启用循环
+        :type node: Node
         """
         update = {}
-        if not node.loop_strategy or not node.loop_outputs_key:
+        if not getattr(node, "loop_enabled", False):
             # 非循环节点：保持原有逻辑
             for origin_key, target_key in data_outputs.items():
                 if origin_key not in execution_data_outputs:
@@ -170,7 +170,7 @@ class Context:
             loop_outputs_key = node.loop_outputs_key
 
             # 从执行数据中取子流程插件已打包好的 outputs 字典
-            current_outputs = execution_data_outputs.get("outputs")
+            current_outputs = execution_data_outputs.get("outputs", {})
             current_outputs["result"] = execution_data_outputs["_result"]
             current_outputs["inner_loop"] = execution_data_outputs["_inner_loop"]
 

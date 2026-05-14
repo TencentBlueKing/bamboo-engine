@@ -25,6 +25,7 @@ from bamboo_engine.eri import (
     EmptyStartEvent,
     ExclusiveGateway,
     ExecutableEndEvent,
+    LoopControlConfig,
     Node,
     NodeType,
     ParallelGateway,
@@ -52,18 +53,26 @@ class NodeMixin:
         )
 
         if node_type == NodeType.ServiceActivity.value:
-            loop_config = node_detail.get("loop_config", {})
+            loop_config_dict = node_detail.get("loop_config") or {}
+            # 仅在显式开启循环时才构造 LoopControlConfig，未开启时保持为 None，
+            # 让引擎主流程的 ``if node.loop_config`` 判断更直观、零成本
+            loop_config = (
+                LoopControlConfig(
+                    loop_times=loop_config_dict.get("loop_times"),
+                    fail_skip=loop_config_dict.get("fail_skip", False),
+                    retryable=loop_config_dict.get("retryable", False),
+                    skippable=loop_config_dict.get("skippable", False),
+                    outputs_key=loop_config_dict.get("outputs_key", LoopControlConfig.DEFAULT_OUTPUTS_KEY),
+                )
+                if loop_config_dict.get("enable", False)
+                else None
+            )
             return ServiceActivity(
                 type=NodeType.ServiceActivity,
                 code=node_detail["code"],
                 version=node_detail["version"],
                 error_ignorable=node_detail["error_ignorable"],
-                loop_strategy=loop_config.get("enable", False),
-                loop_times=loop_config.get("loop_times"),
-                loop_fail_skip=loop_config.get("fail_skip", False),
-                loop_retryable=loop_config.get("retryable", False),
-                loop_skippable=loop_config.get("skippable", False),
-                loop_outputs_key=loop_config.get("outputs_key"),
+                loop_config=loop_config,
                 **common_args
             )
 

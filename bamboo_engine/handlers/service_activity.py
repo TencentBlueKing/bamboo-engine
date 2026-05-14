@@ -355,10 +355,7 @@ class ServiceActivityHandler(NodeHandler):
                         execution_data_outputs=service_data.outputs,
                         node=self.node,
                     )
-                    if self.node.loop_strategy and inner_loop < self.node.loop_times:
-                        next_node_id = self.node.id
-                    else:
-                        next_node_id = self.node.target_nodes[0]
+                    next_node_id = self.node.next_node_id_in_loop(inner_loop)
 
                 self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
@@ -380,9 +377,9 @@ class ServiceActivityHandler(NodeHandler):
                 next_node_id = self.node.target_nodes[0]
             elif not self.node.loop_times:
                 next_node_id = None
-            elif self.node.loop_strategy and self.node.loop_fail_skip:
+            elif self.node.loop_enabled and self.node.loop_fail_skip:
                 # 如果开启了循环并允许失败跳过，则判断是否达到循环次数，如果未达到则继续执行，否则进入下一节点
-                next_node_id = self.node.id if inner_loop < self.node.loop_times else self.node.target_nodes[0]
+                next_node_id = self.node.next_node_id_in_loop(inner_loop)
             else:
                 next_node_id = None
 
@@ -632,9 +629,7 @@ class ServiceActivityHandler(NodeHandler):
                         execution_data=service_data,
                         error_ignored=False,
                         root_pipeline_inputs=root_pipeline_inputs,
-                        next_node_id=self.node.id
-                        if self.node.loop_strategy and inner_loop < self.node.loop_times
-                        else self.node.target_nodes[0],
+                        next_node_id=self.node.next_node_id_in_loop(inner_loop),
                         recover_point=recover_point,
                     )
                 else:
@@ -647,9 +642,7 @@ class ServiceActivityHandler(NodeHandler):
                             execution_data=service_data,
                             error_ignored=False,
                             root_pipeline_inputs=root_pipeline_inputs,
-                            next_node_id=self.node.id
-                            if self.node.loop_strategy and inner_loop < self.node.loop_times
-                            else self.node.target_nodes[0],
+                            next_node_id=self.node.next_node_id_in_loop(inner_loop),
                             recover_point=recover_point,
                         )
 
@@ -671,9 +664,9 @@ class ServiceActivityHandler(NodeHandler):
                 next_node_id = self.node.target_nodes[0]
             elif not self.node.loop_times:
                 next_node_id = None
-            elif self.node.loop_strategy and self.node.loop_fail_skip:
+            elif self.node.loop_enabled and self.node.loop_fail_skip:
                 # 如果开启了循环并允许失败跳过，则判断是否达到循环次数，如果未达到则继续执行，否则进入下一节点
-                next_node_id = self.node.id if inner_loop < self.node.loop_times else self.node.target_nodes[0]
+                next_node_id = self.node.next_node_id_in_loop(inner_loop)
             else:
                 next_node_id = None
 

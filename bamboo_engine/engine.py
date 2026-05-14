@@ -310,7 +310,7 @@ class Engine:
         self._add_history(node_id, state)
         loop_outputs_key = node.loop_outputs_key
         # 判断当前节点是否是循环节点
-        if node.loop_strategy and loop_outputs_key:
+        if node.loop_enabled and loop_outputs_key:
             pipeline_id = process_info.top_pipeline_id
             # 兼容 loop_outputs_key 是字符串或列表的情况
             loop_outputs = self.runtime.get_context_values(pipeline_id, {loop_outputs_key})
@@ -453,7 +453,7 @@ class Engine:
         )
 
         # pure skip node type only has 1 next node
-        if loop_skip and node.loop_strategy and state.inner_loop < node.loop_times:
+        if loop_skip and node.should_continue_loop(state.inner_loop):
             next_node_id = node.id
         else:
             next_node_id = node.target_nodes[0]
@@ -979,7 +979,7 @@ class Engine:
                             reset_mark_bit = True
                             # 重入前记录历史
                             self._add_history(node_id=current_node_id, state=node_state)
-                        elif node.loop_strategy and node_state.name == states.READY:
+                        elif node.loop_enabled and node_state.name == states.READY:
                             loop = 1
                             inner_loop = 1
                         else:
@@ -1003,7 +1003,7 @@ class Engine:
                         parent_id=process_info.top_pipeline_id,
                         set_started_time=True,
                         reset_skip=reset_mark_bit,
-                        reset_retry=reset_mark_bit if not node.loop_strategy else False,
+                        reset_retry=reset_mark_bit if not node.loop_enabled else False,
                         reset_error_ignored=reset_mark_bit,
                         refresh_version=reset_mark_bit,
                         ignore_boring_set=ignore_boring_set,

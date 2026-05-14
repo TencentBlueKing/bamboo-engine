@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 from enum import Enum
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from bamboo_engine.utils.object import Representable
 
@@ -33,6 +33,35 @@ class NodeType(Enum):
     ExecutableEndEvent = "ExecutableEndEvent"
 
 
+class LoopControlConfig(Representable):
+    DEFAULT_OUTPUTS_KEY = "outputs"
+
+    def __init__(
+        self,
+        loop_times: Optional[int] = None,
+        fail_skip: bool = False,
+        retryable: bool = False,
+        skippable: bool = False,
+        outputs_key: str = DEFAULT_OUTPUTS_KEY,
+    ):
+        """
+        :param loop_times: 循环次数上限
+        :param fail_skip: 循环失败是否自动跳过到下一节点
+        :param retryable: 是否允许循环重试
+        :param skippable: 是否允许循环跳过
+        :param outputs_key: 循环聚合输出在上下文中的 key
+        """
+        self.loop_times = loop_times
+        self.fail_skip = fail_skip
+        self.retryable = retryable
+        self.skippable = skippable
+        self.outputs_key = outputs_key
+
+    def should_continue_loop(self, inner_loop: int) -> bool:
+        """是否还需要继续循环（仅基于循环配置自身）"""
+        return self.loop_times is not None and inner_loop < self.loop_times
+
+
 class Node(Representable):
     """
     节点信息描述类
@@ -51,15 +80,9 @@ class Node(Representable):
         can_retry: bool = True,
         name: str = None,
         reserve_rollback: bool = False,
-        loop_strategy: str = None,
-        loop_times: int = None,
-        loop_fail_skip: bool = False,
-        loop_retryable: bool = False,
-        loop_skippable: bool = False,
-        loop_outputs_key: str = None,
+        loop_config: Optional[LoopControlConfig] = None,
     ):
         """
-
         :param id: 节点 ID
         :type id: str
         :param type: 节点类型
@@ -78,18 +101,8 @@ class Node(Representable):
         :type can_skip: bool
         :param can_retry: 节点是否能够重试
         :type can_retry: bool
-        :param loop_strategy: 是否开启循环
-        :type loop_strategy: bool
-        :param loop_times: 循环次数
-        :type loop_times: int
-        :param loop_fail_skip: 循环失败是否跳过
-        :type loop_fail_skip: bool
-        :param loop_retryable: 循环是否可重试
-        :type loop_retryable: bool
-        :param loop_skippable: 循环是否可跳过
-        :type loop_skippable: bool
-        :param loop_outputs_key: 循环输出 key
-        :type loop_outputs_key: str
+        :param loop_config: 循环控制配置（不开启循环时为 ``None``）
+        :type loop_config: Optional[LoopControlConfig]
         """
         self.id = id
         self.type = type
@@ -102,12 +115,56 @@ class Node(Representable):
         self.can_retry = can_retry
         self.name = name
         self.reserve_rollback = reserve_rollback
-        self.loop_strategy = loop_strategy
-        self.loop_times = loop_times
-        self.loop_fail_skip = loop_fail_skip
-        self.can_loop_retryable = loop_retryable
-        self.can_loop_skippable = loop_skippable
-        self.loop_outputs_key = loop_outputs_key
+        self.loop_config = loop_config
+
+    @property
+    def loop_enabled(self) -> bool:
+        """是否开启了循环（loop_config 实例存在即代表开启）。"""
+        return self.loop_config is not None
+
+    @property
+    def loop_times(self) -> Optional[int]:
+        return self.loop_config.loop_times if self.loop_config else None
+
+    @property
+    def loop_fail_skip(self) -> bool:
+        return bool(self.loop_config) and self.loop_config.fail_skip
+
+    @property
+    def can_loop_retryable(self) -> bool:
+        return bool(self.loop_config) and self.loop_config.retryable
+
+    @property
+    def can_loop_skippable(self) -> bool:
+        return bool(self.loop_config) and self.loop_config.skippable
+
+    @property
+    def loop_outputs_key(self) -> Optional[str]:
+        return self.loop_config.outputs_key if self.loop_config else None
+
+    def should_continue_loop(self, inner_loop: int) -> bool:
+        """
+        判断当前节点是否还需要继续循环（仅基于节点自身的循环配置）
+
+        :param inner_loop: 当前内层循环次数
+        :type inner_loop: int
+        :return: 开启了循环策略且未达到循环次数上限时返回 True
+        :rtype: bool
+        """
+        if not self.loop_config:
+            return False
+        return self.loop_config.should_continue_loop(inner_loop)
+
+    def next_node_id_in_loop(self, inner_loop: int) -> str:
+        """
+        循环场景下的下一节点 ID：未达到循环上限时回到自身，否则跳到下一节点
+
+        :param inner_loop: 当前内层循环次数
+        :type inner_loop: int
+        :return: 下一节点 ID
+        :rtype: str
+        """
+        return self.id if self.should_continue_loop(inner_loop) else self.target_nodes[0]
 
 
 class EmptyStartEvent(Node):
