@@ -19,6 +19,7 @@ import logging
 from typing import Any, Dict, List
 from weakref import WeakValueDictionary
 
+from bamboo_engine.config import Settings
 from bamboo_engine.eri import (
     ContextValue,
     ContextValueType,
@@ -170,7 +171,7 @@ class Context:
             loop_outputs_key = node.loop_outputs_key
 
             # 从执行数据中取子流程插件已打包好的 outputs 字典
-            current_outputs = execution_data_outputs.get("outputs", {})
+            current_outputs = execution_data_outputs.get(Settings.LOOP_OUTPUTS_INNER_KEY, {})
             current_outputs["result"] = execution_data_outputs["_result"]
             current_outputs["inner_loop"] = execution_data_outputs["_inner_loop"]
 

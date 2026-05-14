@@ -75,3 +75,5 @@ class Settings:
     PIPELINE_EXCLUSIVE_GATEWAY_STRATEGY = ExclusiveGatewayStrategy.ONLY.value
 
     PIPELINE_ENABLE_ROLLBACK = False
+
+    LOOP_OUTPUTS_INNER_KEY = "outputs"
