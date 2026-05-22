@@ -16,8 +16,10 @@ import datetime
 
 from django.test import TestCase
 
-from pipeline.core.data import expression, sandbox
+from pipeline.core.data import expression, mako_safety, sandbox
 from pipeline.core.data.expression import format_constant_key, deformat_constant_key
+from pipeline.utils.mako_utils.checker import check_mako_template_safety
+from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
 class TestConstantTemplate(TestCase):
@@ -57,10 +59,16 @@ class TestConstantTemplate(TestCase):
 
     def test_resolve_template_with_curly_braces(self):
         cons_tmpl = expression.ConstantTemplate("")
-        one_template = '${"test_{}".format(a)}'
-        self.assertEqual(cons_tmpl.resolve_string(one_template, {"a": "1"}), "test_1")
-        ano_template = '${f"test_{a}"}'
-        self.assertEqual(cons_tmpl.resolve_template(ano_template, {"a": "2"}), "test_2")
+        # ``.format(...)`` / ``.format_map(...)`` 在 mako 模板里被显式禁用以阻断
+        # ``${"{0.__class__}".format("")}`` 这一类 dunder lookup 绕过；走 ``resolve_string``
+        # 时模板会被原样回显。
+        format_attr_template = '${"test_{}".format(a)}'
+        self.assertEqual(cons_tmpl.resolve_string(format_attr_template, {"a": "1"}), format_attr_template)
+        # 合法的等价写法：% 格式化与 f-string 仍正常渲染。
+        percent_template = '${"test_%s" % a}'
+        self.assertEqual(cons_tmpl.resolve_string(percent_template, {"a": "1"}), "test_1")
+        fstring_template = '${f"test_{a}"}'
+        self.assertEqual(cons_tmpl.resolve_template(fstring_template, {"a": "2"}), "test_2")
 
     def test_resolve_string(self):
         cons_tmpl = expression.ConstantTemplate("")
@@ -163,6 +171,7 @@ class TestConstantTemplate(TestCase):
         sandbox_copy = copy.deepcopy(sandbox.SANDBOX)
         shield_words = [
             "ascii",
+            "breakpoint",
             "bytearray",
             "bytes",
             "callable",
@@ -175,6 +184,7 @@ class TestConstantTemplate(TestCase):
             "exec",
             "eval",
             "filter",
+            "format",
             "frozenset",
             "getattr",
             "globals",
@@ -214,3 +224,109 @@ class TestConstantTemplate(TestCase):
             self.assertEqual(expression.ConstantTemplate(at).resolve_data({}), at)
 
         sandbox.SANDBOX = sandbox_copy
+
+
+class TestMakoSafetyHardening(TestCase):
+    """
+    与 ``tests/template/test_template.py`` 平行的 bamboo-pipeline runtime 侧回归。
+
+    PR #265 把 filter callable / tag-level filter 校验加进了 ``bamboo_engine.utils.mako_safety``，
+    bamboo-pipeline runtime 这一路（``pipeline.core.data.mako_safety``）是独立的一份代码，
+    本测试类确保这边的实现具备同样的拦截能力。
+    """
+
+    def _assert_forbidden(self, payload):
+        with self.assertRaises(ForbiddenMakoTemplateException):
+            check_mako_template_safety(
+                payload,
+                mako_safety.SingleLineNodeVisitor(),
+                mako_safety.SingleLinCodeExtractor(),
+            )
+
+    def _assert_allowed(self, payload):
+        check_mako_template_safety(
+            payload,
+            mako_safety.SingleLineNodeVisitor(),
+            mako_safety.SingleLinCodeExtractor(),
+        )
+
+    def test_filter_callable_with_side_effect_is_blocked(self):
+        self._assert_forbidden("${'x'|((side_effect() or str))}")
+
+    def test_filter_with_dunder_chain_is_blocked(self):
+        self._assert_forbidden("${'x'|().__class__.__bases__[0].__subclasses__}")
+
+    def test_filter_list_with_malicious_item_is_blocked(self):
+        self._assert_forbidden("${'x'|h, (side_effect() or str)}")
+
+    def test_decode_filter_with_dunder_is_blocked(self):
+        self._assert_forbidden("${'x'|decode.__class__}")
+
+    def test_tag_level_expression_filter_is_blocked(self):
+        self._assert_forbidden('<%page expression_filter="(side_effect() or str)"/>${name}')
+
+    def test_tag_level_def_filter_is_blocked(self):
+        payload = '<%def name="r(x)" filter="(side_effect() or str)">${x}</%def>${r("x")}'
+        self._assert_forbidden(payload)
+
+    def test_tag_level_block_filter_is_blocked(self):
+        self._assert_forbidden('<%block filter="(side_effect() or str)">x</%block>')
+
+    def test_tag_level_text_filter_is_blocked(self):
+        self._assert_forbidden('<%text filter="(side_effect() or str)">x</%text>')
+
+    def test_format_attribute_call_is_blocked(self):
+        self._assert_forbidden('${"{0.__class__}".format("")}')
+
+    def test_format_map_attribute_call_is_blocked(self):
+        self._assert_forbidden('${"{value.__class__}".format_map({"value": ""})}')
+
+    def test_subscript_dunder_key_is_blocked(self):
+        self._assert_forbidden("${a['__class__']}")
+
+    def test_builtin_filters_remain_allowed(self):
+        for payload in [
+            "${' x ' | h}",
+            "${' x ' | trim}",
+            "${' x ' | h, trim}",
+            "${'x' | n}",
+            "${b'abc' | decode.utf8}",
+        ]:
+            with self.subTest(payload=payload):
+                self._assert_allowed(payload)
+
+    def test_latent_bypass_is_inert_under_complete_shield(self):
+        """以下 payload 能过 AST 检查（动态拼字符串 / Name 调用 / 内建调用），
+        必须依靠完整 shield 在渲染期保持 inert。
+        """
+        sandbox_copy = copy.deepcopy(sandbox.SANDBOX)
+        try:
+            sandbox._shield_words(
+                sandbox.SANDBOX,
+                [
+                    "getattr",
+                    "type",
+                    "vars",
+                    "format",
+                    "breakpoint",
+                    "dir",
+                    "object",
+                ],
+            )
+            payloads = [
+                "${getattr('', '__cl' + 'ass__')}",
+                (
+                    "${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__'),"
+                    " '__sub' + 'classes__')()}"
+                ),
+                "${getattr('', dir(0)[0][0] + dir(0)[0][0] + 'class' + dir(0)[0][0] + dir(0)[0][0])}",
+                "${type('').mro()}",
+                "${vars()}",
+                "${format('', '')}",
+                "${breakpoint()}",
+            ]
+            for p in payloads:
+                with self.subTest(payload=p):
+                    self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+        finally:
+            sandbox.SANDBOX = sandbox_copy
