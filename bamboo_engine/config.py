@@ -23,6 +23,7 @@ class Settings:
 
     MAKO_SANDBOX_SHIELD_WORDS = [
         "ascii",
+        "breakpoint",
         "bytearray",
         "bytes",
         "callable",
@@ -35,6 +36,7 @@ class Settings:
         "exec",
         "eval",
         "filter",
+        "format",
         "frozenset",
         "getattr",
         "globals",
