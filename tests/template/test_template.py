@@ -402,3 +402,51 @@ def test_mako_nested_dunder_expression_is_blocked():
 )
 def test_mako_format_private_lookup_is_blocked(payload):
     _assert_forbidden_template(payload)
+
+
+# ---------------------------------------------------------------------------
+# 纵深防御回归：以下 payload 当前**能通过 AST 安全检查**（visitor 只能识别字面 dunder /
+# 已知禁用属性，无法穿透 BinOp/format/getattr 组合出的动态字符串），但通过运行期 sandbox
+# shield (`MAKO_SANDBOX_SHIELD_WORDS`) 阻断。
+#
+# 把这些 payload 纳入回归是为了：未来一旦 ``Settings.MAKO_SANDBOX_SHIELD_WORDS`` 被
+# 误改成不完整列表，或者 ``_render_template`` 把 ``context.update`` 顺序换成允许 context
+# 覆盖 shield，这些用例会立刻红，提示重新评估纵深防御。
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # BinOp 字符串拼接绕过字面量 dunder 检测
+        "${getattr('', '__cl' + 'ass__')}",
+        # 完整 subclasses RCE 链（多重 getattr + 字符串拼接）
+        (
+            "${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__'),"
+            " '__sub' + 'classes__')()}"
+        ),
+        # 通过 dir(0)[0][0] 间接得到下划线字符再拼出 __class__
+        "${getattr('', dir(0)[0][0] + dir(0)[0][0] + 'class' + dir(0)[0][0] + dir(0)[0][0])}",
+        # type / object / vars 等 callable 走 Name 调用
+        "${type('').mro()}",
+        "${vars()}",
+        # 内建 format() 走 Name 调用（visitor 仅拦 Attribute 形式的 .format(...)）
+        "${format('', '')}",
+        # breakpoint 未屏蔽时会触发 pdb，构成 DoS / 调试 RCE；shield 完整时必须 inert
+        "${breakpoint()}",
+    ],
+)
+def test_mako_latent_bypass_is_inert_at_render(payload):
+    """这些 payload 必须始终在 ``Template.render`` 后保持 inert（原样回显）。
+
+    它们能通过 AST 安全检查（visitor 只能识别字面 dunder / 已知禁用属性，无法穿透
+    BinOp / dir()[0][0] / Name 调用组合出的动态字符串与危险内建调用），所以**唯一的
+    防御**是 ``Settings.MAKO_SANDBOX_SHIELD_WORDS`` 中包含 ``getattr/type/vars/format/
+    breakpoint`` 等条目。若任何一条变成"非原样输出"，意味着 shield 被弱化或
+    ``_render_template`` 的 context 合并顺序被改动，需要立刻重新评估安全边界。
+    """
+    rendered = Template(payload).render({})
+    assert rendered == payload, (
+        "Mako sandbox bypass regression: payload {!r} rendered to {!r}, expected inert echo. "
+        "Check Settings.MAKO_SANDBOX_SHIELD_WORDS completeness."
+    ).format(payload, rendered)
