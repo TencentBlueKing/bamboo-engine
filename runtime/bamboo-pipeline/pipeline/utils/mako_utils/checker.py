@@ -19,8 +19,19 @@ from mako import parsetree
 from mako.exceptions import MakoException
 from mako.lexer import Lexer
 
+from pipeline.core.data import mako_safety
+
 from .code_extract import MakoNodeCodeExtractor
 from .exceptions import ForbiddenMakoTemplateException
+
+
+def validate_node_filter_callables(node: parsetree.Node):
+    # Mako stores inline `${expr | ...}` filter callables in `escapes_code`;
+    # tag-level filters use `filter_args`. Both are executed by create_filter_callable().
+    if hasattr(node, "escapes_code"):
+        mako_safety.validate_filter_args(node.escapes_code.args)
+    if hasattr(node, "filter_args"):
+        mako_safety.validate_filter_args(node.filter_args.args)
 
 
 def parse_template_nodes(
@@ -35,14 +46,15 @@ def parse_template_nodes(
     :param code_extractor: Mako 词法节点处理器，用于提取 python 代码
     """
     for node in nodes:
-        code = code_extractor.extract(node)
-        if code is None:
-            continue
+        validate_node_filter_callables(node)
 
-        ast_node = ast.parse(code, "<unknown>", "exec")
-        node_visitor.visit(ast_node)
+        code = code_extractor.extract(node)
+        if code is not None:
+            ast_node = ast.parse(code, "<unknown>", "exec")
+            node_visitor.visit(ast_node)
+
         if hasattr(node, "nodes"):
-            parse_template_nodes(node.nodes, node_visitor)
+            parse_template_nodes(node.nodes, node_visitor, code_extractor)
 
 
 def check_mako_template_safety(text: str, node_visitor: ast.NodeVisitor, code_extractor: MakoNodeCodeExtractor) -> bool:
