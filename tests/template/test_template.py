@@ -13,8 +13,14 @@ specific language governing permissions and limitations under the License.
 
 import datetime
 
+import pytest
+from mako.template import Template as MakoTemplate
+
 from bamboo_engine.config import Settings
 from bamboo_engine.template import Template
+from bamboo_engine.utils import mako_safety
+from bamboo_engine.utils.mako_utils.checker import check_mako_template_safety
+from bamboo_engine.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
 def test_get_reference():
@@ -130,3 +136,91 @@ def test_mako_attack():
     ]
     for at in attack_templates:
         assert Template(at).render({}) == at
+
+
+def _assert_forbidden_template(payload):
+    with pytest.raises(ForbiddenMakoTemplateException):
+        check_mako_template_safety(
+            payload,
+            mako_safety.SingleLineNodeVisitor(),
+            mako_safety.SingleLinCodeExtractor(),
+        )
+
+
+def test_mako_filter_side_effect_expression_is_blocked():
+    payload = "${'x'|((side_effect() or str))}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_filter_dunder_chain_is_blocked():
+    payload = "${'x'|().__class__.__bases__[0].__subclasses__}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_filter_list_blocks_any_malicious_item():
+    payload = "${'x'|h, (side_effect() or str)}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_decode_filter_private_attribute_is_blocked():
+    payload = "${'x'|decode.__class__}"
+
+    _assert_forbidden_template(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '<%page expression_filter="(side_effect() or str)"/>${name}',
+        '<%def name="render_name(name)" filter="(side_effect() or str)">${name}</%def>${render_name("x")}',
+        '<%block filter="(side_effect() or str)">x</%block>',
+        '<%text filter="(side_effect() or str)">x</%text>',
+    ],
+)
+def test_mako_tag_filter_callables_are_blocked(payload):
+    _assert_forbidden_template(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "${' x ' | h}",
+        "${' x ' | trim}",
+        "${' x ' | h, trim}",
+        "${'x' | n}",
+        "${b'abc' | decode.utf8}",
+    ],
+)
+def test_mako_builtin_filters_remain_allowed(payload):
+    check_mako_template_safety(
+        payload,
+        mako_safety.SingleLineNodeVisitor(),
+        mako_safety.SingleLinCodeExtractor(),
+    )
+
+
+def test_mako_builtin_filter_rendering_still_works():
+    assert MakoTemplate("${'x' | h}").render_unicode() == "x"
+    assert MakoTemplate("${' x ' | trim}").render_unicode() == "x"
+
+
+def test_mako_filter_side_effect_is_not_executed_by_template_render():
+    sentinel = {"called": False}
+
+    def side_effect():
+        sentinel["called"] = True
+        return str
+
+    payload = "${'x'|((side_effect() or str))}"
+
+    assert Template(payload).render({"side_effect": side_effect}) == payload
+    assert sentinel["called"] is False
+
+
+def test_mako_nested_dunder_expression_is_blocked():
+    payload = "${().__class__.mro()}"
+
+    assert Template(payload).render({}) == payload
