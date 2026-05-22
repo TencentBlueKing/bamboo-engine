@@ -25,7 +25,9 @@ from .code_extract import MakoNodeCodeExtractor
 from .exceptions import ForbiddenMakoTemplateException
 
 
-def validate_node_filters(node: parsetree.Node):
+def validate_node_filter_callables(node: parsetree.Node):
+    # Mako stores inline `${expr | ...}` filter callables in `escapes_code`;
+    # tag-level filters use `filter_args`. Both are executed by create_filter_callable().
     if hasattr(node, "escapes_code"):
         mako_safety.validate_filter_args(node.escapes_code.args)
     if hasattr(node, "filter_args"):
@@ -44,7 +46,7 @@ def parse_template_nodes(
     :param code_extractor: Mako 词法节点处理器，用于提取 python 代码
     """
     for node in nodes:
-        validate_node_filters(node)
+        validate_node_filter_callables(node)
 
         code = code_extractor.extract(node)
         if code is not None:

@@ -391,3 +391,14 @@ def test_mako_nested_dunder_expression_is_blocked():
     payload = "${().__class__.mro()}"
 
     assert Template(payload).render({}) == payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '${"{0.__class__}".format("")}',
+        '${"{value.__class__}".format_map({"value": ""})}',
+    ],
+)
+def test_mako_format_private_lookup_is_blocked(payload):
+    _assert_forbidden_template(payload)
