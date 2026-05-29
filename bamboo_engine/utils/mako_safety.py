@@ -15,6 +15,7 @@ specific language governing permissions and limitations under the License.
 
 
 import ast
+import logging
 import re
 
 from mako import parsetree
@@ -23,9 +24,68 @@ from .mako_utils.code_extract import MakoNodeCodeExtractor
 from .mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
+logger = logging.getLogger("root")
+
 FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
 SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
 SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+# 与 ``MAKO_SANDBOX_SHIELD_WORDS`` 不重叠的"安全内建函数"集合。
+# 用于白名单模式下默认放行的根标识符。
+# 不包含 ``bytes/bytearray/frozenset/memoryview/object/type/vars/getattr/...``
+# 等常出现在 shield 列表中的内建——它们即便能通过 AST 也会在渲染期被屏蔽成 ``None``，
+# 留在白名单里只会带来认知噪音。
+SAFE_BUILTIN_NAMES = frozenset(
+    {
+        "True",
+        "False",
+        "None",
+        # 类型构造（不会构造危险对象）
+        "bool",
+        "int",
+        "float",
+        "str",
+        "list",
+        "tuple",
+        "dict",
+        "set",
+        # 数学 / 长度
+        "abs",
+        "round",
+        "pow",
+        "sum",
+        "min",
+        "max",
+        "len",
+        # 序列
+        "range",
+        "slice",
+        "enumerate",
+        "zip",
+        "sorted",
+        "reversed",
+        # 逻辑
+        "all",
+        "any",
+    }
+)
+
+# Mako 在渲染期会向模板命名空间注入的保留对象名，用户模板里出现这些名字时
+# 极大概率是在尝试触达模板内部对象（``self.module.cache.util.os...`` SSTI 链路）。
+# 对它们直接拒绝，可以堵住绝大多数 namespace 链式 RCE 路径。
+MAKO_RESERVED_NAMESPACES = frozenset(
+    {
+        "self",
+        "context",
+        "local",
+        "parent",
+        "next",
+        "caller",
+        "pageargs",
+        "UNDEFINED",
+        "STOP_RENDERING",
+    }
+)
 
 
 class SingleLineNodeVisitor(ast.NodeVisitor):
@@ -98,3 +158,147 @@ class SingleLinCodeExtractor(MakoNodeCodeExtractor):
             return None
         else:
             raise ForbiddenMakoTemplateException("Unsupported node: [{}]".format(node.__class__.__name__))
+
+
+def _deformat_var_key(key):
+    """``${name}`` -> ``name``；其它 key 原样返回。"""
+    if isinstance(key, str) and key.startswith("${") and key.endswith("}"):
+        return key[2:-1]
+    return key
+
+
+def build_allowed_names(context, *, extra=()):
+    """根据当前渲染 context 与全局 ``Settings`` 计算白名单的根标识符集合。
+
+    包含：
+      * ``context`` 中的键（``${name}`` 形式自动 deformat）
+      * ``Settings.MAKO_SANDBOX_IMPORT_MODULES`` 中每个 alias 的首段
+        （例：``os.path`` → ``os``）
+      * :data:`SAFE_BUILTIN_NAMES`
+      * ``Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST``
+      * 调用方传入的 ``extra``
+    """
+    # 局部 import 避免循环依赖（``Settings`` 在 ``bamboo_engine.config``）。
+    from bamboo_engine.config import Settings
+
+    allowed = set(SAFE_BUILTIN_NAMES)
+
+    for key in context.keys() if context else ():
+        allowed.add(_deformat_var_key(key))
+
+    import_modules = getattr(Settings, "MAKO_SANDBOX_IMPORT_MODULES", None) or {}
+    for alias in import_modules.values():
+        if alias:
+            allowed.add(alias.split(".", 1)[0])
+
+    extra_whitelist = getattr(Settings, "MAKO_TEMPLATE_NAME_EXTRA_WHITELIST", None) or ()
+    allowed.update(extra_whitelist)
+    allowed.update(extra)
+
+    return allowed
+
+
+class WhitelistNameVisitor(ast.NodeVisitor):
+    """根标识符白名单 visitor。
+
+    只允许 Load 语义的 ``Name`` 节点引用 ``allowed_names`` 中的标识符；其余一律按
+    ``mode`` 处理：
+
+      * ``warn``：调用 ``on_violation`` / 打 warning 日志，**不抛异常**（灰度模式）。
+      * ``enforce``：抛 :exc:`ForbiddenMakoTemplateException`，由
+        :func:`bamboo_engine.utils.mako_utils.checker.check_mako_template_safety` 捕获。
+
+    本 visitor 还显式拦截 :data:`MAKO_RESERVED_NAMESPACES` 中的标识符，
+    无论是否被传入 ``allowed_names`` 都会被拒，避免误把 ``self/context/...`` 加进
+    上下文导致 SSTI 链路被放行。
+
+    支持 ``ListComp / SetComp / DictComp / GeneratorExp / Lambda`` 引入的局部
+    绑定——这些临时变量会被压入作用域栈，在子树访问完后自动弹出。
+    """
+
+    def __init__(self, allowed_names, mode="enforce", on_violation=None):
+        if mode not in {"warn", "enforce"}:
+            raise ValueError("invalid whitelist mode: {}".format(mode))
+        self.allowed_names = set(allowed_names)
+        self.mode = mode
+        self.on_violation = on_violation
+        self.scope_stack = []
+
+    def _name_allowed(self, name):
+        if name in MAKO_RESERVED_NAMESPACES:
+            return False
+        if name in self.allowed_names:
+            return True
+        for scope in self.scope_stack:
+            if name in scope:
+                return True
+        return False
+
+    def _violate(self, name, reason):
+        msg = "name not in whitelist: {} ({})".format(name, reason)
+        if self.on_violation is not None:
+            try:
+                self.on_violation(name, reason)
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("on_violation callback raised")
+        if self.mode == "enforce":
+            raise ForbiddenMakoTemplateException(msg)
+        logger.warning("[mako_whitelist] %s", msg)
+
+    @staticmethod
+    def _collect_targets(target, into):
+        if isinstance(target, ast.Name):
+            into.add(target.id)
+        elif isinstance(target, ast.Starred):
+            WhitelistNameVisitor._collect_targets(target.value, into)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for elt in target.elts:
+                WhitelistNameVisitor._collect_targets(elt, into)
+
+    def visit_Name(self, node):
+        # Store / Del 上下文是赋值/删除目标，由 _enter_* 显式处理，跳过命名检查
+        if not isinstance(node.ctx, ast.Load):
+            return
+        if node.id in MAKO_RESERVED_NAMESPACES:
+            self._violate(node.id, "mako reserved namespace")
+            return
+        if not self._name_allowed(node.id):
+            self._violate(node.id, "not in whitelist")
+
+    def _enter_comprehension(self, node):
+        local = set()
+        for gen in node.generators:
+            self._collect_targets(gen.target, local)
+        self.scope_stack.append(local)
+        try:
+            self.generic_visit(node)
+        finally:
+            self.scope_stack.pop()
+
+    def visit_ListComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_SetComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_DictComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_GeneratorExp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_Lambda(self, node):
+        local = set()
+        args = node.args
+        local.update(arg.arg for arg in args.args)
+        local.update(arg.arg for arg in args.kwonlyargs)
+        local.update(arg.arg for arg in getattr(args, "posonlyargs", ()) or ())
+        if args.vararg:
+            local.add(args.vararg.arg)
+        if args.kwarg:
+            local.add(args.kwarg.arg)
+        self.scope_stack.append(local)
+        try:
+            self.generic_visit(node)
+        finally:
+            self.scope_stack.pop()
