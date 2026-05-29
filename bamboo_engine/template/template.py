@@ -175,6 +175,24 @@ class Template:
             except Exception:
                 logger.exception("{} safety check error.".format(tpl))
                 continue
+            # 根标识符白名单（``MAKO_TEMPLATE_NAME_WHITELIST_MODE``）。off 模式下保持
+            # 历史行为；warn 模式只打日志；enforce 模式命中即按 SingleLineNodeVisitor
+            # 风格 inert 掉这一段模板（``logger.warning + continue``）。
+            whitelist_mode = getattr(Settings, "MAKO_TEMPLATE_NAME_WHITELIST_MODE", "off")
+            if whitelist_mode in ("warn", "enforce"):
+                allowed_names = mako_safety.build_allowed_names(context)
+                try:
+                    check_mako_template_safety(
+                        tpl,
+                        mako_safety.WhitelistNameVisitor(allowed_names, mode=whitelist_mode),
+                        mako_safety.SingleLinCodeExtractor(),
+                    )
+                except ForbiddenMakoTemplateException as e:
+                    logger.warning("forbidden by whitelist: {}, exception: {}".format(tpl, e))
+                    continue
+                except Exception:
+                    logger.exception("{} whitelist check error.".format(tpl))
+                    continue
             resolved = Template._render_template(tpl, context)
             string = string.replace(tpl, resolved)
         return string

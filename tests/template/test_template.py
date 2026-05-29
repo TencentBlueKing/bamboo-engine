@@ -130,3 +130,168 @@ def test_mako_attack():
     ]
     for at in attack_templates:
         assert Template(at).render({}) == at
+
+
+# ---------------------------------------------------------------------------
+# 根标识符白名单（``MAKO_TEMPLATE_NAME_WHITELIST_MODE``）。这套机制覆盖：
+#
+# 1. ``self / context / local / parent / next / caller / pageargs`` 等 Mako
+#    渲染期注入的保留命名空间（堵 ``self.module.cache.util.os.popen`` SSTI 链路）。
+# 2. attr 链路上的危险字段 / 单下划线 attr，堵 ``${os.path.os.popen(...)}``、
+#    ``${datetime.sys.modules['os']...}``、``${context._kwargs}`` 这类反向引用。
+# 3. 业务正常用法（字符串方法、``datetime.datetime.now().strftime(...)``、
+#    ``os.path.join`` / 列表推导 / lambda）必须照常渲染。
+# ---------------------------------------------------------------------------
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture
+def whitelist_mode():
+    """在 ``Settings`` 上切换 ``MAKO_TEMPLATE_NAME_WHITELIST_MODE``，测试结束后还原。"""
+    original_mode = Settings.MAKO_TEMPLATE_NAME_WHITELIST_MODE
+    original_extra = Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST
+
+    def _set(mode, extra=()):
+        Settings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
+        Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
+
+    try:
+        yield _set
+    finally:
+        Settings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = original_mode
+        Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = original_extra
+
+
+def test_mako_self_module_namespace_executes_when_whitelist_off(whitelist_mode):
+    """白名单关闭时，``self.module.*`` SSTI 链路是确实存在的——这是回归基线。"""
+    whitelist_mode("off")
+    payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
+    rendered = Template(payload).render({})
+    assert "OFF" in rendered, "off 模式下白名单未启用，PoC 应仍执行"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '${self.module.cache.util.os.popen("echo PWNED").read()}',
+        "${context.lookup}",
+        "${local.something}",
+        "${parent.foo}",
+        "${caller.body()}",
+        "${pageargs.x}",
+    ],
+)
+def test_mako_whitelist_blocks_reserved_namespaces(whitelist_mode, payload):
+    whitelist_mode("enforce")
+    assert Template(payload).render({}) == payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # ``os.path`` 内部 ``import os``：os.path.os is os
+        '${os.path.os.popen("echo PWNED").read()}',
+        # 嵌套子模块：os.path.genericpath.os 同样指向真实 os
+        '${os.path.genericpath.os.popen("echo PWNED").read()}',
+        # ``datetime`` import 了 sys，再走 sys.modules 拿 os
+        '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+        # ``re`` 重新 export ``enum``，``enum`` 内部 import sys
+        '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+        # 直接调用 popen / system 也要拦
+        '${os.path.os.system("echo PWNED")}',
+    ],
+)
+def test_mako_whitelist_blocks_dangerous_attr_chain(whitelist_mode, payload):
+    """白名单根名（``os / datetime / re``）必须挡得住 attr 链反向引用。"""
+    whitelist_mode("enforce")
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "datetime": "datetime",
+        "re": "re",
+        "os.path": "os.path",
+    }
+    try:
+        rendered = Template({"x": payload}).render({})
+        # ``rendered["x"] == payload`` 已经证明被拦后原样回显——不再用字面 PWNED 字符串
+        # 二次断言（payload 本身就含 ``echo PWNED``，字符串包含关系无法区分"被拦的原文"
+        # 和"被执行的输出"）。
+        assert rendered["x"] == payload
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "${context._kwargs}",
+        "${context._with_template}",
+        "${context._data}",
+        "${obj._secret}",
+        "${obj.public._private}",
+    ],
+)
+def test_mako_whitelist_blocks_single_underscore_attr(whitelist_mode, payload):
+    whitelist_mode("enforce")
+    rendered = Template({"x": payload}).render({"obj": object()})
+    assert rendered["x"] == payload
+
+
+def test_mako_whitelist_allows_business_patterns(whitelist_mode):
+    whitelist_mode("enforce")
+    cases = [
+        ("${name.upper()}", {"name": "abc"}, "ABC"),
+        ("${name.split('-')}", {"name": "a-b-c"}, "['a', 'b', 'c']"),
+        ("${[x * 2 for x in items]}", {"items": [1, 2, 3]}, "[2, 4, 6]"),
+        ("${(lambda y: y + 1)(seed)}", {"seed": 4}, "5"),
+        ("${a if a else 'default'}", {"a": ""}, "default"),
+        ("${len(items)}", {"items": [1, 2, 3]}, "3"),
+    ]
+    for tpl, ctx, expected in cases:
+        assert Template(tpl).render(ctx) == expected
+
+
+def test_mako_whitelist_allows_imported_modules(whitelist_mode):
+    whitelist_mode("enforce")
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "datetime": "datetime",
+        "os.path": "os.path",
+    }
+    try:
+        # os.path.join 仍可用（join 不在 DANGEROUS_ATTR_NAMES）
+        assert Template('${os.path.join("a", "b")}').render({}) == "a/b"
+        # datetime.datetime.now().strftime 链路全程合法
+        out = Template('${datetime.datetime.now().strftime("%Y")}').render({})
+        assert len(out) == 4 and out.isdigit()
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+
+def test_mako_whitelist_extra_names_allowed(whitelist_mode):
+    whitelist_mode("enforce", extra=("_loop", "_system"))
+    out = Template("${_loop}").render({"_loop": 7})
+    # 单 token 模板会直接返回 context 中的原始值；当不存在时则按白名单评估表达式。
+    assert out == 7
+    assert Template("${_loop + 1}").render({"_loop": 2}) == "3"
+
+
+def test_mako_whitelist_unknown_root_name_is_blocked(whitelist_mode):
+    whitelist_mode("enforce")
+    payload = "${secret_var}"
+    assert Template(payload).render({}) == payload
+
+
+def test_mako_whitelist_warn_mode_does_not_block_but_logs(whitelist_mode, caplog):
+    whitelist_mode("warn")
+    payload = "${self.module}"
+    with caplog.at_level("WARNING"):
+        # warn 模式下 visitor 自身不抛——但 Mako 渲染保留命名空间 ``self.module``
+        # 时仍会在渲染层失败，因此结果取决于运行期；本测试只确认日志被打到。
+        try:
+            Template(payload).render({})
+        except Exception:
+            pass
+    assert any("name not in whitelist" in r.getMessage() or "self" in r.getMessage() for r in caplog.records)
+

@@ -141,6 +141,26 @@ class ConstantTemplate(object):
                 except Exception:
                     logger.exception("{} safety check error.".format(tpl))
                     continue
+                # 根标识符白名单（``MAKO_TEMPLATE_NAME_WHITELIST_MODE``），延用引擎全局
+                # ``Settings`` 配置；off 时保持历史行为，warn 仅打日志，enforce 命中即
+                # 按 SingleLineNodeVisitor 风格 inert 掉这一段模板。
+                from bamboo_engine.config import Settings as _BambooSettings
+
+                whitelist_mode = getattr(_BambooSettings, "MAKO_TEMPLATE_NAME_WHITELIST_MODE", "off")
+                if whitelist_mode in ("warn", "enforce"):
+                    allowed_names = mako_safety.build_allowed_names(value_maps)
+                    try:
+                        check_mako_template_safety(
+                            tpl,
+                            mako_safety.WhitelistNameVisitor(allowed_names, mode=whitelist_mode),
+                            mako_safety.SingleLinCodeExtractor(),
+                        )
+                    except ForbiddenMakoTemplateException as e:
+                        logger.warning("forbidden by whitelist: {}, exception: {}".format(tpl, e))
+                        continue
+                    except Exception:
+                        logger.exception("{} whitelist check error.".format(tpl))
+                        continue
             resolved = ConstantTemplate.resolve_template(tpl, value_maps)
             string = string.replace(tpl, resolved)
         return string
