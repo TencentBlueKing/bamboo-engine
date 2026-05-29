@@ -244,6 +244,11 @@ class TestMakoNameWhitelist(TestCase):
         rendered = expression.ConstantTemplate(payload).resolve_data({})
         self.assertIn("OFF", rendered)
 
+    def test_default_mode_blocks_self_module(self):
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
     def test_enforce_blocks_self_module(self):
         self._set_mode("enforce")
         payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'

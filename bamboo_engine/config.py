@@ -69,8 +69,9 @@ class Settings:
     #   "off"     - 关闭白名单（兼容历史行为）
     #   "warn"    - 仅记录违规日志，不阻断渲染（灰度阶段使用）
     #   "enforce" - 违规即按当前 deny-list 风格拦截（行为同 ForbiddenMakoTemplateException）
-    # 默认 "off"，由具体接入方按节奏开启。
-    MAKO_TEMPLATE_NAME_WHITELIST_MODE = "off"
+    # 默认 "enforce"，避免默认安装后继续暴露 Mako 渲染期保留命名空间注入链路。
+    # 如接入方确有兼容性风险，可在自身 settings 中临时切到 "warn" 或 "off"。
+    MAKO_TEMPLATE_NAME_WHITELIST_MODE = "enforce"
 
     # 在白名单基础上额外允许的根标识符（除 context/导入模块/SAFE_BUILTIN_NAMES 之外）。
     # 接入方通常用于声明 ``_system``、``_loop`` 这类 Mako 渲染期才注入的特殊对象名。

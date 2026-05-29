@@ -172,6 +172,12 @@ def test_mako_self_module_namespace_executes_when_whitelist_off(whitelist_mode):
     assert "OFF" in rendered, "off 模式下白名单未启用，PoC 应仍执行"
 
 
+def test_mako_whitelist_default_blocks_self_module_namespace():
+    """默认配置必须阻断 ``self.module.*`` SSTI 链路。"""
+    payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+    assert Template(payload).render({}) == payload
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -294,4 +300,3 @@ def test_mako_whitelist_warn_mode_does_not_block_but_logs(whitelist_mode, caplog
         except Exception:
             pass
     assert any("name not in whitelist" in r.getMessage() or "self" in r.getMessage() for r in caplog.records)
-
