@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import ast
+import logging
 import re
 
 from mako import parsetree
@@ -20,9 +21,59 @@ from pipeline.utils.mako_utils.code_extract import MakoNodeCodeExtractor
 from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
+logger = logging.getLogger("root")
+
 FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
 SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
 SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+# 与 ``MAKO_SANDBOX_SHIELD_WORDS`` 不重叠的"安全内建函数"集合。
+# 详见 ``bamboo_engine.utils.mako_safety.SAFE_BUILTIN_NAMES`` 的同步实现。
+SAFE_BUILTIN_NAMES = frozenset(
+    {
+        "True",
+        "False",
+        "None",
+        "bool",
+        "int",
+        "float",
+        "str",
+        "list",
+        "tuple",
+        "dict",
+        "set",
+        "abs",
+        "round",
+        "pow",
+        "sum",
+        "min",
+        "max",
+        "len",
+        "range",
+        "slice",
+        "enumerate",
+        "zip",
+        "sorted",
+        "reversed",
+        "all",
+        "any",
+    }
+)
+
+# Mako 渲染期保留命名空间，详见 ``bamboo_engine.utils.mako_safety.MAKO_RESERVED_NAMESPACES``。
+MAKO_RESERVED_NAMESPACES = frozenset(
+    {
+        "self",
+        "context",
+        "local",
+        "parent",
+        "next",
+        "caller",
+        "pageargs",
+        "UNDEFINED",
+        "STOP_RENDERING",
+    }
+)
 
 
 class SingleLineNodeVisitor(ast.NodeVisitor):
@@ -104,3 +155,130 @@ class SingleLinCodeExtractor(MakoNodeCodeExtractor):
             return None
         else:
             raise ForbiddenMakoTemplateException("Unsupported node: [{}]".format(node.__class__.__name__))
+
+
+def _deformat_var_key(key):
+    """``${name}`` -> ``name``。"""
+    if isinstance(key, str) and key.startswith("${") and key.endswith("}"):
+        return key[2:-1]
+    return key
+
+
+def build_allowed_names(value_maps, *, extra=()):
+    """legacy ConstantTemplate 渲染期使用：基于 ``value_maps`` 与 ``Settings`` 计算白名单。
+
+    与 ``bamboo_engine.utils.mako_safety.build_allowed_names`` 等价；为了避免老引擎反向依赖
+    新引擎包，单独实现一份。
+    """
+    from bamboo_engine.config import Settings
+
+    allowed = set(SAFE_BUILTIN_NAMES)
+
+    for key in value_maps.keys() if value_maps else ():
+        allowed.add(_deformat_var_key(key))
+
+    import_modules = getattr(Settings, "MAKO_SANDBOX_IMPORT_MODULES", None) or {}
+    for alias in import_modules.values():
+        if alias:
+            allowed.add(alias.split(".", 1)[0])
+
+    extra_whitelist = getattr(Settings, "MAKO_TEMPLATE_NAME_EXTRA_WHITELIST", None) or ()
+    allowed.update(extra_whitelist)
+    allowed.update(extra)
+
+    return allowed
+
+
+class WhitelistNameVisitor(ast.NodeVisitor):
+    """根标识符白名单 visitor（legacy 引擎版本）。
+
+    行为与 ``bamboo_engine.utils.mako_safety.WhitelistNameVisitor`` 同步——只放行
+    ``allowed_names`` 中的根 ``Name``，并显式拦截 ``self/context/local/parent/next/
+    caller/pageargs`` 等 Mako 保留命名空间。
+    """
+
+    def __init__(self, allowed_names, mode="enforce", on_violation=None):
+        if mode not in {"warn", "enforce"}:
+            raise ValueError("invalid whitelist mode: {}".format(mode))
+        self.allowed_names = set(allowed_names)
+        self.mode = mode
+        self.on_violation = on_violation
+        self.scope_stack = []
+
+    def _name_allowed(self, name):
+        if name in MAKO_RESERVED_NAMESPACES:
+            return False
+        if name in self.allowed_names:
+            return True
+        for scope in self.scope_stack:
+            if name in scope:
+                return True
+        return False
+
+    def _violate(self, name, reason):
+        msg = "name not in whitelist: {} ({})".format(name, reason)
+        if self.on_violation is not None:
+            try:
+                self.on_violation(name, reason)
+            except Exception:  # pragma: no cover - defensive
+                logger.exception("on_violation callback raised")
+        if self.mode == "enforce":
+            raise ForbiddenMakoTemplateException(msg)
+        logger.warning("[mako_whitelist] %s", msg)
+
+    @staticmethod
+    def _collect_targets(target, into):
+        if isinstance(target, ast.Name):
+            into.add(target.id)
+        elif isinstance(target, ast.Starred):
+            WhitelistNameVisitor._collect_targets(target.value, into)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for elt in target.elts:
+                WhitelistNameVisitor._collect_targets(elt, into)
+
+    def visit_Name(self, node):
+        if not isinstance(node.ctx, ast.Load):
+            return
+        if node.id in MAKO_RESERVED_NAMESPACES:
+            self._violate(node.id, "mako reserved namespace")
+            return
+        if not self._name_allowed(node.id):
+            self._violate(node.id, "not in whitelist")
+
+    def _enter_comprehension(self, node):
+        local = set()
+        for gen in node.generators:
+            self._collect_targets(gen.target, local)
+        self.scope_stack.append(local)
+        try:
+            self.generic_visit(node)
+        finally:
+            self.scope_stack.pop()
+
+    def visit_ListComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_SetComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_DictComp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_GeneratorExp(self, node):
+        self._enter_comprehension(node)
+
+    def visit_Lambda(self, node):
+        local = set()
+        args = node.args
+        local.update(arg.arg for arg in args.args)
+        local.update(arg.arg for arg in args.kwonlyargs)
+        local.update(arg.arg for arg in getattr(args, "posonlyargs", ()) or ())
+        if args.vararg:
+            local.add(args.vararg.arg)
+        if args.kwarg:
+            local.add(args.kwarg.arg)
+        self.scope_stack.append(local)
+        try:
+            self.generic_visit(node)
+        finally:
+            self.scope_stack.pop()
