@@ -214,3 +214,96 @@ class TestConstantTemplate(TestCase):
             self.assertEqual(expression.ConstantTemplate(at).resolve_data({}), at)
 
         sandbox.SANDBOX = sandbox_copy
+
+
+class TestMakoNameWhitelist(TestCase):
+    """``MAKO_TEMPLATE_NAME_WHITELIST_MODE`` 在 legacy ``ConstantTemplate`` 上的覆盖。
+
+    新引擎 ``bamboo_engine.template.Template`` 与 legacy ``ConstantTemplate`` 走的是
+    各自独立的渲染路径。两边都需要白名单 visitor，否则只挡一边等于没挡。
+    """
+
+    def setUp(self):
+        from bamboo_engine.config import Settings as BambooSettings
+
+        self._BambooSettings = BambooSettings
+        self._original_mode = BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE
+        self._original_extra = BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST
+
+    def tearDown(self):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = self._original_mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = self._original_extra
+
+    def _set_mode(self, mode, extra=()):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
+
+    def test_off_mode_keeps_legacy_behavior(self):
+        self._set_mode("off")
+        payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertIn("OFF", rendered)
+
+    def test_enforce_blocks_self_module(self):
+        self._set_mode("enforce")
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_dangerous_attr_chain_blocked(self):
+        """根 Name 是白名单内的导入模块，但 attr 链上出现 os/sys/modules/popen 等危险字段也必须拦。"""
+        self._set_mode("enforce")
+        original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
+            "datetime": "datetime",
+            "re": "re",
+            "os.path": "os.path",
+        }
+        try:
+            payloads = [
+                '${os.path.os.popen("echo PWNED").read()}',
+                '${os.path.genericpath.os.popen("echo PWNED").read()}',
+                '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+                '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+            ]
+            for p in payloads:
+                with self.subTest(payload=p):
+                    rendered = expression.ConstantTemplate(p).resolve_data({})
+                    self.assertEqual(rendered, p)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+    def test_single_underscore_attr_blocked(self):
+        self._set_mode("enforce")
+        for p in [
+            "${context._kwargs}",
+            "${context._with_template}",
+            "${obj._secret}",
+        ]:
+            with self.subTest(payload=p):
+                rendered = expression.ConstantTemplate(p).resolve_data({"obj": object()})
+                self.assertEqual(rendered, p)
+
+    def test_business_patterns_still_render(self):
+        self._set_mode("enforce")
+        cases = [
+            ("${name.upper()}", {"name": "abc"}, "ABC"),
+            ("${[x * 2 for x in items]}", {"items": [1, 2, 3]}, "[2, 4, 6]"),
+            ("${(lambda y: y + 1)(seed)}", {"seed": 4}, "5"),
+            ("${len(items)}", {"items": [1, 2]}, "2"),
+        ]
+        for tpl, ctx, expected in cases:
+            with self.subTest(tpl=tpl):
+                self.assertEqual(expression.ConstantTemplate(tpl).resolve_data(ctx), expected)
+
+    def test_extra_whitelist_names(self):
+        self._set_mode("enforce", extra=("_loop", "_system"))
+        # 单 token 模板：直接返回 context 中原始值
+        self.assertEqual(expression.ConstantTemplate("${_loop}").resolve_data({"_loop": 3}), 3)
+        # 表达式：走白名单 visitor，``_loop`` 在 extra 白名单中放行
+        self.assertEqual(expression.ConstantTemplate("${_loop + 1}").resolve_data({"_loop": 4}), "5")
+
+    def test_unknown_root_name_blocked(self):
+        self._set_mode("enforce")
+        payload = "${secret_var}"
+        self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
