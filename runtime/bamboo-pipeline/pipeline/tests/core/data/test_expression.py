@@ -59,10 +59,12 @@ class TestConstantTemplate(TestCase):
 
     def test_resolve_template_with_curly_braces(self):
         cons_tmpl = expression.ConstantTemplate("")
-        one_template = '${"test_{}".format(a)}'
-        self.assertEqual(cons_tmpl.resolve_string(one_template, {"a": "1"}), "test_1")
-        ano_template = '${f"test_{a}"}'
-        self.assertEqual(cons_tmpl.resolve_template(ano_template, {"a": "2"}), "test_2")
+        format_attr_template = '${"test_{}".format(a)}'
+        self.assertEqual(cons_tmpl.resolve_string(format_attr_template, {"a": "1"}), format_attr_template)
+        percent_template = '${"test_%s" % a}'
+        self.assertEqual(cons_tmpl.resolve_string(percent_template, {"a": "1"}), "test_1")
+        fstring_template = '${f"test_{a}"}'
+        self.assertEqual(cons_tmpl.resolve_template(fstring_template, {"a": "2"}), "test_2")
 
     def test_resolve_string(self):
         cons_tmpl = expression.ConstantTemplate("")
