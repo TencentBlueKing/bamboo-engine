@@ -75,6 +75,47 @@ MAKO_RESERVED_NAMESPACES = frozenset(
     }
 )
 
+# attr 链路危险字段，详见 ``bamboo_engine.utils.mako_safety.DANGEROUS_ATTR_NAMES``。
+DANGEROUS_ATTR_NAMES = frozenset(
+    {
+        "os",
+        "sys",
+        "subprocess",
+        "shutil",
+        "ctypes",
+        "socket",
+        "_thread",
+        "threading",
+        "builtins",
+        "__builtins__",
+        "modules",
+        "popen",
+        "popen2",
+        "popen3",
+        "popen4",
+        "system",
+        "spawnl",
+        "spawnle",
+        "spawnlp",
+        "spawnlpe",
+        "spawnv",
+        "spawnve",
+        "spawnvp",
+        "spawnvpe",
+        "execl",
+        "execle",
+        "execlp",
+        "execlpe",
+        "execv",
+        "execve",
+        "execvp",
+        "execvpe",
+        "fork",
+        "forkpty",
+        "kill",
+    }
+)
+
 
 class SingleLineNodeVisitor(ast.NodeVisitor):
     """
@@ -244,6 +285,17 @@ class WhitelistNameVisitor(ast.NodeVisitor):
             return
         if not self._name_allowed(node.id):
             self._violate(node.id, "not in whitelist")
+
+    def visit_Attribute(self, node):
+        # 与新引擎 ``bamboo_engine.utils.mako_safety.WhitelistNameVisitor.visit_Attribute``
+        # 保持一致：单下划线前缀 + 危险 attr 名一律拒绝，堵反向引用 SSTI 链路。
+        if node.attr.startswith("_"):
+            self._violate(node.attr, "private attribute")
+            return
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            self._violate(node.attr, "dangerous attribute")
+            return
+        self.generic_visit(node)
 
     def _enter_comprehension(self, node):
         local = set()

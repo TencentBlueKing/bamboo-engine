@@ -87,6 +87,62 @@ MAKO_RESERVED_NAMESPACES = frozenset(
     }
 )
 
+# attr 链路上一旦出现下列名字就立刻拒绝。
+#
+# 根 ``Name`` 白名单只能防"未授权根标识符"，挡不住通过白名单根名（如 ``os``、``datetime``、
+# ``re``）反向触达危险模块的链路：
+#
+# * ``${os.path.os.popen(...)}``        — ``os.path`` 内部 ``import os``
+# * ``${datetime.sys.modules['os']...}`` — ``datetime`` 内部 ``import sys``
+# * ``${re.enum.sys.modules['os']...}``  — ``re`` 重新 export ``enum``，``enum`` 内 ``import sys``
+#
+# 所有这些链路都需要 attr 链上出现 ``os / sys / subprocess / shutil / ctypes / socket /
+# builtins / modules`` 之一，或调用 ``popen / system / exec* / spawn* / fork*`` 之一。
+# 直接把 attr 名拉黑，就能切掉公共必经路径。这是纵深防御里的"任何路径都不该带这些字"，
+# 不是替代根名白名单。
+DANGEROUS_ATTR_NAMES = frozenset(
+    {
+        # 直接拿到危险模块对象
+        "os",
+        "sys",
+        "subprocess",
+        "shutil",
+        "ctypes",
+        "socket",
+        "_thread",
+        "threading",
+        "builtins",
+        "__builtins__",
+        # 通过模块字典反向触达任意已导入模块
+        "modules",
+        # 进程 / 文件描述符相关原语（即便有人未来误把 ``os`` 加进白名单，也再加一层）
+        "popen",
+        "popen2",
+        "popen3",
+        "popen4",
+        "system",
+        "spawnl",
+        "spawnle",
+        "spawnlp",
+        "spawnlpe",
+        "spawnv",
+        "spawnve",
+        "spawnvp",
+        "spawnvpe",
+        "execl",
+        "execle",
+        "execlp",
+        "execlpe",
+        "execv",
+        "execve",
+        "execvp",
+        "execvpe",
+        "fork",
+        "forkpty",
+        "kill",
+    }
+)
+
 
 class SingleLineNodeVisitor(ast.NodeVisitor):
     """
@@ -264,6 +320,20 @@ class WhitelistNameVisitor(ast.NodeVisitor):
             return
         if not self._name_allowed(node.id):
             self._violate(node.id, "not in whitelist")
+
+    def visit_Attribute(self, node):
+        # 单下划线 attr 拒绝：堵 ``context._with_template / context._kwargs`` 这类
+        # Python "半私有" 通道（双下划线已经在 ``SingleLineNodeVisitor`` 拦过，这里
+        # 顺手收紧成单下划线，覆盖更广）。
+        if node.attr.startswith("_"):
+            self._violate(node.attr, "private attribute")
+            return
+        # 危险 attr 名拒绝：堵 ``${os.path.os.popen(...)}`` /
+        # ``${datetime.sys.modules['os'].popen(...)}`` 类反向引用链路。
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            self._violate(node.attr, "dangerous attribute")
+            return
+        self.generic_visit(node)
 
     def _enter_comprehension(self, node):
         local = set()
