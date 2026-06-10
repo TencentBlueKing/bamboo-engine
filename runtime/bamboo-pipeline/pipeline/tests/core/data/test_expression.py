@@ -16,8 +16,10 @@ import datetime
 
 from django.test import TestCase
 
-from pipeline.core.data import expression, sandbox
+from pipeline.core.data import expression, mako_safety, sandbox
 from pipeline.core.data.expression import format_constant_key, deformat_constant_key
+from pipeline.utils.mako_utils.checker import check_mako_template_safety
+from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
 class TestConstantTemplate(TestCase):
@@ -57,10 +59,12 @@ class TestConstantTemplate(TestCase):
 
     def test_resolve_template_with_curly_braces(self):
         cons_tmpl = expression.ConstantTemplate("")
-        one_template = '${"test_{}".format(a)}'
-        self.assertEqual(cons_tmpl.resolve_string(one_template, {"a": "1"}), "test_1")
-        ano_template = '${f"test_{a}"}'
-        self.assertEqual(cons_tmpl.resolve_template(ano_template, {"a": "2"}), "test_2")
+        format_attr_template = '${"test_{}".format(a)}'
+        self.assertEqual(cons_tmpl.resolve_string(format_attr_template, {"a": "1"}), format_attr_template)
+        percent_template = '${"test_%s" % a}'
+        self.assertEqual(cons_tmpl.resolve_string(percent_template, {"a": "1"}), "test_1")
+        fstring_template = '${f"test_{a}"}'
+        self.assertEqual(cons_tmpl.resolve_template(fstring_template, {"a": "2"}), "test_2")
 
     def test_resolve_string(self):
         cons_tmpl = expression.ConstantTemplate("")
@@ -214,3 +218,151 @@ class TestConstantTemplate(TestCase):
             self.assertEqual(expression.ConstantTemplate(at).resolve_data({}), at)
 
         sandbox.SANDBOX = sandbox_copy
+
+
+class TestMakoNameWhitelist(TestCase):
+    def setUp(self):
+        from bamboo_engine.config import Settings as BambooSettings
+
+        self._BambooSettings = BambooSettings
+        self._original_mode = BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE
+        self._original_extra = BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST
+
+    def tearDown(self):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = self._original_mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = self._original_extra
+
+    def _set_mode(self, mode, extra=()):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
+
+    def test_off_mode_keeps_legacy_behavior(self):
+        self._set_mode("off")
+        payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertIn("OFF", rendered)
+
+    def test_default_mode_blocks_self_module(self):
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_enforce_blocks_self_module(self):
+        self._set_mode("enforce")
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_dangerous_attr_chain_blocked(self):
+        self._set_mode("enforce")
+        original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
+            "datetime": "datetime",
+            "re": "re",
+            "os.path": "os.path",
+        }
+        try:
+            payloads = [
+                '${os.path.os.popen("echo PWNED").read()}',
+                '${os.path.genericpath.os.popen("echo PWNED").read()}',
+                '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+                '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+            ]
+            for p in payloads:
+                with self.subTest(payload=p):
+                    rendered = expression.ConstantTemplate(p).resolve_data({})
+                    self.assertEqual(rendered, p)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+    def test_single_underscore_attr_blocked(self):
+        self._set_mode("enforce")
+        for p in [
+            "${context._kwargs}",
+            "${context._with_template}",
+            "${obj._secret}",
+        ]:
+            with self.subTest(payload=p):
+                rendered = expression.ConstantTemplate(p).resolve_data({"obj": object()})
+                self.assertEqual(rendered, p)
+
+    def test_business_patterns_still_render(self):
+        self._set_mode("enforce")
+        cases = [
+            ("${name.upper()}", {"name": "abc"}, "ABC"),
+            ("${[x * 2 for x in items]}", {"items": [1, 2, 3]}, "[2, 4, 6]"),
+            ("${(lambda y: y + 1)(seed)}", {"seed": 4}, "5"),
+            ("${len(items)}", {"items": [1, 2]}, "2"),
+        ]
+        for tpl, ctx, expected in cases:
+            with self.subTest(tpl=tpl):
+                self.assertEqual(expression.ConstantTemplate(tpl).resolve_data(ctx), expected)
+
+    def test_extra_whitelist_names(self):
+        self._set_mode("enforce", extra=("_loop", "_system"))
+        self.assertEqual(expression.ConstantTemplate("${_loop}").resolve_data({"_loop": 3}), 3)
+        self.assertEqual(expression.ConstantTemplate("${_loop + 1}").resolve_data({"_loop": 4}), "5")
+
+    def test_unknown_root_name_blocked(self):
+        self._set_mode("enforce")
+        payload = "${secret_var}"
+        self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+
+
+class TestMakoSafetyHardening(TestCase):
+    def _assert_forbidden(self, payload):
+        with self.assertRaises(ForbiddenMakoTemplateException):
+            check_mako_template_safety(
+                payload,
+                mako_safety.SingleLineNodeVisitor(),
+                mako_safety.SingleLinCodeExtractor(),
+            )
+
+    def _assert_allowed(self, payload):
+        check_mako_template_safety(
+            payload,
+            mako_safety.SingleLineNodeVisitor(),
+            mako_safety.SingleLinCodeExtractor(),
+        )
+
+    def test_filter_callable_with_side_effect_is_blocked(self):
+        self._assert_forbidden("${'x'|((side_effect() or str))}")
+
+    def test_filter_with_dunder_chain_is_blocked(self):
+        self._assert_forbidden("${'x'|().__class__.__bases__[0].__subclasses__}")
+
+    def test_filter_list_with_malicious_item_is_blocked(self):
+        self._assert_forbidden("${'x'|h, (side_effect() or str)}")
+
+    def test_decode_filter_with_dunder_is_blocked(self):
+        self._assert_forbidden("${'x'|decode.__class__}")
+
+    def test_tag_level_expression_filter_is_blocked(self):
+        self._assert_forbidden('<%page expression_filter="(side_effect() or str)"/>${name}')
+
+    def test_tag_level_def_filter_is_blocked(self):
+        payload = '<%def name="r(x)" filter="(side_effect() or str)">${x}</%def>${r("x")}'
+        self._assert_forbidden(payload)
+
+    def test_tag_level_block_filter_is_blocked(self):
+        self._assert_forbidden('<%block filter="(side_effect() or str)">x</%block>')
+
+    def test_tag_level_text_filter_is_blocked(self):
+        self._assert_forbidden('<%text filter="(side_effect() or str)">x</%text>')
+
+    def test_format_attribute_call_is_blocked(self):
+        self._assert_forbidden('${"{0.__class__}".format("")}')
+
+    def test_format_map_attribute_call_is_blocked(self):
+        self._assert_forbidden('${"{value.__class__}".format_map({"value": ""})}')
+
+    def test_builtin_filters_remain_allowed(self):
+        for payload in [
+            "${' x ' | h}",
+            "${' x ' | trim}",
+            "${' x ' | h, trim}",
+            "${'x' | n}",
+            "${b'abc' | decode.utf8}",
+        ]:
+            with self.subTest(payload=payload):
+                self._assert_allowed(payload)
