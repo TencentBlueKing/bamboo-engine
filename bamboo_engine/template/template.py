@@ -175,6 +175,28 @@ class Template:
             except Exception:
                 logger.exception("{} safety check error.".format(tpl))
                 continue
+
+            # 根标识符白名单：只允许引用 ``context`` 已知键、导入模块别名、
+            # SAFE_BUILTIN_NAMES 与 ``MAKO_TEMPLATE_NAME_EXTRA_WHITELIST``，
+            # 显式拒绝 ``self/context/local/parent/next/caller`` 等 Mako 保留命名空间。
+            whitelist_mode = getattr(Settings, "MAKO_TEMPLATE_NAME_WHITELIST_MODE", "off")
+            if whitelist_mode in {"warn", "enforce"}:
+                try:
+                    allowed_names = mako_safety.build_allowed_names(context)
+                    check_mako_template_safety(
+                        tpl,
+                        mako_safety.WhitelistNameVisitor(allowed_names, mode=whitelist_mode),
+                        mako_safety.SingleLinCodeExtractor(),
+                    )
+                except ForbiddenMakoTemplateException as e:
+                    logger.warning(
+                        "forbidden by whitelist: {}, exception: {}".format(tpl, e)
+                    )
+                    continue
+                except Exception:
+                    logger.exception("{} whitelist check error.".format(tpl))
+                    continue
+
             resolved = Template._render_template(tpl, context)
             string = string.replace(tpl, resolved)
         return string
