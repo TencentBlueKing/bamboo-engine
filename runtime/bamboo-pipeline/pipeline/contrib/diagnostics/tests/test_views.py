@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticOperationAudit
 from pipeline.contrib.diagnostics.views import case_detail, case_list, update_case_status
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 urlpatterns = [

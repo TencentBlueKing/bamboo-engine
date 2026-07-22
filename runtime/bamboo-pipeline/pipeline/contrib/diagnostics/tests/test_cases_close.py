@@ -7,7 +7,7 @@ from django.utils import timezone
 from pipeline.contrib.diagnostics import cases
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.eri.models import Process
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class CloseStaleCasesTest(DiagnosticsTestCase):
@@ -21,18 +21,22 @@ class CloseStaleCasesTest(DiagnosticsTestCase):
 
     def _proc(self, root, beat_delta):
         p = Process.objects.create(
-            root_pipeline_id=root, current_node_id="n1", destination_id="",
-            priority=1, queue="diagnostics", pipeline_stack="[]",
+            root_pipeline_id=root,
+            current_node_id="n1",
+            destination_id="",
+            priority=1,
+            queue="diagnostics",
+            pipeline_stack="[]",
         )
         self.process_ids.append(p.id)
-        Process.objects.filter(id=p.id).update(
-            last_heartbeat=timezone.now() - timedelta(seconds=beat_delta)
-        )
+        Process.objects.filter(id=p.id).update(last_heartbeat=timezone.now() - timedelta(seconds=beat_delta))
         return p
 
     def _open_case(self, root):
         return DiagnosticCase.objects.create(
-            root_pipeline_id=root, node_id="n1", stuck_type="stalled_no_progress",
+            root_pipeline_id=root,
+            node_id="n1",
+            stuck_type="stalled_no_progress",
             status=DiagnosticCase.STATUS_OPEN,
         )
 
@@ -64,7 +68,9 @@ class CloseStaleCasesTest(DiagnosticsTestCase):
 
     def test_already_resolved_not_recounted(self):
         DiagnosticCase.objects.create(
-            root_pipeline_id="root-x", node_id="n1", stuck_type="x",
+            root_pipeline_id="root-x",
+            node_id="n1",
+            stuck_type="x",
             status=DiagnosticCase.STATUS_RESOLVED,
         )
         self.assertEqual(cases.close_stale_cases(threshold_seconds=1800), 0)
@@ -86,14 +92,10 @@ class CloseStaleCasesTest(DiagnosticsTestCase):
         closed = cases.close_stale_cases(threshold_seconds=1800)
         self.assertEqual(closed, 1)
         self.assertEqual(
-            DiagnosticCase.objects.filter(
-                root_pipeline_id="root-recur", status=DiagnosticCase.STATUS_RESOLVED
-            ).count(),
+            DiagnosticCase.objects.filter(root_pipeline_id="root-recur", status=DiagnosticCase.STATUS_RESOLVED).count(),
             1,
         )
         self.assertEqual(
-            DiagnosticCase.objects.filter(
-                root_pipeline_id="root-recur", status=DiagnosticCase.STATUS_OPEN
-            ).count(),
+            DiagnosticCase.objects.filter(root_pipeline_id="root-recur", status=DiagnosticCase.STATUS_OPEN).count(),
             0,
         )

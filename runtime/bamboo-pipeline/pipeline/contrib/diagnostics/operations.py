@@ -159,9 +159,14 @@ def replay_callback_data(callback_data_id, operator="", mode=MODE_DRY_RUN):
     if mode == MODE_APPLY:
         blockers.append("requires dispatcher/runtime integration")
 
+    message = (
+        "Callback data replay precheck finished."
+        if mode == MODE_DRY_RUN
+        else "Callback data replay apply is not integrated."
+    )
     result = OperationResult(
         result=not blockers,
-        message="Callback data replay precheck finished." if mode == MODE_DRY_RUN else "Callback data replay apply is not integrated.",
+        message=message,
         data=data,
         blockers=blockers,
     )
@@ -197,9 +202,14 @@ def resend_schedule(schedule_id, operator="", mode=MODE_DRY_RUN):
     if mode == MODE_APPLY:
         blockers.append("requires dispatcher/runtime integration")
 
+    message = (
+        "Schedule resend precheck finished."
+        if mode == MODE_DRY_RUN
+        else "Schedule resend apply is not integrated."
+    )
     result = OperationResult(
         result=not blockers,
-        message="Schedule resend precheck finished." if mode == MODE_DRY_RUN else "Schedule resend apply is not integrated.",
+        message=message,
         data=data,
         blockers=blockers,
     )
@@ -221,9 +231,15 @@ def expire_stale_schedule(schedule_id, operator="", mode=MODE_DRY_RUN):
         schedule.save(update_fields=["expired"])
         data["expired"] = True
 
+    if mode == MODE_DRY_RUN:
+        message = "Schedule expire precheck finished."
+    elif not blockers:
+        message = "Schedule expired."
+    else:
+        message = "Schedule expire blocked."
     result = OperationResult(
         result=not blockers,
-        message="Schedule expire precheck finished." if mode == MODE_DRY_RUN else "Schedule expired." if not blockers else "Schedule expire blocked.",
+        message=message,
         data=data,
         blockers=blockers,
     )

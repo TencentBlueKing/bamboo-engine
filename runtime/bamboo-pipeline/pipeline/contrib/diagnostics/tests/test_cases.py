@@ -5,7 +5,7 @@ from django.test import override_settings
 from pipeline.contrib.diagnostics.cases import upsert_case
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.contrib.diagnostics.types import DiagnosticHit
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class DiagnosticCaseUpsertTestCase(DiagnosticsTestCase):

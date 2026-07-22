@@ -20,12 +20,22 @@ def _empty_snapshot(root="root-1", node="n1"):
 
 def _snapshot_with_locked_schedule(root="root-1", node="n1"):
     schedule = types.SimpleNamespace(
-        id=1, node_id=node, process_id=1,
-        scheduling=True, finished=False, expired=False, schedule_times=1,
+        id=1,
+        node_id=node,
+        process_id=1,
+        scheduling=True,
+        finished=False,
+        expired=False,
+        schedule_times=1,
     )
     return RuntimeSnapshot(
-        root_pipeline_id=root, node_id=node, process_id=None,
-        processes=[], states=[], schedules=[schedule], callback_data=[],
+        root_pipeline_id=root,
+        node_id=node,
+        process_id=None,
+        processes=[],
+        states=[],
+        schedules=[schedule],
+        callback_data=[],
     )
 
 

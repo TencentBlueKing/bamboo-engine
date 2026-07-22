@@ -11,7 +11,7 @@ from pipeline.contrib.diagnostics.operations import (
     resend_schedule,
 )
 from pipeline.eri.models import CallbackData, Process, Schedule, State
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class DiagnosticOperationsTestCase(DiagnosticsTestCase):

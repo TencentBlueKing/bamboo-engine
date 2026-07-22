@@ -7,7 +7,7 @@ from django.utils import timezone
 from pipeline.contrib.diagnostics import scanner
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.eri.models import Process
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class ScanStalledRootsTest(DiagnosticsTestCase):
@@ -21,13 +21,15 @@ class ScanStalledRootsTest(DiagnosticsTestCase):
 
     def _proc(self, root, node="n1", beat_delta=0):
         p = Process.objects.create(
-            root_pipeline_id=root, current_node_id=node, destination_id="",
-            priority=1, queue="diagnostics", pipeline_stack="[]",
+            root_pipeline_id=root,
+            current_node_id=node,
+            destination_id="",
+            priority=1,
+            queue="diagnostics",
+            pipeline_stack="[]",
         )
         self.process_ids.append(p.id)
-        Process.objects.filter(id=p.id).update(
-            last_heartbeat=timezone.now() - timedelta(seconds=beat_delta)
-        )
+        Process.objects.filter(id=p.id).update(last_heartbeat=timezone.now() - timedelta(seconds=beat_delta))
         return p
 
     def test_stalled_root_produces_case_fresh_does_not(self):

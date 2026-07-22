@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from pipeline.contrib.diagnostics.management.commands.cleanup_diagnostics import Command
 from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class DiagnosticsCleanupTestCase(DiagnosticsTestCase):
@@ -63,12 +63,8 @@ class DiagnosticsCleanupTestCase(DiagnosticsTestCase):
         DiagnosticCase.objects.filter(id=old_open_case.id).update(updated_at=now - datetime.timedelta(days=366))
         DiagnosticCase.objects.filter(id=old_resolved_case.id).update(updated_at=now - datetime.timedelta(days=366))
         DiagnosticCase.objects.filter(id=recent_ignored_case.id).update(updated_at=now - datetime.timedelta(days=1))
-        DiagnosticOperationAudit.objects.filter(id=old_audit.id).update(
-            created_at=now - datetime.timedelta(days=366)
-        )
-        DiagnosticOperationAudit.objects.filter(id=recent_audit.id).update(
-            created_at=now - datetime.timedelta(days=1)
-        )
+        DiagnosticOperationAudit.objects.filter(id=old_audit.id).update(created_at=now - datetime.timedelta(days=366))
+        DiagnosticOperationAudit.objects.filter(id=recent_audit.id).update(created_at=now - datetime.timedelta(days=1))
 
         stdout = StringIO()
         Command(stdout=stdout).handle()

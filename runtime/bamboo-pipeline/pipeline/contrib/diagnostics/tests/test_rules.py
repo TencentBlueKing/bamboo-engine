@@ -126,9 +126,7 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self._create_schedule(103, process.id, "node-without-state", schedule_times=1)
         self._create_callback_data("node-without-state")
 
-        hits = diagnose_snapshot(
-            collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-without-state")
-        )
+        hits = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-without-state"))
 
         self.assertEqual([hit.type for hit in hits], ["missing_state_for_live_process"])
         self._assert_hit_complete(hits[0], "missing_state_for_live_process")

@@ -204,7 +204,12 @@ def _schedule_finished_but_process_not_exited(snapshot, processes_by_id):
     hits = []
     for schedule in sorted(snapshot.schedules, key=lambda item: item.id):
         process = processes_by_id.get(schedule.process_id)
-        if process is not None and schedule.finished and not process.dead and process.current_node_id == schedule.node_id:
+        if (
+            process is not None
+            and schedule.finished
+            and not process.dead
+            and process.current_node_id == schedule.node_id
+        ):
             hits.append(
                 _hit(
                     "schedule_finished_but_process_not_exited",

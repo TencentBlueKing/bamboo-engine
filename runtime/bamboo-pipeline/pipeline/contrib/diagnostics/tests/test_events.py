@@ -5,7 +5,7 @@ from django.test import override_settings
 
 from pipeline.contrib.diagnostics.models import DiagnosticEvent
 from pipeline.contrib.diagnostics.events import emit_event
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class DiagnosticsEventTestCase(DiagnosticsTestCase):

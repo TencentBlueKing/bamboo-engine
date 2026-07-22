@@ -12,7 +12,7 @@ from pipeline.contrib.diagnostics.management.commands.scan_stuck_cases import Co
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.contrib.diagnostics.scanner import diagnose_pipeline
 from pipeline.eri.models import Process, Schedule, State
-from tests.contrib.diagnostics.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
 class DiagnosticsCommandTestCase(DiagnosticsTestCase):
@@ -109,9 +109,7 @@ class DiagnosticsCommandTestCase(DiagnosticsTestCase):
         process = self._create_process(202, root_pipeline_id="root-scan", node_id="node-scan")
         self._create_state("node-scan", root_pipeline_id="root-scan")
         self._create_schedule(202, process.id, "node-scan")
-        Process.objects.filter(id=process.id).update(
-            last_heartbeat=timezone.now() - timedelta(seconds=3600)
-        )
+        Process.objects.filter(id=process.id).update(last_heartbeat=timezone.now() - timedelta(seconds=3600))
 
         stdout = StringIO()
         ScanCommand(stdout=stdout).handle(threshold=1800, batch=100, confirm=0)
@@ -128,9 +126,7 @@ class DiagnosticsCommandTestCase(DiagnosticsTestCase):
         process = self._create_process(203, root_pipeline_id="root-scan-disabled", node_id="node-scan-disabled")
         self._create_state("node-scan-disabled", root_pipeline_id="root-scan-disabled")
         self._create_schedule(203, process.id, "node-scan-disabled")
-        Process.objects.filter(id=process.id).update(
-            last_heartbeat=timezone.now() - timedelta(seconds=3600)
-        )
+        Process.objects.filter(id=process.id).update(last_heartbeat=timezone.now() - timedelta(seconds=3600))
 
         stdout = StringIO()
         ScanCommand(stdout=stdout).handle(threshold=1800, batch=100, confirm=0)
@@ -142,9 +138,7 @@ class DiagnosticsCommandTestCase(DiagnosticsTestCase):
         process = self._create_process(204, root_pipeline_id="root-scan-zero", node_id="node-scan-zero")
         self._create_state("node-scan-zero", root_pipeline_id="root-scan-zero")
         self._create_schedule(204, process.id, "node-scan-zero")
-        Process.objects.filter(id=process.id).update(
-            last_heartbeat=timezone.now() - timedelta(seconds=3600)
-        )
+        Process.objects.filter(id=process.id).update(last_heartbeat=timezone.now() - timedelta(seconds=3600))
 
         stdout = StringIO()
         ScanCommand(stdout=stdout).handle(threshold=1800, batch=0, confirm=0)
