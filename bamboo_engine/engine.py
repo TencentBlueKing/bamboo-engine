@@ -59,6 +59,34 @@ from .utils.string import get_lower_case_name
 logger = logging.getLogger("bamboo_engine")
 
 
+def emit_diagnostic_event(*args, **kwargs):
+    try:
+        from pipeline.contrib.diagnostics.events import emit_event
+    except Exception:
+        logger.debug("pipeline diagnostics event module is unavailable", exc_info=True)
+        return None
+
+    try:
+        return emit_event(*args, **kwargs)
+    except Exception:
+        logger.debug("pipeline diagnostics event emit failed", exc_info=True)
+        return None
+
+
+def emit_diagnostic_alert(*args, **kwargs):
+    try:
+        from pipeline.contrib.diagnostics.metrics import emit_alert_log
+    except Exception:
+        logger.debug("pipeline diagnostics alert module is unavailable", exc_info=True)
+        return None
+
+    try:
+        return emit_alert_log(*args, **kwargs)
+    except Exception:
+        logger.debug("pipeline diagnostics alert emit failed", exc_info=True)
+        return None
+
+
 def interrupt_exception_catcher(func):
     @wraps(func)
     def _wrapper(*args, **kwargs):
@@ -1020,6 +1048,31 @@ class Engine:
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
+                schedule_type = getattr(schedule.type, "name", schedule.type)
+                retry_count = self._schedule_lock_retry_count(headers)
+                event_payload = {
+                    "schedule_type": schedule_type,
+                    "retry_count": retry_count,
+                    "headers": headers or {},
+                }
+                emit_diagnostic_event(
+                    event_type="schedule_lock_conflict",
+                    root_pipeline_id=root_pipeline_id,
+                    node_id=node_id,
+                    version=schedule.version,
+                    result="failed",
+                    reason="lock_busy",
+                    process_id=process_id,
+                    schedule_id=schedule_id,
+                    callback_data_id=callback_data_id,
+                    payload=event_payload,
+                )
+                emit_diagnostic_alert(
+                    alert_type="schedule_lock_conflict",
+                    root_pipeline_id=root_pipeline_id,
+                    node_id=node_id,
+                    payload=event_payload,
+                )
                 callback_data = None
                 # only retry at multiple callback type
                 should_retry = schedule.type is ScheduleType.MULTIPLE_CALLBACK
