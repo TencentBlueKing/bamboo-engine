@@ -35,7 +35,19 @@ def alert_enabled():
 
 
 def apply_enabled():
-    return _get_setting("APPLY_ENABLED", True)
+    return _get_setting("APPLY_ENABLED", False)  # M1: 默认关闭写操作
+
+
+def stall_threshold_seconds():
+    return _get_setting("STALL_THRESHOLD_SECONDS", 1800)
+
+
+def scan_batch():
+    return _get_setting("SCAN_BATCH", 200)
+
+
+def second_confirm_seconds():
+    return _get_setting("SECOND_CONFIRM_SECONDS", 3)
 
 
 def batch_operation_enabled():

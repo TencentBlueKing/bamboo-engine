@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import json
+from datetime import timedelta
 from io import StringIO
 
 from django.test import override_settings
+from django.utils import timezone
 
 from pipeline.contrib.diagnostics.management.commands.diagnose_pipeline import Command as DiagnoseCommand
 from pipeline.contrib.diagnostics.management.commands.scan_stuck_cases import Command as ScanCommand
@@ -103,13 +105,16 @@ class DiagnosticsCommandTestCase(DiagnosticsTestCase):
         self.assertEqual(payload[0]["type"], "schedule_lock_stuck")
         self.assertEqual(payload[0]["related_objects"]["node_id"], "node-command-process")
 
-    def test_scan_stuck_cases_upserts_case(self):
+    def test_scan_stuck_cases_upserts_stalled_case(self):
         process = self._create_process(202, root_pipeline_id="root-scan", node_id="node-scan")
         self._create_state("node-scan", root_pipeline_id="root-scan")
         self._create_schedule(202, process.id, "node-scan")
+        Process.objects.filter(id=process.id).update(
+            last_heartbeat=timezone.now() - timedelta(seconds=3600)
+        )
 
         stdout = StringIO()
-        ScanCommand(stdout=stdout).handle(limit=100)
+        ScanCommand(stdout=stdout).handle(threshold=1800, batch=100, confirm=0)
 
         self.assertEqual(DiagnosticCase.objects.count(), 1)
         case = DiagnosticCase.objects.get()
@@ -123,20 +128,26 @@ class DiagnosticsCommandTestCase(DiagnosticsTestCase):
         process = self._create_process(203, root_pipeline_id="root-scan-disabled", node_id="node-scan-disabled")
         self._create_state("node-scan-disabled", root_pipeline_id="root-scan-disabled")
         self._create_schedule(203, process.id, "node-scan-disabled")
+        Process.objects.filter(id=process.id).update(
+            last_heartbeat=timezone.now() - timedelta(seconds=3600)
+        )
 
         stdout = StringIO()
-        ScanCommand(stdout=stdout).handle(limit=100)
+        ScanCommand(stdout=stdout).handle(threshold=1800, batch=100, confirm=0)
 
         self.assertEqual(DiagnosticCase.objects.count(), 0)
         self.assertIn("upserted cases: 0", stdout.getvalue())
 
-    def test_scan_stuck_cases_limit_zero_does_not_upsert(self):
+    def test_scan_stuck_cases_batch_zero_does_not_upsert(self):
         process = self._create_process(204, root_pipeline_id="root-scan-zero", node_id="node-scan-zero")
         self._create_state("node-scan-zero", root_pipeline_id="root-scan-zero")
         self._create_schedule(204, process.id, "node-scan-zero")
+        Process.objects.filter(id=process.id).update(
+            last_heartbeat=timezone.now() - timedelta(seconds=3600)
+        )
 
         stdout = StringIO()
-        ScanCommand(stdout=stdout).handle(limit=0)
+        ScanCommand(stdout=stdout).handle(threshold=1800, batch=0, confirm=0)
 
         self.assertEqual(DiagnosticCase.objects.count(), 0)
         self.assertIn("upserted cases: 0", stdout.getvalue())

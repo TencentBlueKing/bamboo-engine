@@ -127,6 +127,7 @@ class DiagnosticOperationsTestCase(DiagnosticsTestCase):
         self.assertEqual(result.data["processes"][0]["need_ack"], 3)
         self.assertEqual(audit.operation_type, "inspect_ack_converge")
 
+    @override_settings(PIPELINE_DIAGNOSTICS_APPLY_ENABLED=True)
     def test_replay_callback_data_dry_run_and_apply(self):
         callback_data = self._create_callback_data(304)
 
@@ -141,6 +142,7 @@ class DiagnosticOperationsTestCase(DiagnosticsTestCase):
         self.assertFalse(applied.result)
         self.assertIn("requires dispatcher/runtime integration", applied.blockers)
 
+    @override_settings(PIPELINE_DIAGNOSTICS_APPLY_ENABLED=True)
     def test_resend_schedule_dry_run_and_apply(self):
         process = self._create_process(305)
         schedule = self._create_schedule(305, process.id)
@@ -160,6 +162,7 @@ class DiagnosticOperationsTestCase(DiagnosticsTestCase):
         self.assertFalse(applied.result)
         self.assertIn("requires dispatcher/runtime integration", applied.blockers)
 
+    @override_settings(PIPELINE_DIAGNOSTICS_APPLY_ENABLED=True)
     def test_expire_stale_schedule_dry_run_and_apply(self):
         process = self._create_process(308)
         schedule = self._create_schedule(308, process.id, expired=False)

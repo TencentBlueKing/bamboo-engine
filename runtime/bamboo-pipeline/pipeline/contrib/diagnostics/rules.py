@@ -228,7 +228,23 @@ def _schedule_finished_but_process_not_exited(snapshot, processes_by_id):
     return hits
 
 
-def diagnose_snapshot(snapshot):
+def _stalled_no_progress_hit(snapshot, stall_seconds):
+    node_id = snapshot.node_id or (
+        snapshot.processes[0].current_node_id if snapshot.processes else ""
+    )
+    return _hit(
+        "stalled_no_progress",
+        "warning",
+        0.80,
+        {"node_id": node_id, "stall_seconds": stall_seconds},
+        {"node_id": node_id, "root_pipeline_id": snapshot.root_pipeline_id},
+        ["inspect_node_runtime_readiness"],
+        [],
+        "Root {} has not progressed for {}s".format(snapshot.root_pipeline_id, stall_seconds),
+    )
+
+
+def diagnose_snapshot(snapshot, stall_seconds=None):
     processes_by_id, processes_by_node, states_by_node, schedules_by_node, callbacks_by_node = _build_indexes(snapshot)
 
     hits = []
@@ -239,4 +255,14 @@ def diagnose_snapshot(snapshot):
     hits.extend(_parallel_ack_not_converged(snapshot))
     hits.extend(_schedule_finished_but_process_not_exited(snapshot, processes_by_id))
     hits.extend(_multiple_sleep_process_for_node(processes_by_node))
+
+    if not hits and stall_seconds is not None:
+        hits = [_stalled_no_progress_hit(snapshot, stall_seconds)]
+
+    if stall_seconds is not None:
+        hits = [
+            hit._replace(evidence=dict(hit.evidence, stall_seconds=stall_seconds))
+            for hit in hits
+        ]
+
     return hits

@@ -77,3 +77,66 @@ def upsert_case(root_pipeline_id, node_id, hit):
         with transaction.atomic():
             case = DiagnosticCase.objects.select_for_update().get(**lookup)
             return _apply_hit(case, hit, now)
+
+
+def _resolve_one(case, now_dt):
+    """Flip an OPEN case to RESOLVED; if a RESOLVED twin already exists
+    (unique_together includes status), merge the recurrence into it and
+    drop this duplicate OPEN row."""
+    existing = (
+        DiagnosticCase.objects.filter(
+            root_pipeline_id=case.root_pipeline_id,
+            node_id=case.node_id,
+            stuck_type=case.stuck_type,
+            status=DiagnosticCase.STATUS_RESOLVED,
+        )
+        .exclude(id=case.id)
+        .first()
+    )
+    if existing is None:
+        case.status = DiagnosticCase.STATUS_RESOLVED
+        case.last_seen_at = now_dt
+        case.save(update_fields=["status", "last_seen_at", "updated_at"])
+        return
+
+    if case.last_seen_at and case.last_seen_at > existing.last_seen_at:
+        existing.last_seen_at = case.last_seen_at
+    existing.hit_count += case.hit_count
+    existing.severity = case.severity
+    existing.confidence = case.confidence
+    existing.evidence = case.evidence
+    existing.related_objects = case.related_objects
+    existing.recommended_actions = case.recommended_actions
+    existing.forbidden_actions = case.forbidden_actions
+    existing.message = case.message
+    existing.save(
+        update_fields=[
+            "last_seen_at",
+            "hit_count",
+            "severity",
+            "confidence",
+            "evidence",
+            "related_objects",
+            "recommended_actions",
+            "forbidden_actions",
+            "message",
+            "updated_at",
+        ]
+    )
+    case.delete()
+
+
+def close_stale_cases(threshold_seconds, now=None):
+    """Resolve open cases whose root recovered (progressed within threshold) or has no live process."""
+    from pipeline.contrib.diagnostics.progress import root_last_progress, stall_cutoff
+
+    cutoff = stall_cutoff(threshold_seconds, now=now)
+    now_dt = now or timezone.now()
+    to_close = []
+    for case in DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN).iterator():
+        latest = root_last_progress(case.root_pipeline_id)
+        if latest is None or latest >= cutoff:
+            to_close.append(case)
+    for case in to_close:
+        _resolve_one(case, now_dt)
+    return len(to_close)
