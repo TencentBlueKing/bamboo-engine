@@ -13,10 +13,28 @@ specific language governing permissions and limitations under the License.
 
 import logging
 
+from django.db import connection
+
 from pipeline.contrib.diagnostics import conf
 from pipeline.contrib.diagnostics.models import DiagnosticEvent
 
 logger = logging.getLogger(__name__)
+_EVENT_TABLE_AVAILABLE = None
+
+
+def _event_table_available():
+    global _EVENT_TABLE_AVAILABLE
+
+    if _EVENT_TABLE_AVAILABLE is not None:
+        return _EVENT_TABLE_AVAILABLE
+
+    try:
+        _EVENT_TABLE_AVAILABLE = DiagnosticEvent._meta.db_table in connection.introspection.table_names()
+    except Exception:
+        logger.debug("check diagnostic event table failed", exc_info=True)
+        _EVENT_TABLE_AVAILABLE = False
+
+    return _EVENT_TABLE_AVAILABLE
 
 
 def emit_event(
@@ -30,6 +48,9 @@ def emit_event(
     **kwargs
 ):
     if not conf.event_enabled():
+        return None
+
+    if not _event_table_available():
         return None
 
     try:

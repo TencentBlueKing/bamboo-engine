@@ -56,6 +56,18 @@ class DiagnosticsEventTestCase(DiagnosticsTestCase):
         self.assertIsNone(event)
         logger.exception.assert_called_once()
 
+    def test_emit_event_noop_when_event_table_missing(self):
+        with mock.patch("pipeline.contrib.diagnostics.events._EVENT_TABLE_AVAILABLE", None, create=True):
+            with mock.patch("pipeline.contrib.diagnostics.events.connection", create=True) as connection:
+                connection.introspection.table_names.return_value = []
+                with mock.patch("pipeline.contrib.diagnostics.events.DiagnosticEvent.objects.create") as create:
+                    with mock.patch("pipeline.contrib.diagnostics.events.logger") as logger:
+                        event = emit_event(event_type="stuck", root_pipeline_id="root-pipeline-1")
+
+        self.assertIsNone(event)
+        create.assert_not_called()
+        logger.exception.assert_not_called()
+
     def test_emit_event_uses_empty_payload_by_default(self):
         event = emit_event(event_type="stuck", root_pipeline_id="root-pipeline-1")
 
