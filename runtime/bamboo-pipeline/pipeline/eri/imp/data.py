@@ -254,7 +254,16 @@ class DataMixin(SerializerMixin):
         :return: 回调数据 ID
         :rtype: int
         """
-        return DBCallbackData.objects.create(node_id=node_id, version=version, data=json.dumps(data)).id
+        callback_data_id = DBCallbackData.objects.create(
+            node_id=node_id, version=version, data=json.dumps(data)
+        ).id
+        try:
+            from pipeline.contrib.reliable_events.collector import record_callback_receipt
+
+            record_callback_receipt(node_id=node_id, version=version, callback_data_id=callback_data_id, data=data)
+        except Exception:  # 影子写永不影响真实回调
+            pass
+        return callback_data_id
 
     @metrics.setup_histogram(metrics.ENGINE_RUNTIME_CALLBACK_DATA_READ_TIME)
     def get_callback_data(self, data_id: int) -> CallbackData:
