@@ -48,3 +48,23 @@ def compensation_batch():
 
 def event_retention_days():
     return _get_setting("EVENT_RETENTION_DAYS", 30)
+
+
+def active_enabled():
+    return _get_setting("ACTIVE_ENABLED", False)
+
+
+def active_initial_delay_seconds():
+    return _get_setting("ACTIVE_INITIAL_DELAY_SECONDS", 10)
+
+
+def mode_resolver():
+    path = _get_setting("MODE_RESOLVER", None)
+    if not path:
+        return None
+    try:
+        module_path, _, attr = path.rpartition(".")
+        module = __import__(module_path, fromlist=[attr])
+        return getattr(module, attr)
+    except Exception:  # 钩子导入失败绝不影响主链路
+        return None

@@ -21,3 +21,20 @@ class ShadowReportTest(ReliableEventsTestCase):
         self.assertEqual(stats["obsolete"], 1)
         self.assertEqual(stats["pending"], 1)
         self.assertEqual(stats["by_status"]["APPLIED"], 2)
+
+
+class ModeStatsTest(ReliableEventsTestCase):
+    def _mk(self, mode, status, key):
+        EngineEventInbox.objects.create(
+            event_type="NODE_CALLBACK", idempotency_key=key, node_id="n", version="v",
+            source_id="1", concurrency_key="n:v", mode=mode, status=status,
+        )
+
+    def test_mode_status_stats_groups_by_mode(self):
+        self._mk("ACTIVE", "APPLIED", "a1")
+        self._mk("ACTIVE", "MANUAL_REQUIRED", "a2")
+        self._mk("SHADOW", "SHADOW_MISMATCH", "s1")
+        stats = metrics.mode_status_stats()
+        assert stats["ACTIVE"]["APPLIED"] == 1
+        assert stats["ACTIVE"]["MANUAL_REQUIRED"] == 1
+        assert stats["SHADOW"]["SHADOW_MISMATCH"] == 1
