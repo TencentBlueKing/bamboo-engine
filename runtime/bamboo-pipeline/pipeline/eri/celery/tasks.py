@@ -30,6 +30,7 @@ from bamboo_engine.interrupt import (
     ScheduleKeyPoint,
 )
 
+from pipeline.contrib.diagnostics.events import emit_event
 from pipeline.eri.models import LogEntry
 from pipeline.eri.runtime import BambooDjangoRuntime
 
@@ -101,6 +102,16 @@ def schedule(
         f"(process_id: {process_id}, node_id: {node_id}, schedule_id: {schedule_id}, headers: {headers})"
     )
     _observe_message_delay(metrics.ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY, headers)
+    emit_event(
+        event_type="schedule_received",
+        root_pipeline_id="",
+        node_id=node_id,
+        result="received",
+        process_id=process_id,
+        schedule_id=schedule_id,
+        callback_data_id=callback_data_id,
+        payload={"headers": headers or {}},
+    )
 
     runtime = BambooDjangoRuntime()
     recover_point = ScheduleInterruptPoint.from_json(recover_point)

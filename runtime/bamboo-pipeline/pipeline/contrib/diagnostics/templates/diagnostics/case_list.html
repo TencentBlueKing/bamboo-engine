@@ -1,0 +1,64 @@
+{% extends "diagnostics/base.html" %}
+
+{% block content %}
+<div class="header">
+  <div>
+    <h1>Pipeline Diagnostic Cases</h1>
+    <p class="muted">Runtime stuck cases detected from bamboo-engine diagnostics.</p>
+  </div>
+</div>
+
+<form class="filters" method="get">
+  <label>Status
+    <select name="status">
+      <option value="">All</option>
+      <option value="open" {% if filters.status == "open" %}selected{% endif %}>open</option>
+      <option value="resolved" {% if filters.status == "resolved" %}selected{% endif %}>resolved</option>
+      <option value="ignored" {% if filters.status == "ignored" %}selected{% endif %}>ignored</option>
+    </select>
+  </label>
+  <label>Type
+    <input name="stuck_type" value="{{ filters.stuck_type }}">
+  </label>
+  <label>Root Pipeline
+    <input name="root_pipeline_id" value="{{ filters.root_pipeline_id }}">
+  </label>
+  <label>Node
+    <input name="node_id" value="{{ filters.node_id }}">
+  </label>
+  <button type="submit">Filter</button>
+</form>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Status</th>
+      <th>Type</th>
+      <th>Severity</th>
+      <th>Root Pipeline</th>
+      <th>Node</th>
+      <th>Hits</th>
+      <th>Last Seen</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for case in page.object_list %}
+    <tr>
+      <td><a href="{% url 'pipeline_diagnostics:case_detail' case.id %}">{{ case.id }}</a></td>
+      <td><span class="badge">{{ case.status }}</span></td>
+      <td>{{ case.stuck_type }}</td>
+      <td>{{ case.severity }}</td>
+      <td>{{ case.root_pipeline_id }}</td>
+      <td>{{ case.node_id }}</td>
+      <td>{{ case.hit_count }}</td>
+      <td>{{ case.last_seen_at }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="8">No diagnostic cases found.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
