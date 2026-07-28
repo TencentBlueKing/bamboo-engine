@@ -65,14 +65,14 @@ tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 
 [[package]]
 name = "bamboo-engine"
-version = "3.0.4"
+version = "3.0.5"
 description = "Bamboo-engine is a general-purpose workflow engine"
 optional = false
 python-versions = "<3.12,>=3.11"
 groups = ["main"]
 files = [
-    {file = "bamboo_engine-3.0.4-py3-none-any.whl", hash = "sha256:d5dd488ac37d946a9f71711e6d97ffceffc8174693de756135e9a8c009f53404"},
-    {file = "bamboo_engine-3.0.4.tar.gz", hash = "sha256:67a9344df7cbca711faa34eab061c642b6c329060077cfd87fd00a4b8cc07d38"},
+    {file = "bamboo_engine-3.0.5-py3-none-any.whl", hash = "sha256:484fdda2d1d1f709d300dde4783ac24c59c5c8f7ea47af376dba2762f0a72d25"},
+    {file = "bamboo_engine-3.0.5.tar.gz", hash = "sha256:2b642b1c72b933340a4e37938a2409737d8e2843f9d460d0e3453318d595a375"},
 ]
 
 [package.dependencies]
@@ -1453,4 +1453,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.12"
-content-hash = "1fa5b83c5a3b2555d5f4bcaab80151f143cf67371748eac4f31d4c998c39327b"
+content-hash = "283cbf605b9ca72985c79aa5fd05b7649f4ae4e75f5508cf877a64637040aaa6"
