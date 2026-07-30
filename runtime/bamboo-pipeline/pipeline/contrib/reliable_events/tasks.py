@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from pipeline.contrib.celery_tools.periodic import periodic_task
 from pipeline.contrib.reliable_events import conf, consumer
+from pipeline.contrib.reliable_events import purge as purge_mod
 from pipeline.contrib.reliable_events.constants import EventStatus
 from pipeline.contrib.reliable_events.models import EngineEventInbox
 
@@ -34,3 +35,15 @@ def compensation_scan():
     )
     for event_id in due_ids:
         dispatch_event.apply_async(kwargs={"event_id": event_id})
+
+
+@periodic_task(run_every=crontab(minute=17, hour="*/6"), ignore_result=True)
+def purge_scan():
+    if not conf.compensation_enabled():
+        return
+    try:
+        deleted = purge_mod.purge_finished_events()
+        if deleted:
+            logger.info("reliable events purge removed %s finished events", deleted)
+    except Exception:
+        logger.exception("reliable events purge failed")

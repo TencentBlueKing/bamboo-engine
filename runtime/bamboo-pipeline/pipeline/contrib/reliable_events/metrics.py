@@ -24,6 +24,16 @@ def shadow_stats(since=None):
     }
 
 
+def mode_status_stats(since=None):
+    qs = EngineEventInbox.objects.all()
+    if since is not None:
+        qs = qs.filter(accepted_at__gte=since)
+    result = {}
+    for row in qs.values("mode", "status").annotate(c=Count("id")):
+        result.setdefault(row["mode"], {})[row["status"]] = row["c"]
+    return result
+
+
 def emit_shadow_report(stats):
     logger.warning(
         "[reliable_events_shadow_report] total=%s applied=%s obsolete=%s mismatch=%s pending=%s by_status=%s",
