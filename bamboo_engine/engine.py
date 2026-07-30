@@ -1192,6 +1192,17 @@ class Engine:
                 )
                 return
 
+            root_state = self.runtime.batch_get_state_name([root_pipeline_id]).get(root_pipeline_id)
+            if root_state == states.REVOKED:
+                logger.info(
+                    "root pipeline[%s] schedule(%s) %s expired because root pipeline is revoked",
+                    root_pipeline_id,
+                    schedule_id,
+                    node_id,
+                )
+                self.runtime.expire_schedule(schedule_id)
+                return
+
             # 检查 schedule 是否过期
             version_mismatch = False
             if interrupter.recover_point and interrupter.recover_point.version_mismatch is not None:

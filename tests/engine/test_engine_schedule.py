@@ -197,6 +197,33 @@ def test_schedule__schedule_is_finished(node_id, pi, schedule, interrupter):
     runtime.beat.assert_not_called()
 
 
+def test_schedule__root_pipeline_is_revoked(node_id, pi, state, schedule, node, interrupter):
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.batch_get_state_name = MagicMock(return_value={pi.root_pipeline_id: states.REVOKED})
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_node = MagicMock(return_value=node)
+
+    handler = MagicMock()
+    get_handler = MagicMock(return_value=handler)
+
+    engine = Engine(runtime=runtime)
+
+    with mock.patch(
+        "bamboo_engine.engine.HandlerFactory.get_handler",
+        get_handler,
+    ):
+        engine.schedule(pi.process_id, node_id, schedule.id, interrupter, headers={})
+
+    runtime.batch_get_state_name.assert_called_once_with([pi.root_pipeline_id])
+    runtime.expire_schedule.assert_called_once_with(schedule.id)
+    runtime.apply_schedule_lock.assert_not_called()
+    runtime.get_node.assert_not_called()
+    handler.schedule.assert_not_called()
+
+
 def test_schedule__schedule_version_not_match(node_id, pi, state, schedule, interrupter):
     state.version = "v2"
 
