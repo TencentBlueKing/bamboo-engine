@@ -209,6 +209,9 @@ class ProcessMixin:
         """
         标记某个进程的子进程执行完成，并返回是否能够唤醒父进程继续执行的标志位
 
+        该接口应为幂等：同一子进程重复调用时不得再次增加父进程 ack_num，
+        否则消息重投会把陈旧 ACK 计入后续 fork 轮次，导致假唤醒或丢唤醒。
+
         :param parent_id: 父进程 ID
         :type parent_id: int
         :param process_id: 子进程 ID
@@ -217,7 +220,10 @@ class ProcessMixin:
         :rtype: bool
         """
         with transaction.atomic():
-            Process.objects.filter(id=process_id).update(dead=True)
+            # 子进程一生只允许合法 ACK 一次；dead 翻转失败说明是重复投递
+            finished = Process.objects.filter(id=process_id, dead=False).update(dead=True)
+            if not finished:
+                return False
 
             Process.objects.filter(id=parent_id).update(ack_num=F("ack_num") + 1)
 
