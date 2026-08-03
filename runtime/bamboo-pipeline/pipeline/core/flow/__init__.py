@@ -11,9 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from .activity import SubProcess  # noqa
 from .activity import AbstractIntervalGenerator  # noqa
-
+from .activity import SubProcess  # noqa
 from .activity import (  # noqa
     DefaultIntervalGenerator,
     LinearIntervalGenerator,
@@ -23,6 +22,7 @@ from .activity import (  # noqa
     SquareIntervalGenerator,
     StaticIntervalGenerator,
 )
+from .activity.sub_canvas import SubCanvas  # noqa
 from .base import SequenceFlow  # noqa
 from .event import (  # noqa
     EmptyEndEvent,
@@ -45,6 +45,7 @@ class FlowNodeClsFactory(object):
     nodes_cls = {
         ServiceActivity.__name__: ServiceActivity,
         SubProcess.__name__: SubProcess,
+        SubCanvas.__name__: SubCanvas,
         EmptyEndEvent.__name__: EmptyEndEvent,
         EmptyStartEvent.__name__: EmptyStartEvent,
         ParallelGateway.__name__: ParallelGateway,

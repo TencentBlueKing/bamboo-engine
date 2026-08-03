@@ -14,17 +14,16 @@ specific language governing permissions and limitations under the License.
 import json
 from typing import Dict, List, Set
 
-from django.db.models import Q
 from django.db import transaction
+from django.db.models import Q
+from pipeline.eri.imp.serializer import SerializerMixin
+from pipeline.eri.models import ContextOutputs
+from pipeline.eri.models import ContextValue as DBContextValue
+from pipeline.eri.utils import caculate_final_references
 
 from bamboo_engine import metrics
-from bamboo_engine.template import Template
 from bamboo_engine.eri import ContextValue, ContextValueType
-
-from pipeline.eri.utils import caculate_final_references
-from pipeline.eri.models import ContextValue as DBContextValue
-from pipeline.eri.models import ContextOutputs
-from pipeline.eri.imp.serializer import SerializerMixin
+from bamboo_engine.template import Template
 
 
 class ContextMixin(SerializerMixin):
@@ -205,3 +204,34 @@ class ContextMixin(SerializerMixin):
         """
         co_model = ContextOutputs.objects.get(pipeline_id=pipeline_id)
         return set(json.loads(co_model.outputs))
+
+    @transaction.atomic
+    def copy_context_values_to_new_pipeline(
+        self, from_pipeline_id: str, to_pipeline_id: str, exclude_keys: Set[str] = None
+    ):
+        """
+        将源流程的所有上下文字段原样复制到新流程 ID 下，支持排除指定 key
+
+        :param from_pipeline_id: 源流程 ID
+        :param to_pipeline_id: 目标流程 ID
+        :param exclude_keys: 不需要复制的变量 key 集合，如 {"${_system}"}
+        """
+        exclude_keys = exclude_keys or set()
+
+        # 1. 查出源流程所有上下文记录（每个字段都在）
+        source_qs = DBContextValue.objects.filter(pipeline_id=from_pipeline_id)
+        if exclude_keys:
+            source_qs = source_qs.exclude(key__in=exclude_keys)
+
+        # 2. 克隆对象，清空主键，替换 pipeline_id
+        new_models = []
+        for cv in source_qs:
+            cv.pk = None  # 清除自增 ID，bulk_create 时重新生成
+            cv.pipeline_id = to_pipeline_id
+            new_models.append(cv)
+
+        # 3. 如果目标流程可能已有上下文，先清掉避免唯一索引冲突（按业务需要）
+        DBContextValue.objects.filter(pipeline_id=to_pipeline_id).delete()
+
+        # 4. 批量插入
+        DBContextValue.objects.bulk_create(new_models, batch_size=500)

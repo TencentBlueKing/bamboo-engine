@@ -325,7 +325,7 @@ class Engine:
                 updated_context_values = []
                 # 如果是循环重试，删除列表中的最后一个元素
                 if loop_retry:
-                    new_value = loop_outputs[:-1]
+                    new_value = loop_outputs[0].value[:-1]
                 # 如果是节点重试，将列表清空
                 else:
                     new_value = []

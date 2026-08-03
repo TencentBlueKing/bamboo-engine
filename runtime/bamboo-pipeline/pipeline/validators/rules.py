@@ -57,4 +57,5 @@ NODE_RULES = {
     "ConditionalParallelGateway": EMIT_RULE,
     "ConvergeGateway": CONVERGE_RULE,
     "SubProcess": ACTIVITY_RULE,
+    "SubCanvas": ACTIVITY_RULE,
 }
