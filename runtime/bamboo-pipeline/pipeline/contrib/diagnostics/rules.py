@@ -29,6 +29,25 @@ def _schedule_type_value(schedule):
     return getattr(schedule.type, "value", schedule.type)
 
 
+def _waiting_ack_convergence(process):
+    """并行网关把自己置为 FINISHED 后让父进程沉睡等子进程收敛，守在终态节点上是设计内行为。"""
+    return process.need_ack > 0 and 0 <= process.ack_num < process.need_ack
+
+
+def _live_children_count(snapshot):
+    counts = defaultdict(int)
+    for process in snapshot.processes:
+        parent_id = getattr(process, "parent_id", -1)
+        if not process.dead and parent_id not in (None, -1):
+            counts[parent_id] += 1
+    return counts
+
+
+def _has_full_process_view(snapshot):
+    """快照是否按 root 全量收集：只有此时子进程才在其中，才能判断收敛是否真的丢了。"""
+    return not snapshot.node_id and snapshot.process_id is None
+
+
 def _waiting_external_callback(snapshot, states_by_node, schedules_by_node):
     """引擎正沉睡等待外部回调。
 
@@ -202,6 +221,9 @@ def _process_alive_but_terminal_state(snapshot, states_by_node):
             continue
         if _parked_by_user(process) or _parked_at_failed_node(process, state):
             continue
+        if _waiting_ack_convergence(process):
+            # 收敛是否真的丢了由 parallel_ack_not_converged 判断，这里不重复报同一个根因
+            continue
         if state.name in TERMINAL_STATES:
             hits.append(
                 _hit(
@@ -221,30 +243,81 @@ def _process_alive_but_terminal_state(snapshot, states_by_node):
 
 
 def _parallel_ack_not_converged(snapshot):
+    """父进程等不到子进程的 ACK。
+
+    子进程还活着时未收敛是并行流程的正常形态，问题（如果有）在子进程身上，会被它自己的签名抓到，
+    报父进程只会把诊断指向错误的位置。只有子进程全都没了却仍未收敛，才是真的收敛丢失。
+    """
+    if not _has_full_process_view(snapshot):
+        return []
+
+    live_children = _live_children_count(snapshot)
     hits = []
     for process in sorted(snapshot.processes, key=lambda item: item.id):
-        if _parked_by_user(process):
+        if _parked_by_user(process) or not _waiting_ack_convergence(process):
             continue
-        if process.need_ack > 0 and 0 <= process.ack_num < process.need_ack:
-            hits.append(
-                _hit(
-                    "parallel_ack_not_converged",
-                    "high",
-                    0.94,
-                    {
-                        "process_id": process.id,
-                        "node_id": process.current_node_id,
-                        "ack_num": process.ack_num,
-                        "need_ack": process.need_ack,
-                    },
-                    {"process_id": process.id, "node_id": process.current_node_id},
-                    ["inspect_ack_converge"],
-                    ["resend_schedule", "replay_callback_data"],
-                    "Process {} waits for ACK convergence: {}/{}".format(
-                        process.id, process.ack_num, process.need_ack
-                    ),
-                )
+        if live_children.get(process.id, 0) > 0:
+            continue
+        hits.append(
+            _hit(
+                "parallel_ack_not_converged",
+                "high",
+                0.94,
+                {
+                    "process_id": process.id,
+                    "node_id": process.current_node_id,
+                    "ack_num": process.ack_num,
+                    "need_ack": process.need_ack,
+                    "live_children": 0,
+                },
+                {"process_id": process.id, "node_id": process.current_node_id},
+                ["inspect_ack_converge"],
+                ["resend_schedule", "replay_callback_data"],
+                "Process {} waits for ACK convergence: {}/{} while no child process is alive".format(
+                    process.id, process.ack_num, process.need_ack
+                ),
             )
+        )
+    return hits
+
+
+def _schedule_missing_for_running_node(snapshot, states_by_node, schedules_by_node):
+    """节点还在 RUNNING、有存活进程守着，却没有对应 version 的调度记录。
+
+    沉睡的进程只能由调度或回调唤醒，没有调度记录就是确定性地不可唤醒；未沉睡的多数是
+    celery worker 在 execute 途中被杀（OOM / 发布 / 驱逐），状态停在 RUNNING、调度还没写。
+    两者都不会再自行往前走，但后者与"execute 仍在执行"签名重合，因此本判据只在已确认静默时生效。
+    """
+    hits = []
+    for process in sorted(snapshot.processes, key=lambda item: item.id):
+        if process.dead or not process.current_node_id or _parked_by_user(process):
+            continue
+        state = states_by_node.get(process.current_node_id)
+        if state is None or state.name != states.RUNNING:
+            continue
+        versions = {schedule.version for schedule in schedules_by_node.get(process.current_node_id, [])}
+        if state.version in versions:
+            continue
+        asleep = bool(getattr(process, "asleep", False))
+        hits.append(
+            _hit(
+                "schedule_missing_for_running_node",
+                "critical",
+                0.90,
+                {
+                    "process_id": process.id,
+                    "node_id": process.current_node_id,
+                    "version": state.version,
+                    "process_asleep": asleep,
+                },
+                {"process_id": process.id, "node_id": process.current_node_id},
+                ["inspect_node_runtime_readiness"],
+                ["resend_schedule", "replay_callback_data"],
+                "Node {} is running without schedule for version {} while process {} stays on it (asleep={})".format(
+                    process.current_node_id, state.version, process.id, asleep
+                ),
+            )
+        )
     return hits
 
 
@@ -333,6 +406,10 @@ def diagnose_snapshot(snapshot, stall_seconds=None):
     hits.extend(_parallel_ack_not_converged(snapshot))
     hits.extend(_schedule_finished_but_process_not_exited(snapshot, processes_by_id))
     hits.extend(_multiple_sleep_process_for_node(processes_by_node))
+
+    if stall_seconds is not None:
+        # 需要"已确认静默"作为前置，否则会把 execute 正在执行的瞬时窗口当成异常
+        hits.extend(_schedule_missing_for_running_node(snapshot, states_by_node, schedules_by_node))
 
     if (
         not hits

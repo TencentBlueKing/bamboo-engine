@@ -94,10 +94,12 @@ def test_fallback_hit_when_callback_schedule_expired():
     assert [hit.type for hit in diagnose_snapshot(snapshot, stall_seconds=7200)] == ["stalled_no_progress"]
 
 
-def test_fallback_hit_when_running_node_has_no_schedule():
-    """RUNNING 但没有调度记录：没有任何机制会再唤醒它，必须保留。"""
+def test_running_node_without_schedule_gets_dedicated_hit():
+    """RUNNING 但没有调度记录：没有任何机制会再唤醒它，由专属判据接管而非走兜底。"""
     snapshot = _waiting_snapshot(ScheduleType.CALLBACK, with_schedule=False)
-    assert [hit.type for hit in diagnose_snapshot(snapshot, stall_seconds=7200)] == ["stalled_no_progress"]
+    hits = diagnose_snapshot(snapshot, stall_seconds=7200)
+    assert [hit.type for hit in hits] == ["schedule_missing_for_running_node"]
+    assert hits[0].evidence["stall_seconds"] == 7200
 
 
 def test_fallback_stalled_hit_when_no_specific_rule():

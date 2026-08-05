@@ -77,6 +77,10 @@ class DiagnosticRulesTestCase(TransactionTestCase):
     def _snapshot(self, root_pipeline_id="root-rules", node_id="node-rules", process_id=None):
         return collect_runtime_snapshot(root_pipeline_id=root_pipeline_id, node_id=node_id, process_id=process_id)
 
+    def _root_snapshot(self, root_pipeline_id="root-rules"):
+        """按 root 全量收集：只有这样子进程才在快照里，才能判断 ACK 收敛是否真的丢了。"""
+        return collect_runtime_snapshot(root_pipeline_id=root_pipeline_id)
+
     def _assert_hit_complete(self, hit, stuck_type):
         self.assertEqual(hit.type, stuck_type)
         self.assertTrue(hit.severity)
@@ -245,15 +249,73 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self._create_process(119, ack_num=1, need_ack=3, suspended=True, suspended_by="root-rules")
         self._create_state("node-rules")
 
-        hits = diagnose_snapshot(self._snapshot())
+        hits = diagnose_snapshot(self._root_snapshot())
 
         self.assertEqual(hits, [])
+
+    def test_parallel_ack_not_reported_while_children_alive(self):
+        """并行网关把自己置为 FINISHED 后让父进程沉睡等收敛，子进程还在跑就是正常形态。"""
+        parent = self._create_process(130, node_id="gateway-node", ack_num=1, need_ack=3, asleep=True)
+        self._create_process(131, node_id="child-node", parent_id=parent.id, dead=False, asleep=False)
+        self._create_state("gateway-node", name=states.FINISHED)
+        self._create_state("child-node", name=states.RUNNING)
+
+        hits = diagnose_snapshot(self._root_snapshot())
+
+        self.assertEqual(hits, [])
+
+    def test_parallel_ack_reported_when_all_children_dead(self):
+        parent = self._create_process(132, node_id="gateway-node", ack_num=0, need_ack=2, asleep=True)
+        self._create_process(133, node_id="child-node", parent_id=parent.id, dead=True)
+        self._create_state("gateway-node", name=states.FINISHED)
+
+        hits = diagnose_snapshot(self._root_snapshot())
+
+        self.assertEqual([hit.type for hit in hits], ["parallel_ack_not_converged"])
+        self.assertEqual(hits[0].evidence["live_children"], 0)
+        self.assertEqual(hits[0].related_objects["process_id"], parent.id)
+
+    def test_schedule_missing_for_running_node_reported_for_both_asleep_states(self):
+        """沉睡的确定不可唤醒；未沉睡的多是 worker 在 execute 途中被杀，同样不会再往前走。"""
+        for index, asleep in enumerate((True, False)):
+            with self.subTest(asleep=asleep):
+                node_id = "node-missing-{}".format(index)
+                process = self._create_process(140 + index, node_id=node_id, dead=False, asleep=asleep)
+                self._create_state(node_id, name=states.RUNNING)
+
+                hits = diagnose_snapshot(
+                    collect_runtime_snapshot(root_pipeline_id="root-rules", node_id=node_id), stall_seconds=3600
+                )
+
+                self.assertEqual([hit.type for hit in hits], ["schedule_missing_for_running_node"])
+                self.assertEqual(hits[0].evidence["process_asleep"], asleep)
+                self.assertEqual(hits[0].related_objects["process_id"], process.id)
+
+    def test_schedule_missing_not_reported_without_confirmed_stall(self):
+        """没有确认静默时不报，避免把 execute 正在执行的瞬时窗口当成异常。"""
+        self._create_process(142, node_id="node-missing-x", dead=False, asleep=False)
+        self._create_state("node-missing-x", name=states.RUNNING)
+
+        hits = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-missing-x"))
+
+        self.assertEqual(hits, [])
+
+    def test_schedule_missing_not_reported_when_current_version_has_schedule(self):
+        process = self._create_process(143, node_id="node-missing-y", dead=False, asleep=True)
+        self._create_state("node-missing-y", name=states.RUNNING, version="v9")
+        self._create_schedule(143, process.id, "node-missing-y", version="v9")
+
+        hits = diagnose_snapshot(
+            collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-missing-y"), stall_seconds=3600
+        )
+
+        self.assertEqual([hit.type for hit in hits], [])
 
     def test_parallel_ack_not_converged(self):
         process = self._create_process(105, ack_num=1, need_ack=3)
         self._create_state("node-rules")
 
-        hits = diagnose_snapshot(self._snapshot())
+        hits = diagnose_snapshot(self._root_snapshot())
 
         self.assertEqual([hit.type for hit in hits], ["parallel_ack_not_converged"])
         self._assert_hit_complete(hits[0], "parallel_ack_not_converged")
