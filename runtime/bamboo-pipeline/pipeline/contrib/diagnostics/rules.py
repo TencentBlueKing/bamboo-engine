@@ -13,6 +13,20 @@ def _ids(items):
     return [item.id for item in sorted(items, key=lambda item: item.id)]
 
 
+def _parked_by_user(process):
+    """暂停/冻结的进程按设计停在原地等人工恢复，不是卡住。
+
+    pause_pipeline / pause_node / freeze 只把 suspended | frozen 置位，进程既没死也不再往前推进，
+    此时它指向的下一个节点自然还没有 State，各类"进程活着但状态不对"的判据都会误判。
+    """
+    return bool(getattr(process, "suspended", False) or getattr(process, "frozen", False))
+
+
+def _parked_at_failed_node(process, state):
+    """节点失败后引擎会 sleep 进程并停在该 FAILED 节点，等待人工重试或跳过，不是卡住。"""
+    return state.name == states.FAILED and bool(getattr(process, "asleep", False))
+
+
 def _hit(hit_type, severity, confidence, evidence, related_objects, recommended_actions, forbidden_actions, message):
     return DiagnosticHit(
         type=hit_type,
@@ -107,6 +121,8 @@ def _schedule_lock_stuck(snapshot):
 def _missing_state_for_live_process(snapshot, states_by_node):
     hits = []
     for process in sorted(snapshot.processes, key=lambda item: item.id):
+        if _parked_by_user(process):
+            continue
         if not process.dead and process.current_node_id and process.current_node_id not in states_by_node:
             hits.append(
                 _hit(
@@ -133,7 +149,11 @@ def _process_alive_but_terminal_state(snapshot, states_by_node):
     hits = []
     for process in sorted(snapshot.processes, key=lambda item: item.id):
         state = states_by_node.get(process.current_node_id)
-        if state is not None and not process.dead and state.name in TERMINAL_STATES:
+        if state is None or process.dead:
+            continue
+        if _parked_by_user(process) or _parked_at_failed_node(process, state):
+            continue
+        if state.name in TERMINAL_STATES:
             hits.append(
                 _hit(
                     "process_alive_but_terminal_state",
@@ -154,6 +174,8 @@ def _process_alive_but_terminal_state(snapshot, states_by_node):
 def _parallel_ack_not_converged(snapshot):
     hits = []
     for process in sorted(snapshot.processes, key=lambda item: item.id):
+        if _parked_by_user(process):
+            continue
         if process.need_ack > 0 and 0 <= process.ack_num < process.need_ack:
             hits.append(
                 _hit(
@@ -204,6 +226,8 @@ def _schedule_finished_but_process_not_exited(snapshot, processes_by_id):
     hits = []
     for schedule in sorted(snapshot.schedules, key=lambda item: item.id):
         process = processes_by_id.get(schedule.process_id)
+        if process is not None and _parked_by_user(process):
+            continue
         if (
             process is not None
             and schedule.finished

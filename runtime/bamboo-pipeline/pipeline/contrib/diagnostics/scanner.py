@@ -20,15 +20,16 @@ def _node_id_for_hit(hit, fallback_node_id=""):
     return hit.related_objects.get("node_id") or hit.evidence.get("node_id") or fallback_node_id or ""
 
 
-def scan_stalled_roots(threshold_seconds=None, batch=None, confirm_seconds=None, now=None):
+def scan_stalled_roots(threshold_seconds=None, batch=None, confirm_seconds=None, now=None, max_silent_seconds=None):
     if not conf.scan_enabled():
         return []
 
     threshold_seconds = threshold_seconds if threshold_seconds is not None else conf.stall_threshold_seconds()
     batch = batch if batch is not None else conf.scan_batch()
     confirm_seconds = confirm_seconds if confirm_seconds is not None else conf.second_confirm_seconds()
+    max_silent_seconds = max_silent_seconds if max_silent_seconds is not None else conf.scan_max_silent_seconds()
 
-    candidates = stalled_root_candidates(threshold_seconds, batch, now=now)
+    candidates = stalled_root_candidates(threshold_seconds, batch, now=now, max_silent_seconds=max_silent_seconds)
     if confirm_seconds and candidates:
         time.sleep(confirm_seconds)  # 一次性等待后统一二次确认，剔除刚恢复的 root
 

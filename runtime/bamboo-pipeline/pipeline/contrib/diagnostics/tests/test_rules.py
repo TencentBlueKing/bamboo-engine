@@ -132,6 +132,36 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self._assert_hit_complete(hits[0], "missing_state_for_live_process")
         self.assertEqual(hits[0].related_objects["process_id"], process.id)
 
+    def test_missing_state_not_reported_for_suspended_process(self):
+        """用户暂停整条流程时，进程停在还没建 State 的下一个节点上，不算卡住。"""
+        self._create_process(
+            113,
+            node_id="node-without-state",
+            dead=False,
+            suspended=True,
+            suspended_by="root-rules",
+        )
+
+        hits = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-without-state"))
+
+        self.assertEqual(hits, [])
+
+    def test_missing_state_not_reported_for_frozen_process(self):
+        self._create_process(114, node_id="node-without-state", dead=False, frozen=True)
+
+        hits = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-without-state"))
+
+        self.assertEqual(hits, [])
+
+    def test_missing_state_still_reported_for_asleep_process(self):
+        """asleep 不等于人工停车，仍然要报出来。"""
+        process = self._create_process(115, node_id="node-without-state", dead=False, asleep=True)
+
+        hits = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="root-rules", node_id="node-without-state"))
+
+        self.assertEqual([hit.type for hit in hits], ["missing_state_for_live_process"])
+        self.assertEqual(hits[0].related_objects["process_id"], process.id)
+
     def test_process_alive_but_terminal_state(self):
         process = self._create_process(104, dead=False)
         self._create_state("node-rules", name=states.FINISHED)
@@ -142,6 +172,41 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self._assert_hit_complete(hits[0], "process_alive_but_terminal_state")
         self.assertEqual(hits[0].evidence["state"], states.FINISHED)
         self.assertEqual(hits[0].related_objects["process_id"], process.id)
+
+    def test_terminal_state_not_reported_for_failed_node_parking(self):
+        """节点失败后引擎会 sleep 进程停在 FAILED 节点等人工，是设计内行为。"""
+        self._create_process(116, dead=False, asleep=True)
+        self._create_state("node-rules", name=states.FAILED)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual(hits, [])
+
+    def test_terminal_state_still_reported_for_awake_process_on_failed_node(self):
+        """停在 FAILED 节点但没睡，说明不是正常停车。"""
+        process = self._create_process(117, dead=False, asleep=False)
+        self._create_state("node-rules", name=states.FAILED)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual([hit.type for hit in hits], ["process_alive_but_terminal_state"])
+        self.assertEqual(hits[0].related_objects["process_id"], process.id)
+
+    def test_terminal_state_not_reported_for_suspended_process(self):
+        self._create_process(118, dead=False, suspended=True, suspended_by="root-rules")
+        self._create_state("node-rules", name=states.FINISHED)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual(hits, [])
+
+    def test_parallel_ack_not_reported_for_suspended_process(self):
+        self._create_process(119, ack_num=1, need_ack=3, suspended=True, suspended_by="root-rules")
+        self._create_state("node-rules")
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual(hits, [])
 
     def test_parallel_ack_not_converged(self):
         process = self._create_process(105, ack_num=1, need_ack=3)
@@ -177,6 +242,15 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self._assert_hit_complete(hits[0], "schedule_finished_but_process_not_exited")
         self.assertEqual(hits[0].related_objects["process_id"], process.id)
         self.assertEqual(hits[0].related_objects["schedule_id"], schedule.id)
+
+    def test_schedule_finished_not_reported_for_suspended_process(self):
+        process = self._create_process(120, dead=False, suspended=True, suspended_by="root-rules")
+        self._create_state("node-rules")
+        self._create_schedule(120, process.id, "node-rules", finished=True)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual(hits, [])
 
     def test_healthy_snapshot_returns_empty(self):
         process = self._create_process(109, asleep=False, dead=False, ack_num=0, need_ack=-1)
