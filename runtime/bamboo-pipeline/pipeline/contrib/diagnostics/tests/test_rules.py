@@ -110,6 +110,47 @@ class DiagnosticRulesTestCase(TransactionTestCase):
         self.assertEqual(hits[0].evidence["schedule_times"], 1)
         self.assertEqual(hits[0].related_objects["schedule_ids"], [schedule.id])
 
+    def test_callback_lock_conflict_not_reported_for_terminal_node(self):
+        """JOB 节点失败后迟到的回调会写入 CallbackData 但不会自增 schedule_times，属于残留。"""
+        process = self._create_process(121, dead=False, asleep=True)
+        self._create_state("node-rules", name=states.FAILED)
+        self._create_schedule(121, process.id, "node-rules", schedule_times=1, expired=True)
+        self._create_callback_data("node-rules", callback_data_id=121)
+        self._create_callback_data("node-rules", callback_data_id=122)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual(hits, [])
+
+    def test_callback_lock_conflict_ignores_stale_version_residue(self):
+        """节点重试后老 version 的回调残留挡不住当前 version 的调度。"""
+        process = self._create_process(122, dead=False)
+        self._create_state("node-rules", name=states.RUNNING, version="v2")
+        self._create_schedule(122, process.id, "node-rules", version="v1", schedule_times=1, expired=True)
+        self._create_schedule(123, process.id, "node-rules", version="v2", schedule_times=1)
+        self._create_callback_data("node-rules", version="v1", callback_data_id=123)
+        self._create_callback_data("node-rules", version="v1", callback_data_id=124)
+        self._create_callback_data("node-rules", version="v2", callback_data_id=125)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertEqual([hit.type for hit in hits], [])
+
+    def test_callback_lock_conflict_reported_for_running_node(self):
+        """回调写了但调度一次都没跑起来，节点会一直等着，仍然要报。"""
+        process = self._create_process(123, dead=False)
+        self._create_state("node-rules", name=states.RUNNING)
+        self._create_schedule(124, process.id, "node-rules", schedule_times=0)
+        self._create_callback_data("node-rules", callback_data_id=126)
+
+        hits = diagnose_snapshot(self._snapshot())
+
+        self.assertIn("callback_lock_conflict", [hit.type for hit in hits])
+        conflict = [hit for hit in hits if hit.type == "callback_lock_conflict"][0]
+        self.assertEqual(conflict.evidence["callback_data_count"], 1)
+        self.assertEqual(conflict.evidence["schedule_times"], 0)
+        self.assertEqual(conflict.evidence["version"], "v1")
+
     def test_schedule_lock_stuck(self):
         process = self._create_process(102)
         self._create_state("node-rules")

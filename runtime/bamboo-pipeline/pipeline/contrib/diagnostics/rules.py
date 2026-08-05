@@ -63,11 +63,31 @@ def _build_indexes(snapshot):
     return processes_by_id, processes_by_node, states_by_node, schedules_by_node, callbacks_by_node
 
 
-def _callback_lock_conflicts(schedules_by_node, callbacks_by_node):
+def _callback_lock_conflicts(schedules_by_node, callbacks_by_node, states_by_node):
+    """回调数据多于调度次数，说明有回调没被消费掉，节点会一直等在那里。
+
+    只在节点还没到终态、且只统计当前 version 的数据时才成立：
+
+    - 终态节点上多出来的回调数据是迟到回调留下的残留。callback() 只校验"有沉睡进程 + version 一致 +
+      schedule 未完成"，而节点失败后进程恰好是沉睡在该节点上、version 也不变，迟到的回调因此能写进
+      CallbackData，随后调度任务发现节点已不是 RUNNING 就直接 expire 返回，schedule_times 不会自增。
+    - Schedule 是按 (node_id, version) 唯一的，跨 version 求和会让重试前残留的回调把总数顶起来，
+      而历史 version 的回调按定义挡不住当前 version 的调度。
+    """
     hits = []
     for node_id in sorted(set(schedules_by_node.keys()) | set(callbacks_by_node.keys())):
-        schedules = sorted(schedules_by_node.get(node_id, []), key=lambda schedule: schedule.id)
-        callbacks = sorted(callbacks_by_node.get(node_id, []), key=lambda callback_data: callback_data.id)
+        state = states_by_node.get(node_id)
+        if state is not None and state.name in TERMINAL_STATES:
+            continue
+        version = state.version if state is not None else None
+        schedules = sorted(
+            [item for item in schedules_by_node.get(node_id, []) if version is None or item.version == version],
+            key=lambda schedule: schedule.id,
+        )
+        callbacks = sorted(
+            [item for item in callbacks_by_node.get(node_id, []) if version is None or item.version == version],
+            key=lambda callback_data: callback_data.id,
+        )
         schedule_times = sum(schedule.schedule_times for schedule in schedules)
         if callbacks and len(callbacks) > schedule_times:
             hits.append(
@@ -77,6 +97,7 @@ def _callback_lock_conflicts(schedules_by_node, callbacks_by_node):
                     0.99,
                     {
                         "node_id": node_id,
+                        "version": version or "",
                         "callback_data_count": len(callbacks),
                         "schedule_times": schedule_times,
                     },
@@ -277,7 +298,7 @@ def diagnose_snapshot(snapshot, stall_seconds=None):
     processes_by_id, processes_by_node, states_by_node, schedules_by_node, callbacks_by_node = _build_indexes(snapshot)
 
     hits = []
-    hits.extend(_callback_lock_conflicts(schedules_by_node, callbacks_by_node))
+    hits.extend(_callback_lock_conflicts(schedules_by_node, callbacks_by_node, states_by_node))
     hits.extend(_missing_state_for_live_process(snapshot, states_by_node))
     hits.extend(_process_alive_but_terminal_state(snapshot, states_by_node))
     hits.extend(_schedule_lock_stuck(snapshot))
