@@ -2,11 +2,14 @@
 
 from collections import defaultdict
 
+from bamboo_engine.eri import ScheduleType
+
 from pipeline.contrib.diagnostics.types import DiagnosticHit
 from pipeline.engine import states
 
 
 TERMINAL_STATES = frozenset([states.FINISHED, states.FAILED, states.REVOKED])
+CALLBACK_SCHEDULE_TYPES = frozenset([ScheduleType.CALLBACK.value, ScheduleType.MULTIPLE_CALLBACK.value])
 
 
 def _ids(items):
@@ -20,6 +23,31 @@ def _parked_by_user(process):
     此时它指向的下一个节点自然还没有 State，各类"进程活着但状态不对"的判据都会误判。
     """
     return bool(getattr(process, "suspended", False) or getattr(process, "frozen", False))
+
+
+def _schedule_type_value(schedule):
+    return getattr(schedule.type, "value", schedule.type)
+
+
+def _waiting_external_callback(snapshot, states_by_node, schedules_by_node):
+    """引擎正沉睡等待外部回调。
+
+    runtime.beat() 只在执行推进循环和 schedule() 内部调用，等回调期间进程两者都不执行，
+    心跳因此冻结在入睡那一刻。也就是说"心跳静默"是回调型节点的设计必然结果，
+    而不是停滞的证据——等人的暂停节点、审批节点更是没有任何合理的时长上界。
+    """
+    for process in snapshot.processes:
+        if process.dead or not process.current_node_id:
+            continue
+        state = states_by_node.get(process.current_node_id)
+        if state is None or state.name != states.RUNNING:
+            continue
+        for schedule in schedules_by_node.get(process.current_node_id, []):
+            if schedule.version != state.version or schedule.finished or schedule.expired:
+                continue
+            if _schedule_type_value(schedule) in CALLBACK_SCHEDULE_TYPES:
+                return True
+    return False
 
 
 def _parked_at_failed_node(process, state):
@@ -306,7 +334,11 @@ def diagnose_snapshot(snapshot, stall_seconds=None):
     hits.extend(_schedule_finished_but_process_not_exited(snapshot, processes_by_id))
     hits.extend(_multiple_sleep_process_for_node(processes_by_node))
 
-    if not hits and stall_seconds is not None:
+    if (
+        not hits
+        and stall_seconds is not None
+        and not _waiting_external_callback(snapshot, states_by_node, schedules_by_node)
+    ):
         hits = [_stalled_no_progress_hit(snapshot, stall_seconds)]
 
     if stall_seconds is not None:
