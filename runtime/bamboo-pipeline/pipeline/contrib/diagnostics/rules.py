@@ -52,18 +52,29 @@ def _all_live_processes_parked(snapshot, states_by_node):
     """整条流程的存活进程都停在人工停车点（用户暂停 / 节点失败等重试）。
 
     停车期间不推进是设计内行为，心跳必然停摆，兜底判据不能把它当成停滞。
+
+    等 ACK 收敛的父进程在这里算中性：它自己没有停车，但也不代表流程还在推进——
+    能不能往下走完全取决于子进程，而子进程会各自被判定。典型形态是并行网关下几个分支
+    失败停车，父进程因此永远收不齐 ACK，整条流程实际上是在等人工处理那几个失败分支。
+    子进程若真的卡了（RUNNING 无调度）或全死却未收敛，都有各自的判据接住，不会被这里放过。
     """
     live = [process for process in snapshot.processes if not process.dead]
     if not live:
         return False
+    parked_seen = False
     for process in live:
+        if _waiting_ack_convergence(process):
+            continue
         if _parked_by_user(process):
+            parked_seen = True
             continue
         state = states_by_node.get(process.current_node_id)
         if state is not None and _parked_at_failed_node(process, state):
+            parked_seen = True
             continue
         return False
-    return True
+    # 全是等 ACK 的父进程、一个停车的都没有时不算停车，交回兜底判断
+    return parked_seen
 
 
 def _waiting_external_callback(snapshot, states_by_node, schedules_by_node):
