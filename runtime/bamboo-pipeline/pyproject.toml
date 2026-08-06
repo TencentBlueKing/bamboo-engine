@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "bamboo-pipeline"
-version = "3.24.15"
+version = "3.24.16"
 description = "runtime for bamboo-engine base on Django and Celery"
 authors = ["blueking <blueking@tencent.com>"]
 license = "MIT"
