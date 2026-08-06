@@ -1433,7 +1433,11 @@ def test_preview_node_inputs__with_subprocess():
             }
         },
         "activities": {
-            "sid": {"pipeline": subprocess_pipeline, "params": {"${input}": {"type": "splice", "value": "${test}"}}}
+            "sid": {
+                "pipeline": subprocess_pipeline,
+                "type": "SubProcess",
+                "params": {"${input}": {"type": "splice", "value": "${test}"}},
+            }
         },
     }
     runtime = MagicMock()
@@ -1441,6 +1445,84 @@ def test_preview_node_inputs__with_subprocess():
     api_result = preview_node_inputs(runtime, pipeline, node_id, subprocess_stack=[subprocess_id])
     assert api_result.result is True
     assert api_result.data == {"input": "test_value"}
+
+
+def test_preview_node_inputs__with_subcanvas():
+    """子画布（SubCanvas）与主流程共享上下文，无需通过 params 注入参数，
+    子画布内部节点直接引用父流程的上下文变量。"""
+    node_id = "nid"
+    canvas_id = "cid"
+    # 子画布内部节点直接引用父流程的 ${input}，子画布自身 data 不重定义 ${input}
+    subcanvas_pipeline = {
+        "data": {},
+        "activities": {
+            "nid": {
+                "component": {
+                    "inputs": {"input": {"value": "${input}", "type": "splice", "is_param": False}},
+                },
+                "type": "ServiceActivity",
+            }
+        },
+    }
+    pipeline = {
+        "data": {
+            "inputs": {
+                "${test}": {
+                    "value": "test_value",
+                    "type": "plain",
+                    "is_param": False,
+                },
+                "${input}": {"value": "parent_input", "type": "plain", "is_param": False},
+            }
+        },
+        "activities": {
+            # 子画布只包含 pipeline 字段，没有 params（与子流程区分），共享父上下文
+            "cid": {"pipeline": subcanvas_pipeline, "type": "SubCanvas"},
+        },
+    }
+    runtime = MagicMock()
+
+    api_result = preview_node_inputs(runtime, pipeline, node_id, subprocess_stack=[canvas_id])
+    assert api_result.result is True
+    # 子画布共享父流程上下文，内部 ${input} 直接解析为父流程中的 ${input} 原值
+    assert api_result.data == {"input": "parent_input"}
+
+
+def test_preview_node_inputs__subcanvas_ref_variable():
+    """子画布内部节点引用父流程上下文中的 splicing 变量，并且父流程变量是 lazy 类型的计算变量。"""
+    node_id = "nid"
+    canvas_id = "cid"
+    # 子画布内部节点直接引用父流程的 ${ref}，子画布自身 data 不重定义
+    subcanvas_pipeline = {
+        "data": {},
+        "activities": {
+            "nid": {
+                "component": {
+                    "inputs": {"input": {"value": "${ref}", "type": "splice", "is_param": False}},
+                },
+                "type": "ServiceActivity",
+            }
+        },
+    }
+    pipeline = {
+        "data": {
+            "inputs": {
+                "${ref}": {"custom_type": "custom_type", "value": "test", "is_param": False, "type": "lazy"},
+            }
+        },
+        "activities": {
+            "cid": {"pipeline": subcanvas_pipeline, "type": "SubCanvas"},
+        },
+    }
+
+    compute_var = MockCV(pipeline["data"]["inputs"]["${ref}"]["value"])
+    runtime = MagicMock()
+    runtime.get_compute_variable = MagicMock(return_value=compute_var)
+
+    api_result = preview_node_inputs(runtime, pipeline, node_id, subprocess_stack=[canvas_id])
+    assert api_result.result is True
+    # 子画布共享父上下文，内部 ${ref} 直接解析为父流程中的 lazy 变量，经计算变量解析
+    assert api_result.data == {"input": "test"}
 
 
 def test_retry_subprocess__type_not_match():

@@ -230,8 +230,4 @@ class ContextMixin(SerializerMixin):
             cv.pipeline_id = to_pipeline_id
             new_models.append(cv)
 
-        # 3. 如果目标流程可能已有上下文，先清掉避免唯一索引冲突（按业务需要）
-        DBContextValue.objects.filter(pipeline_id=to_pipeline_id).delete()
-
-        # 4. 批量插入
         DBContextValue.objects.bulk_create(new_models, batch_size=500)
