@@ -78,7 +78,11 @@ def get_allowed_start_node_ids(pipeline_tree):
 
 
 def validate_and_process_pipeline(pipeline: dict, cycle_tolerate=False):
-    for subproc in [act for act in pipeline["activities"].values() if act["type"] == NodeType.SubProcess.value]:
+    for subproc in [
+        act
+        for act in pipeline["activities"].values()
+        if act["type"] in (NodeType.SubProcess.value, NodeType.SubCanvas.value)
+    ]:
         validate_and_process_pipeline(subproc["pipeline"], cycle_tolerate)
 
     format_pipeline_tree_io_to_list(pipeline)

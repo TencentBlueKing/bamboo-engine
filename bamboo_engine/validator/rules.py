@@ -18,6 +18,7 @@ MAX_OUT = 1000
 FLOW_NODES_WITHOUT_STARTEVENT = [
     NodeType.ServiceActivity.value,
     NodeType.SubProcess.value,
+    NodeType.SubCanvas.value,
     NodeType.EmptyEndEvent.value,
     NodeType.ParallelGateway.value,
     NodeType.ConditionalParallelGateway.value,
@@ -28,6 +29,7 @@ FLOW_NODES_WITHOUT_STARTEVENT = [
 FLOW_NODES_WITHOUT_START_AND_END = [
     NodeType.ServiceActivity.value,
     NodeType.SubProcess.value,
+    NodeType.SubCanvas.value,
     NodeType.ParallelGateway.value,
     NodeType.ConditionalParallelGateway.value,
     NodeType.ExclusiveGateway.value,
@@ -84,4 +86,5 @@ NODE_RULES = {
     NodeType.ConditionalParallelGateway.value: EMIT_RULE,
     NodeType.ConvergeGateway.value: CONVERGE_RULE,
     NodeType.SubProcess.value: ACTIVITY_RULE,
+    NodeType.SubCanvas.value: ACTIVITY_RULE,
 }

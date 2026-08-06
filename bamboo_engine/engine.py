@@ -211,7 +211,7 @@ class Engine:
         """
         node = self.runtime.get_node(node_id)
 
-        if node.type == NodeType.SubProcess:
+        if node.type in (NodeType.SubProcess, NodeType.SubCanvas):
             raise InvalidOperationError("can not use pause_node_appoint api for {}".format(node.type))
 
         process_id = self.runtime.get_process_id_with_current_node_id(node_id)
@@ -250,7 +250,7 @@ class Engine:
         """
         node = self.runtime.get_node(node_id)
 
-        if node.type == NodeType.SubProcess:
+        if node.type in (NodeType.SubProcess, NodeType.SubCanvas):
             raise InvalidOperationError("can not use pause_node_appoint api for {}".format(node.type))
 
         self.runtime.pre_resume_node(node_id)
@@ -922,7 +922,7 @@ class Engine:
                         # 重入次数超过限制
                         if (
                             node_state.name == states.FINISHED
-                            and node.type != NodeType.SubProcess
+                            and node.type not in (NodeType.SubProcess, NodeType.SubCanvas)
                             and node_state.loop > rerun_limit
                         ):
                             exec_outputs = self.runtime.get_execution_data_outputs(current_node_id)

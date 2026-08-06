@@ -24,6 +24,7 @@ class NodeType(Enum):
 
     ServiceActivity = "ServiceActivity"
     SubProcess = "SubProcess"
+    SubCanvas = "SubCanvas"
     ExclusiveGateway = "ExclusiveGateway"
     ParallelGateway = "ParallelGateway"
     ConditionalParallelGateway = "ConditionalParallelGateway"
@@ -324,6 +325,20 @@ class SubProcess(Node):
         """
 
         :param start_event_id: 子流程开始节点 ID
+        :type start_event_id: str
+        """
+        super().__init__(*args, **kwargs)
+        self.start_event_id = start_event_id
+
+
+class SubCanvas(Node):
+    """
+    子画布
+    """
+
+    def __init__(self, start_event_id: str, *args, **kwargs):
+        """
+        :param start_event_id: 子画布开始节点 ID
         :type start_event_id: str
         """
         super().__init__(*args, **kwargs)

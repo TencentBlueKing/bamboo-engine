@@ -11,11 +11,12 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-from .base import Element
 from bamboo_engine.eri import NodeType
 from bamboo_engine.utils.collections import FancyDict
 
-__all__ = ["ServiceActivity", "SubProcess"]
+from .base import Element
+
+__all__ = ["ServiceActivity", "SubProcess", "SubCanvas"]
 
 
 class ServiceActivity(Element):
@@ -49,3 +50,16 @@ class SubProcess(Element):
 
     def type(self):
         return NodeType.SubProcess.value
+
+
+class SubCanvas(Element):
+    def __init__(self, start=None, data=None, params=None, global_outputs=None, replace_id=False, *args, **kwargs):
+        self.start = start
+        self.data = data
+        self.params = params or {}
+        self.replace_id = replace_id
+        self.global_outputs = FancyDict(global_outputs or {})
+        super(SubCanvas, self).__init__(*args, **kwargs)
+
+    def type(self):
+        return NodeType.SubCanvas.value

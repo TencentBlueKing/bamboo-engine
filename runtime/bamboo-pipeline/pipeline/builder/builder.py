@@ -35,6 +35,7 @@ __skeleton = {
 __node_type = {
     PE.ServiceActivity: PE.activities,
     PE.SubProcess: PE.activities,
+    PE.SubCanvas: PE.activities,
     PE.EmptyEndEvent: PE.end_event,
     PE.EmptyStartEvent: PE.start_event,
     PE.ParallelGateway: PE.gateways,
@@ -55,6 +56,7 @@ __multiple_incoming_type = {
     PE.ConditionalParallelGateway,
     PE.ExclusiveGateway,
     PE.SubProcess,
+    PE.SubCanvas,
 }
 
 __incoming = "__incoming"
@@ -166,6 +168,23 @@ def __grow(tree, elem):
             subprocess[PE.pipeline] = build_tree(
                 start_elem=elem.start, id=elem.id, data=elem.data, replace_id=elem.replace_id
             )
+
+        tree[PE.activities][elem.id] = subprocess
+
+        next_elem = elem.outgoing[0]
+        __grow_flow(tree, outgoing, elem, next_elem)
+
+    elif elem.type() == PE.SubCanvas:
+        outgoing = uniqid()
+
+        subprocess = {
+            PE.id: elem.id,
+            PE.incoming: tree[__incoming][elem.id],
+            PE.name: elem.name,
+            PE.outgoing: outgoing,
+            PE.type: elem.type(),
+            PE.pipeline: build_tree(start_elem=elem.start, id=elem.id, data=elem.data, replace_id=elem.replace_id),
+        }
 
         tree[PE.activities][elem.id] = subprocess
 
