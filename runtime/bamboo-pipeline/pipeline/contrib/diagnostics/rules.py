@@ -48,6 +48,24 @@ def _has_full_process_view(snapshot):
     return not snapshot.node_id and snapshot.process_id is None
 
 
+def _all_live_processes_parked(snapshot, states_by_node):
+    """整条流程的存活进程都停在人工停车点（用户暂停 / 节点失败等重试）。
+
+    停车期间不推进是设计内行为，心跳必然停摆，兜底判据不能把它当成停滞。
+    """
+    live = [process for process in snapshot.processes if not process.dead]
+    if not live:
+        return False
+    for process in live:
+        if _parked_by_user(process):
+            continue
+        state = states_by_node.get(process.current_node_id)
+        if state is not None and _parked_at_failed_node(process, state):
+            continue
+        return False
+    return True
+
+
 def _waiting_external_callback(snapshot, states_by_node, schedules_by_node):
     """引擎正沉睡等待外部回调。
 
@@ -415,6 +433,7 @@ def diagnose_snapshot(snapshot, stall_seconds=None):
         not hits
         and stall_seconds is not None
         and not _waiting_external_callback(snapshot, states_by_node, schedules_by_node)
+        and not _all_live_processes_parked(snapshot, states_by_node)
     ):
         hits = [_stalled_no_progress_hit(snapshot, stall_seconds)]
 

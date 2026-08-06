@@ -102,6 +102,53 @@ def test_running_node_without_schedule_gets_dedicated_hit():
     assert hits[0].evidence["stall_seconds"] == 7200
 
 
+def _parked_snapshot(suspended=False, frozen=False, state_name=engine_states.RUNNING, asleep=True, node="n1"):
+    """停车中的流程：用户暂停，或节点失败后沉睡等人工重试。"""
+    process = types.SimpleNamespace(
+        id=1,
+        current_node_id=node,
+        dead=False,
+        asleep=asleep,
+        need_ack=-1,
+        ack_num=0,
+        suspended=suspended,
+        frozen=frozen,
+    )
+    state = types.SimpleNamespace(id=1, node_id=node, name=state_name, version="v1")
+    return RuntimeSnapshot(
+        root_pipeline_id="root-1",
+        node_id="",
+        process_id=None,
+        processes=[process],
+        states=[state],
+        schedules=[],
+        callback_data=[],
+    )
+
+
+def test_no_fallback_when_pipeline_suspended_by_user():
+    """用户暂停期间心跳必然停摆，兜底判据也不能把它当成停滞。"""
+    assert diagnose_snapshot(_parked_snapshot(suspended=True), stall_seconds=7200) == []
+
+
+def test_no_fallback_when_process_frozen():
+    assert diagnose_snapshot(_parked_snapshot(frozen=True), stall_seconds=7200) == []
+
+
+def test_no_fallback_when_parked_at_failed_node():
+    """节点失败后沉睡等人工重试或跳过，是设计内停车。"""
+    snapshot = _parked_snapshot(state_name=engine_states.FAILED)
+    assert diagnose_snapshot(snapshot, stall_seconds=7200) == []
+
+
+def test_failed_node_process_not_asleep_still_reported():
+    """停在 FAILED 却没睡不是正常停车形态；新增的停车豁免不能把它一起放过。"""
+    snapshot = _parked_snapshot(state_name=engine_states.FAILED, asleep=False)
+    assert [hit.type for hit in diagnose_snapshot(snapshot, stall_seconds=7200)] == [
+        "process_alive_but_terminal_state"
+    ]
+
+
 def test_fallback_stalled_hit_when_no_specific_rule():
     hits = diagnose_snapshot(_empty_snapshot(), stall_seconds=3600)
     assert len(hits) == 1
