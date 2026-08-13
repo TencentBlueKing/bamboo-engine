@@ -18,7 +18,7 @@ from .endevent import EmptyEndEventHandler, ExecutableEndEventHandler
 from .exclusive_gateway import ExclusiveGatewayHandler
 from .parallel_gateway import ParallelGatewayHandler
 from .service_activity import ServiceActivityHandler
-from .subcvanvas import SubCanvasHandler
+from .subcanvas import SubCanvasHandler
 from .subprocess import SubprocessHandler
 
 

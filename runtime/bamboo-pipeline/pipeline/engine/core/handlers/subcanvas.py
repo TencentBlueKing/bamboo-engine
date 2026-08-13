@@ -16,7 +16,7 @@ from copy import deepcopy
 from pipeline.conf import default_settings
 from pipeline.core.data.context import Context
 from pipeline.core.data.hydration import hydrate_node_data
-from pipeline.core.flow.activity.sub_canvas import SubCanvas
+from pipeline.core.flow.activity.subcanvas import SubCanvas
 
 from .base import FlowElementHandler
 

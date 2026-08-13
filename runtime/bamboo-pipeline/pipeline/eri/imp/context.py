@@ -214,7 +214,7 @@ class ContextMixin(SerializerMixin):
 
         :param from_pipeline_id: 源流程 ID
         :param to_pipeline_id: 目标流程 ID
-        :param exclude_keys: 不需要复制的变量 key 集合，如 {"${_system}"}
+        :param exclude_keys: 不需要复制的变量 key 集合
         """
         exclude_keys = exclude_keys or set()
 

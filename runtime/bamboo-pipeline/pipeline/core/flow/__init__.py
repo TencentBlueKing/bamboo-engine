@@ -22,7 +22,7 @@ from .activity import (  # noqa
     SquareIntervalGenerator,
     StaticIntervalGenerator,
 )
-from .activity.sub_canvas import SubCanvas  # noqa
+from .activity.subcanvas import SubCanvas  # noqa
 from .base import SequenceFlow  # noqa
 from .event import (  # noqa
     EmptyEndEvent,
