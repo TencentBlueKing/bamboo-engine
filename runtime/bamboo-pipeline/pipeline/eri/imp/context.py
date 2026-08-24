@@ -218,16 +218,23 @@ class ContextMixin(SerializerMixin):
         """
         exclude_keys = exclude_keys or set()
 
-        # 1. 查出源流程所有上下文记录（每个字段都在）
+        # 1. 查出源流程所有上下文记录
         source_qs = DBContextValue.objects.filter(pipeline_id=from_pipeline_id)
         if exclude_keys:
             source_qs = source_qs.exclude(key__in=exclude_keys)
 
-        # 2. 克隆对象，清空主键，替换 pipeline_id
-        new_models = []
+        # 2. 逐条 update_or_create：目标不存在则创建，已存在则覆盖更新
         for cv in source_qs:
-            cv.pk = None  # 清除自增 ID，bulk_create 时重新生成
-            cv.pipeline_id = to_pipeline_id
-            new_models.append(cv)
+            value, serializer = self._serialize(self._deserialize(cv.value, cv.serializer))
 
-        DBContextValue.objects.bulk_create(new_models, batch_size=500)
+            DBContextValue.objects.update_or_create(
+                pipeline_id=to_pipeline_id,
+                key=cv.key,
+                defaults={
+                    "type": cv.type,
+                    "serializer": serializer,
+                    "code": cv.code or "",
+                    "value": value,
+                    "references": cv.references,
+                },
+            )
