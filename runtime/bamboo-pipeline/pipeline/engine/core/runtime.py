@@ -16,11 +16,16 @@ import logging
 import traceback
 
 from pipeline.conf import settings as pipeline_settings
-from pipeline.core.flow.activity import SubProcess
+from pipeline.core.flow.activity import SubCanvas, SubProcess
 from pipeline.engine import states
 from pipeline.engine.core import context
 from pipeline.engine.core.handlers import HandlersFactory
-from pipeline.engine.models import NAME_MAX_LENGTH, FunctionSwitch, NodeRelationship, Status
+from pipeline.engine.models import (
+    NAME_MAX_LENGTH,
+    FunctionSwitch,
+    NodeRelationship,
+    Status,
+)
 
 logger = logging.getLogger("pipeline_engine")
 celery_logger = logging.getLogger("celery")
@@ -86,7 +91,7 @@ def run_loop(process):
 
             # check rerun limit
             if (
-                not isinstance(current_node, SubProcess)
+                not isinstance(current_node, (SubProcess, SubCanvas))
                 and RERUN_MAX_LIMIT != 0
                 and action.extra.loop > RERUN_MAX_LIMIT
             ):

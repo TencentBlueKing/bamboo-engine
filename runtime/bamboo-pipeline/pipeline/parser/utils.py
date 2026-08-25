@@ -33,7 +33,7 @@ def _recursive_replace_id_with_node_map(pipeline_data, subprocess_id=None):
     node_map[pipeline_id] = replace_result_map
     activities = pipeline_data[PE.activities]
     for act_id, act in list(activities.items()):
-        if act[PE.type] == PE.SubProcess:
+        if act[PE.type] in (PE.SubProcess, PE.SubCanvas):
             replace_result_map = _recursive_replace_id_with_node_map(act[PE.pipeline], act_id)
             act[PE.pipeline][PE.id] = act_id
             node_map[pipeline_id].setdefault("subprocess", {}).update(replace_result_map)

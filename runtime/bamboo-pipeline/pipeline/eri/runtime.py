@@ -250,12 +250,13 @@ class BambooDjangoRuntime(
         )
 
     def _gen_subproc_node(self, subproc: dict, pipeline: dict, root_id: str, parent_id: str) -> Node:
+        node_type = subproc.get("type", NodeType.SubProcess.value)
         return Node(
             node_id=subproc["id"],
             detail=json.dumps(
                 {
                     "id": subproc["id"],
-                    "type": NodeType.SubProcess.value,
+                    "type": node_type,
                     "targets": {subproc["outgoing"]: pipeline["flows"][subproc["outgoing"]]["target"]},
                     "root_pipeline_id": root_id,
                     "parent_pipeline_id": parent_id,
@@ -351,6 +352,33 @@ class BambooDjangoRuntime(
                     context_values.append(cv)
                     final_references[cv.key] = set()
                     context_var_references[cv.key] = Template(cv.value).get_reference()
+
+            elif act["type"] == NodeType.SubCanvas.value:
+                # node
+                nodes.append(
+                    self._gen_subproc_node(subproc=act, pipeline=pipeline, root_id=root_id, parent_id=parent_id)
+                )
+                context_outputs.append(
+                    ContextOutputs(pipeline_id=act["id"], outputs=json.dumps(act["pipeline"]["data"]["outputs"]))
+                )
+                datas.append(
+                    Data(
+                        node_id=act["id"],
+                        inputs="{}",
+                        outputs=json.dumps(node_outputs.get(act["id"], {})),
+                    )
+                )
+                sub_nodes, sub_datas, sub_ctx_values, sub_ctx_outputs = self._prepare(
+                    pipeline=act["pipeline"],
+                    root_id=root_id,
+                    subprocess_context=subprocess_context,
+                    parent_id=act["id"],
+                )
+
+                nodes.extend(sub_nodes)
+                datas.extend(sub_datas)
+                context_values.extend(sub_ctx_values)
+                context_outputs.extend(sub_ctx_outputs)
 
             elif act["type"] == NodeType.SubProcess.value:
                 # node

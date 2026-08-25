@@ -1339,6 +1339,17 @@ class ContextMixin:
         :rtype: Set[str]
         """
 
+    def copy_context_values_to_new_pipeline(
+        self, from_pipeline_id: str, to_pipeline_id: str, exclude_keys: Set[str] = None
+    ):
+        """
+        将源流程的所有上下文字段原样复制到新流程 ID 下，支持排除指定 key
+
+        :param from_pipeline_id: 源流程 ID
+        :param to_pipeline_id: 目标流程 ID
+        :param exclude_keys: 不需要复制的变量 key 集合
+        """
+
 
 class DataMixin:
     """

@@ -639,14 +639,20 @@ def preview_node_inputs(
 
     if subprocess_stack:
         subprocess = subprocess_stack[0]
-        child_pipeline = pipeline["activities"][subprocess]["pipeline"]
-        param_data = {key: info["value"] for key, info in pipeline["activities"][subprocess]["params"].items()}
+        child_pipeline = pipeline["activities"][subprocess]
+        sub_pipeline = child_pipeline["pipeline"]
+        if child_pipeline["type"] == NodeType.SubProcess.value:
+            param_data = {key: info["value"] for key, info in pipeline["activities"][subprocess]["params"].items()}
+        elif child_pipeline["type"] == NodeType.SubCanvas.value:
+            param_data = {key: info["value"] for key, info in pipeline["data"]["inputs"].items()}
+        else:
+            raise InvalidOperationError(f"can not preview inputs for node type: {child_pipeline['type']}")
         hydrated_context = context.hydrate(deformat=True)
         hydrated_param_data = Template(param_data).render(hydrated_context)
         formatted_param_data = {key: {"value": value, "type": "plain"} for key, value in hydrated_param_data.items()}
         return preview_node_inputs(
             runtime=runtime,
-            pipeline=child_pipeline,
+            pipeline=sub_pipeline,
             node_id=node_id,
             subprocess_stack=subprocess_stack[1:],
             root_pipeline_data=root_pipeline_data,
