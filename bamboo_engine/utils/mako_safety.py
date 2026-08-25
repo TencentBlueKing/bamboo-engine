@@ -155,6 +155,8 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
     @staticmethod
     def _get_subscript_key(node):
         slice_node = node.slice
+        if hasattr(ast, "Index") and isinstance(slice_node, ast.Index):
+            slice_node = slice_node.value
         if isinstance(slice_node, ast.Constant) and isinstance(slice_node.value, str):
             return slice_node.value
         if hasattr(ast, "Str") and isinstance(slice_node, ast.Str):

@@ -6,23 +6,23 @@ on:
 
 jobs:
   engine-lint:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_flake8_and_black.yml@master
+    uses: ./.github/workflows/engine_flake8_and_black.yml
 
   pipeline-lint:
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_flake8_and_black.yml@master
+    uses: ./.github/workflows/runtime_pipeline_flake8_and_black.yml
 
   engine-unittest:
     needs: engine-lint
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/engine_unittest.yml@master
+    uses: ./.github/workflows/engine_unittest.yml
 
   pipeline-unittest:
     needs: pipeline-lint
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_unittest.yml@master
+    uses: ./.github/workflows/runtime_pipeline_unittest.yml
   
   runtime-pipeline-intergration-test:
     needs: [engine-unittest, pipeline-unittest]
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/runtime_pipeline_end_to_end_test.yml@master
+    uses: ./.github/workflows/runtime_pipeline_end_to_end_test.yml
   
   pipeline-intergration-test:
     needs: pipeline-unittest
-    uses: TencentBlueKing/bamboo-engine/.github/workflows/pipeline_end_to_end_test.yml@master
+    uses: ./.github/workflows/pipeline_end_to_end_test.yml

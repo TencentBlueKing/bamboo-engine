@@ -202,6 +202,12 @@ def test_mako_filter_dunder_chain_is_blocked():
     _assert_forbidden_template(payload)
 
 
+def test_mako_subscript_dunder_key_is_blocked():
+    payload = "${a['__class__']}"
+
+    _assert_forbidden_template(payload)
+
+
 def test_mako_filter_list_blocks_any_malicious_item():
     payload = "${'x'|h, (side_effect() or str)}"
 
