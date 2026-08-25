@@ -11,6 +11,7 @@ jobs:
       DB_DATABASE: pipeline_test
       DB_USER: root
       DB_PASSWORD: root
+      PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
     strategy:
       matrix:
         python-version: [3.6.12, 3.7.16]
