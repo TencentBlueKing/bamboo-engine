@@ -25,4 +25,5 @@ def register():
     from .executable_end_event import ExecutableEndEventHandler  # noqa
     from .parallel_gateway import ParallelGatewayHandler  # noqa
     from .service_activity import ServiceActivityHandler  # noqa
+    from .subcanvas import SubCanvasHandler  # noqa
     from .subprocess import SubProcessHandler  # noqa

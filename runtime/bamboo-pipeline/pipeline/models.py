@@ -22,16 +22,15 @@ from django.db import models, transaction
 from django.utils import timezone
 from django.utils.module_loading import import_string
 from django.utils.translation import ugettext_lazy as _
-
 from pipeline.conf import settings
 from pipeline.constants import PIPELINE_DEFAULT_PRIORITY
 from pipeline.core.constants import PE
-from pipeline.signals import post_pipeline_finish, post_pipeline_revoke
 from pipeline.engine.utils import ActionResult, calculate_elapsed_time
 from pipeline.exceptions import SubprocessRefError
 from pipeline.parser.context import get_pipeline_context
 from pipeline.parser.utils import replace_all_id
 from pipeline.service import task_service
+from pipeline.signals import post_pipeline_finish, post_pipeline_revoke
 from pipeline.utils.graph import Graph
 from pipeline.utils.uniqid import node_uniqid, uniqid
 
@@ -259,7 +258,7 @@ class TemplateManager(models.Manager):
         id_maps = replace_all_id(pipeline_data)
         activities = pipeline_data[PE.activities]
         for act_id, act in list(activities.items()):
-            if act[PE.type] == PE.SubProcess:
+            if act[PE.type] in [PE.SubProcess, PE.SubCanvas]:
                 subproc_data = act[PE.pipeline]
                 sub_id_maps = self.replace_id(subproc_data)
                 # act_id is new id

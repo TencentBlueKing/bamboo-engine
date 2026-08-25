@@ -169,27 +169,27 @@ class Context:
         else:
             # 循环节点：使用列表结构存储所有循环节点输出
             loop_outputs_key = node.loop_outputs_key
+            if data_outputs and loop_outputs_key in data_outputs.values():
+                # 从执行数据中取子流程插件已打包好的 outputs 字典
+                current_outputs = execution_data_outputs.get(Settings.LOOP_OUTPUTS_INNER_KEY, {})
+                current_outputs["result"] = execution_data_outputs["_result"]
+                current_outputs["inner_loop"] = execution_data_outputs["_inner_loop"]
 
-            # 从执行数据中取子流程插件已打包好的 outputs 字典
-            current_outputs = execution_data_outputs.get(Settings.LOOP_OUTPUTS_INNER_KEY, {})
-            current_outputs["result"] = execution_data_outputs["_result"]
-            current_outputs["inner_loop"] = execution_data_outputs["_inner_loop"]
+                # 获取现有的循环输出列表，追加本次结果
+                existing_loop_outputs = self._get_existing_context_value(pipeline_id, loop_outputs_key)
+                if existing_loop_outputs is None or not isinstance(existing_loop_outputs.value, list):
+                    loop_outputs_list = []
+                else:
+                    loop_outputs_list = existing_loop_outputs.value.copy()
 
-            # 获取现有的循环输出列表，追加本次结果
-            existing_loop_outputs = self._get_existing_context_value(pipeline_id, loop_outputs_key)
-            if existing_loop_outputs is None or not isinstance(existing_loop_outputs.value, list):
-                loop_outputs_list = []
-            else:
-                loop_outputs_list = existing_loop_outputs.value.copy()
+                loop_outputs_list.append(current_outputs)
 
-            loop_outputs_list.append(current_outputs)
-
-            # 更新循环输出列表
-            update[loop_outputs_key] = ContextValue(
-                key=loop_outputs_key,
-                type=ContextValueType.PLAIN,
-                value=loop_outputs_list,
-            )
+                # 更新循环输出列表
+                update[loop_outputs_key] = ContextValue(
+                    key=loop_outputs_key,
+                    type=ContextValueType.PLAIN,
+                    value=loop_outputs_list,
+                )
 
         self.runtime.upsert_plain_context_values(pipeline_id=pipeline_id, update=update)
 

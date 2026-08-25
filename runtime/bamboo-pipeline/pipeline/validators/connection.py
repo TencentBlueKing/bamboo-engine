@@ -12,12 +12,11 @@ specific language governing permissions and limitations under the License.
 """
 
 from django.utils.translation import ugettext_lazy as _
-
+from pipeline.core.constants import PE
 from pipeline.exceptions import ConnectionValidateError
 from pipeline.utils.graph import Graph
 from pipeline.validators.rules import NODE_RULES
 from pipeline.validators.utils import get_nodes_dict
-from pipeline.core.constants import PE
 
 
 def validate_graph_connection(data):
@@ -34,16 +33,19 @@ def validate_graph_connection(data):
         message = ""
         for j in nodes[i][PE.target]:
             if nodes[j][PE.type] not in rule["allowed_out"]:
-                message += _("不能连接%s类型节点\n") % nodes[i][PE.type]
-            if rule["min_in"] > len(nodes[i][PE.source]) or len(nodes[i][PE.source]) > rule["max_in"]:
-                message += _("节点的入度最大为%s，最小为%s\n") % (rule["max_in"], rule["min_in"])
-            if rule["min_out"] > len(nodes[i][PE.target]) or len(nodes[i][PE.target]) > rule["max_out"]:
-                message += _("节点的出度最大为%s，最小为%s\n") % (rule["max_out"], rule["min_out"])
+                message += _("不能连接%s类型节点\n") % nodes[j][PE.type]
+
+        # 检查当前节点的入度是否合法
+        if rule["min_in"] > len(nodes[i][PE.source]) or len(nodes[i][PE.source]) > rule["max_in"]:
+            message += _("节点的入度最大为%s，最小为%s\n") % (rule["max_in"], rule["min_in"])
+
+        # 检查当前节点的出度是否合法
+        if rule["min_out"] > len(nodes[i][PE.target]) or len(nodes[i][PE.target]) > rule["max_out"]:
+            message += _("节点的出度最大为%s，最小为%s\n") % (rule["max_out"], rule["min_out"])
+
         if message:
             result["failed_nodes"].append(i)
             result["message"][i] = message
-
-        if result["failed_nodes"]:
             raise ConnectionValidateError(failed_nodes=result["failed_nodes"], detail=result["message"])
 
 

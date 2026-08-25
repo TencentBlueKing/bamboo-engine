@@ -30,6 +30,7 @@ from bamboo_engine.eri import (
     NodeType,
     ParallelGateway,
     ServiceActivity,
+    SubCanvas,
     SubProcess,
 )
 
@@ -78,6 +79,9 @@ class NodeMixin:
 
         elif node_type == NodeType.SubProcess.value:
             return SubProcess(type=NodeType.SubProcess, start_event_id=node_detail["start_event_id"], **common_args)
+
+        elif node_type == NodeType.SubCanvas.value:
+            return SubCanvas(type=NodeType.SubCanvas, start_event_id=node_detail["start_event_id"], **common_args)
 
         elif node_type == NodeType.ExclusiveGateway.value:
             default_condition = node_detail.get("default_condition")
