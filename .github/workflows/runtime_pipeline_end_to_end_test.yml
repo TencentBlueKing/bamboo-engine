@@ -19,6 +19,11 @@ jobs:
     steps:
 
     - uses: actions/checkout@v6
+    - name: Set up Poetry
+      uses: abatilo/actions-poetry@v2.0.0
+      with:
+        poetry-version: 1.2.2
+
     - name: Set up Python ${{ matrix.python-version }} with pyenv
       run: .github/scripts/setup_pyenv_python.sh ${{ matrix.python-version }}
 
@@ -37,14 +42,10 @@ jobs:
       with:
         rabbitmq version: 3
 
-    - name: Set up Poetry
-      uses: abatilo/actions-poetry@v2.0.0
-      with:
-        poetry-version: 1.1.14
-
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
+        poetry env use "$PYENV_ROOT/versions/${{ matrix.python-version }}/bin/python"
         poetry install
         poetry run pip install "Django>${{ matrix.django-version }}"
 
