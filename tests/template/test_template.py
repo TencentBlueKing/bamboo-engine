@@ -104,6 +104,14 @@ def test_render__with_sandbox():
     Settings.MAKO_SANDBOX_IMPORT_MODULES = {"datetime": "datetime"}
 
     r2 = Template("""${datetime.datetime.now().strftime("%Y")}""").render({})
+    assert r2 == """${datetime.datetime.now().strftime("%Y")}"""
+
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "datetime": "datetime",
+        "datetime.datetime": "datetime.datetime",
+    }
+
+    r2 = Template("""${datetime.datetime.now().strftime("%Y")}""").render({})
     year = datetime.datetime.now().strftime("%Y")
     assert r2 == year
 
@@ -143,7 +151,7 @@ def test_mako_attack():
 #
 # 1. ``self / context / local / parent / next / caller / pageargs`` 等 Mako
 #    渲染期注入的保留命名空间（堵 ``self.module.cache.util.os.popen`` SSTI 链路）。
-# 2. attr 链路上的危险字段 / 单下划线 attr，堵 ``${os.path.os.popen(...)}``、
+# 2. 保留名属性链 / 导入前缀外超一级，堵 ``${os.path.os.popen(...)}``、
 #    ``${datetime.sys.modules['os']...}``、``${context._kwargs}`` 这类反向引用。
 # 3. 业务正常用法（字符串方法、``datetime.datetime.now().strftime(...)``、
 #    ``os.path.join`` / 列表推导 / lambda）必须照常渲染。
@@ -289,13 +297,34 @@ def test_mako_whitelist_blocks_dangerous_attr_chain(whitelist_mode, payload):
         "${context._kwargs}",
         "${context._with_template}",
         "${context._data}",
-        "${obj._secret}",
-        "${obj.public._private}",
     ],
 )
-def test_mako_whitelist_blocks_single_underscore_attr(whitelist_mode, payload):
+def test_mako_whitelist_blocks_reserved_namespace_attributes(whitelist_mode, payload):
     whitelist_mode("enforce")
-    rendered = Template({"x": payload}).render({"obj": object()})
+    rendered = Template({"x": payload}).render({})
+    assert rendered["x"] == payload
+
+
+def test_mako_whitelist_allows_user_single_underscore_attr(whitelist_mode):
+    whitelist_mode("enforce")
+
+    class Bag(object):
+        def __init__(self):
+            self._module = [{"gamesvr": "1.1.1.1"}]
+
+    out = Template("${obj._module[0]['gamesvr']}").render({"obj": Bag()})
+    assert out == "1.1.1.1"
+
+
+def test_mako_whitelist_allows_bare_reserved_name(whitelist_mode):
+    whitelist_mode("enforce")
+    assert Template("${caller}").render({"caller": "alice"}) == "alice"
+
+
+def test_mako_whitelist_blocks_self_module_even_if_self_in_context(whitelist_mode):
+    whitelist_mode("enforce")
+    payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+    rendered = Template({"x": payload}).render({"self": "ignored"})
     assert rendered["x"] == payload
 
 
@@ -318,14 +347,31 @@ def test_mako_whitelist_allows_imported_modules(whitelist_mode):
     original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
     Settings.MAKO_SANDBOX_IMPORT_MODULES = {
         "datetime": "datetime",
+        "datetime.datetime": "datetime.datetime",
         "os.path": "os.path",
+        "json": "json",
+        "hashlib": "hashlib",
     }
     try:
-        # os.path.join 仍可用（join 不在 DANGEROUS_ATTR_NAMES）
         assert Template('${os.path.join("a", "b")}').render({}) == "a/b"
-        # datetime.datetime.now().strftime 链路全程合法
         out = Template('${datetime.datetime.now().strftime("%Y")}').render({})
         assert len(out) == 4 and out.isdigit()
+        assert Template("${json.dumps({'a': 1})}").render({})
+        digest = Template("${hashlib.md5(b'x').hexdigest()}").render({})
+        assert len(digest) == 32
+        deep = "${json.codecs.builtins.exec('1')}"
+        assert Template({"x": deep}).render({})["x"] == deep
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+
+def test_mako_whitelist_datetime_now_requires_configured_class_alias(whitelist_mode):
+    whitelist_mode("enforce")
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {"datetime": "datetime"}
+    try:
+        payload = '${datetime.datetime.now().strftime("%Y")}'
+        assert Template({"x": payload}).render({})["x"] == payload
     finally:
         Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
 
