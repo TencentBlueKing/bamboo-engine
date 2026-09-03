@@ -15,7 +15,7 @@ specific language governing permissions and limitations under the License.
 
 import builtins
 
-from bamboo_engine.template.sandbox import resolve_import_object
+from bamboo_engine.template.sandbox import filter_import_modules, resolve_import_object
 from pipeline.conf import default_settings
 
 SANDBOX = {}
@@ -48,6 +48,7 @@ class ModuleObject:
 
 
 def _import_modules(sandbox, modules):
+    modules = filter_import_modules(modules)
     items = sorted(modules.items(), key=lambda kv: kv[1].count("."))
     for mod_path, alias in items:
         obj = resolve_import_object(mod_path)

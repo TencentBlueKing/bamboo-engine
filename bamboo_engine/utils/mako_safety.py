@@ -215,8 +215,19 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
             raise ForbiddenMakoTemplateException("can not access private attribute")
         if node.attr in FRAME_INTROSPECTION_ATTRS:
             raise ForbiddenMakoTemplateException("can not access frame or generator internals")
+        # 危险属性名（``os / sys / builtins / modules / system / popen ...``）与保留命名空间
+        # 属性链（``self.module... / context....``）改为 always-on 无条件拦截：它们原本只在
+        # ``WhitelistNameVisitor``（warn/enforce）里挡，导致 ``off`` 模式下仍可用
+        # ``${self.module.cache.util.os.system(...)}`` / ``${os.path.os.system(...)}`` /
+        # ``${json.codecs.builtins.exec(...)}`` 反向 pivot 到真实模块拿 RCE。这里下沉到
+        # ``SingleLineNodeVisitor``，任何模式（含 off）都切断这两条公共必经路径。
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            raise ForbiddenMakoTemplateException("can not access dangerous attribute")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
+        root_kind, root_name, _attrs = resolve_attr_chain(node)
+        if root_kind == "name" and root_name in MAKO_RESERVED_NAMESPACES:
+            raise ForbiddenMakoTemplateException("can not access mako reserved namespace attribute")
         self.generic_visit(node)
 
     def visit_Name(self, node):

@@ -149,8 +149,16 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
             raise ForbiddenMakoTemplateException("can not access private attribute")
         if node.attr in FRAME_INTROSPECTION_ATTRS:
             raise ForbiddenMakoTemplateException("can not access frame or generator internals")
+        # 与 ``bamboo_engine.utils.mako_safety.SingleLineNodeVisitor`` 对齐：危险属性名与保留
+        # 命名空间属性链下沉为 always-on 无条件拦截，堵住 off 模式下的模块反向 pivot 与
+        # ``self.module...`` 链路。
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            raise ForbiddenMakoTemplateException("can not access dangerous attribute")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
+        root_kind, root_name, _attrs = resolve_attr_chain(node)
+        if root_kind == "name" and root_name in MAKO_RESERVED_NAMESPACES:
+            raise ForbiddenMakoTemplateException("can not access mako reserved namespace attribute")
         self.generic_visit(node)
 
     def visit_Name(self, node):

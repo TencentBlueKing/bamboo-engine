@@ -83,6 +83,97 @@ def _shield_words(sandbox: dict, words: List[str]):
         sandbox[shield_word] = None
 
 
+# 绝不允许注入 ``MAKO_SANDBOX_IMPORT_MODULES`` 的模块根。
+#
+# 注入模块白名单是整个沙箱的信任根：一旦把下列任意模块注入渲染命名空间，攻击者无需触碰
+# dunder / frame，直接 ``${module.<primitive>(...)}`` 就能执行代码 / 导入 / 反序列化 /
+# 读写文件，AST deny-list 与根名白名单全部形同虚设（例如 ``operator.attrgetter('__globals__')``
+# 用字符串绕过 dunder 检查、``pickle.loads`` 反序列化、``os.system`` 直接命令执行）。
+# 这里在注入入口做一层 deny-list 兜底：即便接入方误配置，也拒绝把这些模块放进沙箱。
+DANGEROUS_IMPORT_MODULE_ROOTS = frozenset(
+    {
+        "os",
+        "sys",
+        "subprocess",
+        "importlib",
+        "imp",
+        "runpy",
+        "operator",
+        "inspect",
+        "pickle",
+        "_pickle",
+        "cpickle",
+        "marshal",
+        "shelve",
+        "dill",
+        "ctypes",
+        "cffi",
+        "pty",
+        "platform",
+        "pydoc",
+        "code",
+        "codeop",
+        "builtins",
+        "__builtin__",
+        "gc",
+        "socket",
+        "shutil",
+        "signal",
+        "multiprocessing",
+        "threading",
+        "_thread",
+        "mmap",
+        "fcntl",
+        "resource",
+        "tempfile",
+        "pdb",
+        "bdb",
+        "trace",
+        "timeit",
+        "ast",
+        "compileall",
+        "py_compile",
+    }
+)
+
+# deny-list 的例外：这些子模块本身不暴露执行原语，历史上被业务合法注入（如 ``os.path`` 的
+# ``join / exists``）。``os.path.os`` / ``os.path.sys`` 这类反向 pivot 已由 always-on 的属性
+# deny-list（``DANGEROUS_ATTR_NAMES``）拦截，因此保留 ``os.path`` 是安全的。
+SAFE_IMPORT_SUBMODULES = frozenset({"os.path"})
+
+_WARNED_DANGEROUS_IMPORTS = set()
+
+
+def _is_dangerous_import(mod_path: str) -> bool:
+    if not mod_path:
+        return False
+    if mod_path in SAFE_IMPORT_SUBMODULES:
+        return False
+    root = mod_path.split(".", 1)[0]
+    return root in DANGEROUS_IMPORT_MODULE_ROOTS
+
+
+def filter_import_modules(modules: Dict[str, str]) -> Dict[str, str]:
+    """剔除 deny-list 中的危险模块，返回可安全注入沙箱的子集。
+
+    命中危险模块时不抛异常（避免误配置直接打挂全部渲染），改为跳过 + 记录一次 error 日志，
+    保证系统 fail-safe：危险模块不会进入渲染命名空间，依赖它的模板会以 inert 形式失败并留痕。
+    """
+    safe = {}
+    for mod_path, alias in modules.items():
+        if _is_dangerous_import(mod_path):
+            if mod_path not in _WARNED_DANGEROUS_IMPORTS:
+                _WARNED_DANGEROUS_IMPORTS.add(mod_path)
+                logger.error(
+                    "refuse to inject dangerous module into mako sandbox: %s (alias=%s)",
+                    mod_path,
+                    alias,
+                )
+            continue
+        safe[mod_path] = alias
+    return safe
+
+
 class ModuleObject:
     def __init__(self, sub_paths, module):
         if len(sub_paths) == 1:
@@ -103,6 +194,7 @@ def resolve_import_object(mod_path):
 
 
 def _import_modules(sandbox: dict, modules: Dict[str, str]):
+    modules = filter_import_modules(modules)
     items = sorted(modules.items(), key=lambda kv: kv[1].count("."))
     for mod_path, alias in items:
         obj = resolve_import_object(mod_path)

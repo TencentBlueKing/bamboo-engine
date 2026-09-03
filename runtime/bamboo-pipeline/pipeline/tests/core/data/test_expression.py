@@ -236,11 +236,13 @@ class TestMakoNameWhitelist(TestCase):
         self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
         self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
 
-    def test_off_mode_keeps_legacy_behavior(self):
+    def test_off_mode_also_blocks_self_module(self):
+        # 保留命名空间属性链下沉 always-on 后，off 模式也 inert
+        # （此前 off 会解析出真实 os 模块执行命令，这里回归为拦截）。
         self._set_mode("off")
         payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
         rendered = expression.ConstantTemplate(payload).resolve_data({})
-        self.assertIn("OFF", rendered)
+        self.assertEqual(rendered, payload)
 
     def test_default_mode_blocks_self_module(self):
         payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
@@ -345,6 +347,36 @@ class TestMakoNameWhitelist(TestCase):
                 self._set_mode(mode)
                 self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
 
+    def test_dangerous_attr_chain_blocked_all_modes(self):
+        # 危险属性名下沉 always-on 后，模块反向 pivot 在 off / warn / enforce 三档都 inert。
+        original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
+            "datetime": "datetime",
+            "re": "re",
+            "os.path": "os.path",
+            "json": "json",
+        }
+        payloads = [
+            '${os.path.os.system("echo PWNED")}',
+            '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+            '${json.codecs.builtins.exec("import os")}',
+        ]
+        try:
+            for mode in ("off", "warn", "enforce"):
+                for p in payloads:
+                    with self.subTest(mode=mode, payload=p):
+                        self._set_mode(mode)
+                        self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+    def test_reserved_namespace_chain_blocked_all_modes(self):
+        for mode in ("off", "warn", "enforce"):
+            for p in ("${context.lookup}", "${local.something}", "${parent.foo}"):
+                with self.subTest(mode=mode, payload=p):
+                    self._set_mode(mode)
+                    self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+
 
 class TestMakoSafetyHardening(TestCase):
     def _assert_forbidden(self, payload):
@@ -430,3 +462,33 @@ class TestMakoSafetyHardening(TestCase):
             self.assertNotIn(name, rb)
         for name in ("len", "str", "range", "int", "__import__"):
             self.assertIn(name, rb)
+
+    def test_dangerous_attr_names_are_blocked_always_on(self):
+        for attr in ("os", "sys", "subprocess", "builtins", "modules", "system", "popen", "kill"):
+            with self.subTest(attr=attr):
+                self._assert_forbidden("${obj.%s}" % attr)
+
+    def test_reserved_namespace_chain_is_blocked_always_on(self):
+        for payload in (
+            '${self.module.cache.util}',
+            "${context.lookup}",
+            "${local.x}",
+            "${parent.foo}",
+            "${caller.body()}",
+            "${pageargs.x}",
+        ):
+            with self.subTest(payload=payload):
+                self._assert_forbidden(payload)
+
+    def test_filter_import_modules_rejects_dangerous_keeps_safe(self):
+        from bamboo_engine.template import sandbox as engine_sandbox
+
+        src = {
+            "os": "os",
+            "subprocess": "subprocess",
+            "operator": "operator",
+            "pickle": "pickle",
+            "os.path": "os.path",
+            "json": "json",
+        }
+        self.assertEqual(set(engine_sandbox.filter_import_modules(src)), {"os.path", "json"})
