@@ -16,6 +16,11 @@ import re
 
 from mako import parsetree
 
+from bamboo_engine.utils.mako_safety import (
+    configured_import_aliases,
+    import_chain_violation,
+    resolve_attr_chain,
+)
 from pipeline.utils.mako_utils.code_extract import MakoNodeCodeExtractor
 from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
@@ -277,23 +282,30 @@ class WhitelistNameVisitor(ast.NodeVisitor):
                 WhitelistNameVisitor._collect_targets(elt, into)
 
     def visit_Name(self, node):
+        # Store / Del 上下文是赋值/删除目标，由 _enter_* 显式处理，跳过命名检查
         if not isinstance(node.ctx, ast.Load):
             return
         if node.id in MAKO_RESERVED_NAMESPACES:
-            self._violate(node.id, "mako reserved namespace")
             return
         if not self._name_allowed(node.id):
             self._violate(node.id, "not in whitelist")
 
     def visit_Attribute(self, node):
-        # 与新引擎 ``bamboo_engine.utils.mako_safety.WhitelistNameVisitor.visit_Attribute``
-        # 保持一致：单下划线前缀 + 危险 attr 名一律拒绝，堵反向引用 SSTI 链路。
-        if node.attr.startswith("_"):
+        if node.attr.startswith("__"):
             self._violate(node.attr, "private attribute")
             return
         if node.attr in DANGEROUS_ATTR_NAMES:
             self._violate(node.attr, "dangerous attribute")
             return
+        kind, root, attrs = resolve_attr_chain(node)
+        if kind == "name" and root in MAKO_RESERVED_NAMESPACES:
+            self._violate(root, "mako reserved namespace attribute")
+            return
+        if kind == "name":
+            reason = import_chain_violation(root, attrs, configured_import_aliases())
+            if reason:
+                self._violate(root, reason)
+                return
         self.generic_visit(node)
 
     def _enter_comprehension(self, node):
