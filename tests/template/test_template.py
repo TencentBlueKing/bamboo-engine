@@ -356,3 +356,58 @@ def test_mako_filter_side_effect_is_not_executed_by_template_render():
 )
 def test_mako_format_private_lookup_is_blocked(payload):
     _assert_forbidden_template(payload)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    [
+        "gi_frame",
+        "gi_code",
+        "cr_frame",
+        "ag_frame",
+        "f_back",
+        "f_builtins",
+        "f_globals",
+        "f_locals",
+        "f_code",
+        "tb_frame",
+        "tb_next",
+        "func_globals",
+    ],
+)
+def test_mako_frame_introspection_attr_is_blocked(attr):
+    # 无论根对象是什么，通向 frame 的反射属性名一律在 always-on 的 SingleLineNodeVisitor 拒绝。
+    _assert_forbidden_template("${obj.%s}" % attr)
+
+
+def test_mako_generator_frame_builtins_gadget_is_inert_in_all_modes(whitelist_mode):
+    # 生成器帧 -> 真实 builtins -> eval 的通用 RCE：off / warn / enforce 三档都必须拦。
+    payload = (
+        "${(i for i in [1]).gi_frame.f_builtins['eval']"
+        "(\"__import__('os').popen('echo PWNED').read()\")}"
+    )
+    for mode in ("off", "warn", "enforce"):
+        whitelist_mode(mode)
+        assert Template(payload).render({}) == payload
+
+
+def test_restricted_builtins_strips_execution_primitives():
+    from bamboo_engine.template import sandbox
+
+    rb = sandbox.restricted_builtins()
+    for name in ("eval", "exec", "compile", "open", "input", "breakpoint"):
+        assert name not in rb
+    # 不能误伤 Mako codegen / 业务表达式需要的安全内建，以及 C 扩展惰性 import 依赖的 __import__。
+    for name in ("len", "str", "range", "int", "dict", "enumerate", "__import__"):
+        assert name in rb
+
+
+def test_harden_template_builtins_is_defense_in_depth(whitelist_mode, monkeypatch):
+    # 模拟未来某条未被枚举到的"通向 frame"链路：临时清空属性 deny-list，证明即便 AST 放过，
+    # 渲染期受限 builtins 也已摘掉 eval，攻击者拿不到执行原语；同时不影响安全内建（len）。
+    whitelist_mode("off")
+    monkeypatch.setattr(mako_safety, "FRAME_INTROSPECTION_ATTRS", frozenset())
+    pwn = "${(i for i in [1]).gi_frame.f_builtins['eval']('1+1')}"
+    assert Template(pwn).render({}) == pwn
+    safe = "${(i for i in [1]).gi_frame.f_builtins['len']([1, 2, 3])}"
+    assert Template(safe).render({}) == "3"

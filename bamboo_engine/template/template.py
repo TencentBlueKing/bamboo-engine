@@ -205,6 +205,7 @@ class Template:
         except (MakoException, SyntaxError) as e:
             logger.error("pipeline resolve template[{}] error[{}]".format(template, e))
             return template
+        sandbox.harden_template_builtins(tm)
         try:
             resolved = tm.render_unicode(**data)
         except Exception as e:

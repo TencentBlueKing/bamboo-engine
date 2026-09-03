@@ -335,6 +335,16 @@ class TestMakoNameWhitelist(TestCase):
         payload = "${secret_var}"
         self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
 
+    def test_generator_frame_gadget_blocked_all_modes(self):
+        payload = (
+            "${(i for i in [1]).gi_frame.f_builtins['eval']"
+            "(\"__import__('os').popen('echo PWNED').read()\")}"
+        )
+        for mode in ("off", "warn", "enforce"):
+            with self.subTest(mode=mode):
+                self._set_mode(mode)
+                self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+
 
 class TestMakoSafetyHardening(TestCase):
     def _assert_forbidden(self, payload):
@@ -393,3 +403,30 @@ class TestMakoSafetyHardening(TestCase):
         ]:
             with self.subTest(payload=payload):
                 self._assert_allowed(payload)
+
+    def test_frame_introspection_attrs_are_blocked(self):
+        for attr in [
+            "gi_frame",
+            "gi_code",
+            "cr_frame",
+            "ag_frame",
+            "f_back",
+            "f_builtins",
+            "f_globals",
+            "f_locals",
+            "f_code",
+            "tb_frame",
+            "tb_next",
+            "func_globals",
+        ]:
+            with self.subTest(attr=attr):
+                self._assert_forbidden("${obj.%s}" % attr)
+
+    def test_restricted_builtins_strips_execution_primitives(self):
+        from bamboo_engine.template import sandbox as engine_sandbox
+
+        rb = engine_sandbox.restricted_builtins()
+        for name in ("eval", "exec", "compile", "open", "input", "breakpoint"):
+            self.assertNotIn(name, rb)
+        for name in ("len", "str", "range", "int", "__import__"):
+            self.assertIn(name, rb)

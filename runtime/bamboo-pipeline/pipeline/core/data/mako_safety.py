@@ -17,6 +17,7 @@ import re
 from mako import parsetree
 
 from bamboo_engine.utils.mako_safety import (
+    FRAME_INTROSPECTION_ATTRS,
     configured_import_aliases,
     import_chain_violation,
     resolve_attr_chain,
@@ -146,6 +147,8 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node):
         if node.attr.startswith("__"):
             raise ForbiddenMakoTemplateException("can not access private attribute")
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            raise ForbiddenMakoTemplateException("can not access frame or generator internals")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
         self.generic_visit(node)
@@ -298,6 +301,9 @@ class WhitelistNameVisitor(ast.NodeVisitor):
             return
         if node.attr in DANGEROUS_ATTR_NAMES:
             self._violate(node.attr, "dangerous attribute")
+            return
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            self._violate(node.attr, "frame or generator internals")
             return
         kind, root, attrs = resolve_attr_chain(node)
         if kind == "name" and root in MAKO_RESERVED_NAMESPACES:

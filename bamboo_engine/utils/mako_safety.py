@@ -139,6 +139,50 @@ DANGEROUS_ATTR_NAMES = frozenset(
     }
 )
 
+# 生成器 / 协程 / 异步生成器 / traceback / frame 对象的反射属性。
+#
+# 这些名字都不是 ``__`` 前缀，因此逃过私有属性检查，也不在 :data:`DANGEROUS_ATTR_NAMES`
+# 里；但任意一个都能拿到一个 ``frame`` 对象，再顺着 ``frame.f_builtins`` /
+# ``frame.f_globals`` 直接取回**真实** builtins（``eval`` / ``exec`` / ``open`` /
+# ``__import__`` ...），是 deny-list 之外与配置无关的通用 RCE 入口：
+#
+#     ``${(i for i in [1]).gi_frame.f_builtins['eval']("__import__('os').system('id')")}``
+#
+# ``eval`` / ``exec`` 的实参是字符串常量，AST 不会解析其内容，所以一旦摸到 builtins
+# 字典，白名单 / 黑名单全部失效。这里把"通向 frame 的属性名"整体拒绝，从入口切断。
+FRAME_INTROSPECTION_ATTRS = frozenset(
+    {
+        # generator
+        "gi_frame",
+        "gi_code",
+        "gi_yieldfrom",
+        # coroutine
+        "cr_frame",
+        "cr_code",
+        "cr_await",
+        "cr_origin",
+        # async generator
+        "ag_frame",
+        "ag_code",
+        "ag_await",
+        # frame 对象
+        "f_back",
+        "f_builtins",
+        "f_globals",
+        "f_locals",
+        "f_code",
+        "f_trace",
+        # traceback 对象
+        "tb_frame",
+        "tb_next",
+        # 兼容老式函数内部属性别名（py2 时代，拦住无副作用）
+        "func_globals",
+        "func_code",
+        "func_closure",
+        "func_builtins",
+    }
+)
+
 FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
 SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
 SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -169,6 +213,8 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node):
         if node.attr.startswith("__"):
             raise ForbiddenMakoTemplateException("can not access private attribute")
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            raise ForbiddenMakoTemplateException("can not access frame or generator internals")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
         self.generic_visit(node)
@@ -370,6 +416,9 @@ class WhitelistNameVisitor(ast.NodeVisitor):
             return
         if node.attr in DANGEROUS_ATTR_NAMES:
             self._violate(node.attr, "dangerous attribute")
+            return
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            self._violate(node.attr, "frame or generator internals")
             return
         kind, root, attrs = resolve_attr_chain(node)
         if kind == "name" and root in MAKO_RESERVED_NAMESPACES:
