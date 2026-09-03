@@ -225,6 +225,45 @@ def _deformat_var_key(key):
     return key
 
 
+def resolve_attr_chain(node):
+    attrs = [node.attr]
+    cur = node.value
+    while isinstance(cur, ast.Attribute):
+        attrs.append(cur.attr)
+        cur = cur.value
+    attrs.reverse()
+    if isinstance(cur, ast.Name):
+        return "name", cur.id, attrs
+    if isinstance(cur, ast.Call):
+        return "call_result", None, attrs
+    return "other", None, attrs
+
+
+def import_chain_violation(root, attrs, aliases):
+    if not root:
+        return None
+    roots = set(alias.split(".", 1)[0] for alias in aliases)
+    if root not in roots:
+        return None
+    best_len = -1
+    for index in range(len(attrs) + 1):
+        candidate = root if index == 0 else "{}.{}".format(root, ".".join(attrs[:index]))
+        if candidate in aliases:
+            best_len = index
+    if best_len < 0:
+        return "import path not configured"
+    if len(attrs[best_len:]) > 1:
+        return "import attr deeper than one level"
+    return None
+
+
+def configured_import_aliases():
+    from bamboo_engine.config import Settings
+
+    modules = getattr(Settings, "MAKO_SANDBOX_IMPORT_MODULES", None) or {}
+    return frozenset(alias for alias in modules.values() if alias)
+
+
 def build_allowed_names(context, *, extra=()):
     """根据当前渲染 context 与全局 ``Settings`` 计算白名单的根标识符集合。
 
