@@ -14,8 +14,8 @@ specific language governing permissions and limitations under the License.
 # mock str return value of Built-in Functions，make str(func) return "func" rather than "<built-in function func>"
 
 import builtins
-import importlib
 
+from bamboo_engine.template.sandbox import resolve_import_object
 from pipeline.conf import default_settings
 
 SANDBOX = {}
@@ -48,13 +48,18 @@ class ModuleObject:
 
 
 def _import_modules(sandbox, modules):
-    for mod_path, alias in modules.items():
-        mod = importlib.import_module(mod_path)
+    items = sorted(modules.items(), key=lambda kv: kv[1].count("."))
+    for mod_path, alias in items:
+        obj = resolve_import_object(mod_path)
         sub_paths = alias.split(".")
         if len(sub_paths) == 1:
-            sandbox[alias] = mod
-        else:
-            sandbox[sub_paths[0]] = ModuleObject(sub_paths[1:], mod)
+            sandbox[alias] = obj
+            continue
+        root = sub_paths[0]
+        existing = sandbox.get(root)
+        if existing is not None and not isinstance(existing, ModuleObject):
+            continue
+        sandbox[root] = ModuleObject(sub_paths[1:], obj)
 
 
 def _mock_builtins():
