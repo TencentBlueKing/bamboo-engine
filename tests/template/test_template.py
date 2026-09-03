@@ -318,7 +318,7 @@ def test_mako_whitelist_allows_user_single_underscore_attr(whitelist_mode):
 
 def test_mako_whitelist_allows_bare_reserved_name(whitelist_mode):
     whitelist_mode("enforce")
-    assert Template("${caller}").render({"caller": "alice"}) == "alice"
+    assert Template("${parent + ''}").render({"parent": "alice"}) == "alice"
 
 
 def test_mako_whitelist_blocks_self_module_even_if_self_in_context(whitelist_mode):
