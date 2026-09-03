@@ -275,16 +275,43 @@ class TestMakoNameWhitelist(TestCase):
         finally:
             self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
 
-    def test_single_underscore_attr_blocked(self):
+    def test_reserved_namespace_attributes_blocked(self):
         self._set_mode("enforce")
         for p in [
             "${context._kwargs}",
             "${context._with_template}",
-            "${obj._secret}",
         ]:
             with self.subTest(payload=p):
-                rendered = expression.ConstantTemplate(p).resolve_data({"obj": object()})
+                rendered = expression.ConstantTemplate(p).resolve_data({})
                 self.assertEqual(rendered, p)
+
+    def test_user_single_underscore_attr_allowed(self):
+        self._set_mode("enforce")
+
+        class Bag(object):
+            def __init__(self):
+                self._module = [{"gamesvr": "1.1.1.1"}]
+
+        rendered = expression.ConstantTemplate("${obj._module[0]['gamesvr']}").resolve_data({"obj": Bag()})
+        self.assertEqual(rendered, "1.1.1.1")
+
+    def test_bare_caller_allowed(self):
+        self._set_mode("enforce")
+        # ConstantTemplate 对光杆 ``${caller}`` 会按 context 键短路，AST 走不到 visitor。
+        self.assertEqual(
+            expression.ConstantTemplate("${parent + ''}").resolve_data({"parent": "alice"}),
+            "alice",
+        )
+
+    def test_import_deep_chain_blocked(self):
+        self._set_mode("enforce")
+        original = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {"json": "json"}
+        try:
+            payload = "${json.codecs.builtins.exec('1')}"
+            self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original
 
     def test_business_patterns_still_render(self):
         self._set_mode("enforce")
