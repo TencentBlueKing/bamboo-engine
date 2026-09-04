@@ -19,7 +19,6 @@ import logging
 
 from typing import Any, List, Set
 
-from mako.template import Template as MakoTemplate
 from mako import lexer, codegen
 from mako.exceptions import MakoException
 
@@ -30,6 +29,7 @@ from bamboo_engine.utils import mako_safety
 from bamboo_engine.utils.string import deformat_var_key
 
 from . import sandbox
+from .render_backend import get_render_backend, SandboxProvider, SandboxSpec
 
 
 logger = logging.getLogger("root")
@@ -195,21 +195,14 @@ class Template:
         :return: [description]
         :rtype: str
         """
-        data = {}
-        data.update(sandbox.get())
-        data.update(context)
         if not isinstance(template, str):
             raise TypeError("constant resolve error, template[%s] is not a string" % template)
-        try:
-            tm = MakoTemplate(template)
-        except (MakoException, SyntaxError) as e:
-            logger.error("pipeline resolve template[{}] error[{}]".format(template, e))
-            return template
-        sandbox.harden_template_builtins(tm)
-        try:
-            resolved = tm.render_unicode(**data)
-        except Exception as e:
-            logger.warning("constant content({}) is invalid, data({}), error: {}".format(template, data, e))
-            return template
-        else:
-            return resolved
+        # 唯一的“执行用户表达式”入口下沉到可插拔的 render backend：默认 ``InProcessRenderBackend``
+        # 行为与历史完全一致（沙箱 dict + context 合并、harden、render_unicode、编译/渲染失败 inert）。
+        # provider 同时提供：进程内 ``sandbox.get`` 现场构造，与可序列化的 ``SandboxSpec``（供隔离
+        # backend 在子进程本地重建沙箱、只序列化 context）。见 bamboo_engine/template/render_backend.py。
+        provider = SandboxProvider(
+            sandbox.get,
+            SandboxSpec("engine", Settings.MAKO_SANDBOX_SHIELD_WORDS, Settings.MAKO_SANDBOX_IMPORT_MODULES),
+        )
+        return get_render_backend().render(template, context, provider)

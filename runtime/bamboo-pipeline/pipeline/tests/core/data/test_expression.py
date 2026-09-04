@@ -492,3 +492,56 @@ class TestMakoSafetyHardening(TestCase):
             "json": "json",
         }
         self.assertEqual(set(engine_sandbox.filter_import_modules(src)), {"os.path", "json"})
+
+
+class TestRenderBackendSeam(TestCase):
+    """校验 ``ConstantTemplate.resolve_template`` 已下沉到可插拔 render backend，且默认行为不变。"""
+
+    def setUp(self):
+        from bamboo_engine.template import render_backend
+
+        render_backend.reset_render_backend()
+
+    def tearDown(self):
+        from bamboo_engine.template import render_backend
+
+        render_backend.reset_render_backend()
+
+    def test_default_backend_preserves_inprocess_render(self):
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${a}", {"a": "1"}), "1")
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${a+int(b)}", {"a": 2, "b": "3"}), "5")
+
+    def test_compile_and_render_errors_stay_inert(self):
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${", {}), "${")
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${nope}", {}), "${nope}")
+
+    def test_resolve_template_rejects_non_string(self):
+        with self.assertRaises(expression.exceptions.ConstantTypeException):
+            expression.ConstantTemplate.resolve_template(123, {})
+
+    def test_resolve_template_routes_through_configured_backend(self):
+        from bamboo_engine.template import render_backend
+
+        calls = []
+
+        class _StubBackend(render_backend.RenderBackend):
+            def render(self, template, context, sandbox_builder):
+                calls.append((template, context, sandbox_builder))
+                return "STUB::" + template
+
+        render_backend.set_render_backend(_StubBackend())
+        out = expression.ConstantTemplate.resolve_template("${a}", {"a": 1})
+        self.assertEqual(out, "STUB::${a}")
+        self.assertEqual(len(calls), 1)
+        template_arg, context_arg, sandbox_builder = calls[0]
+        self.assertEqual(template_arg, "${a}")
+        self.assertEqual(context_arg, {"a": 1})
+        # the seam must pass the sandbox *builder* callable (for subprocess-local rebuild), not a dict
+        self.assertTrue(callable(sandbox_builder))
+        self.assertIsInstance(sandbox_builder(), dict)
+
+    def test_render_sandbox_builder_reads_expression_sandbox_at_call_time(self):
+        # The builder must resolve expression.SANDBOX at call time (matching the historical
+        # ``data.update(SANDBOX)``), so rebinding pipeline.core.data.sandbox.SANDBOX elsewhere
+        # never diverges the render source from what callers mutate via expression.SANDBOX.
+        self.assertIs(expression._mako_render_sandbox(), expression.SANDBOX)
