@@ -87,9 +87,14 @@ def _engine_provider():
     )
 
 
+def _local_backend(**kwargs):
+    # Portable process/IPC tests; actual no-network requirements are tested separately.
+    return SubprocessPoolRenderBackend(no_network=False, **kwargs)
+
+
 @pytest.fixture
 def backend():
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=10.0)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=10.0)
     try:
         yield b
     finally:
@@ -110,7 +115,7 @@ def test_subprocess_backend_reuses_warm_worker(backend):
 
 
 def test_subprocess_backend_recycles_after_max_uses():
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1, timeout=10.0)
+    b = _local_backend(pool_size=1, max_uses=1, timeout=10.0)
     try:
         r1 = b.render("${probe()}", {"probe": _worker_pid_probe}, _engine_provider())
         r2 = b.render("${probe()}", {"probe": _worker_pid_probe}, _engine_provider())
@@ -121,7 +126,7 @@ def test_subprocess_backend_recycles_after_max_uses():
 
 def test_subprocess_backend_scrubs_credentials_from_env():
     os.environ["MAKO_TEST_APP_SECRET"] = "topsecret"
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=10.0)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=10.0)
     try:
         result = b.render("${probe()}", {"probe": _read_scrubbed_env}, _engine_provider())
         assert result == "<absent>"  # 子进程启动即清洗掉了凭证类 env
@@ -131,7 +136,7 @@ def test_subprocess_backend_scrubs_credentials_from_env():
 
 
 def test_subprocess_backend_timeout_returns_inert_without_hanging():
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=0.5)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=0.5)
     try:
         start = time.time()
         template = "${probe()}"
@@ -145,7 +150,7 @@ def test_subprocess_backend_timeout_returns_inert_without_hanging():
 
 def test_subprocess_backend_falls_back_inprocess_on_unpicklable_context():
     # 显式 fallback_inprocess=True：threading.Lock 不可 pickle → 无法进隔离子进程 → 回退进程内、渲染正确。
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=10.0, fallback_inprocess=True)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=10.0, fallback_inprocess=True)
     try:
         context = {"x": 5, "_lock": threading.Lock()}
         result = b.render("${x + 1}", context, _engine_provider())
@@ -156,7 +161,7 @@ def test_subprocess_backend_falls_back_inprocess_on_unpicklable_context():
 
 def test_subprocess_backend_strict_default_is_inert_on_unserializable():
     # 默认 strict：不可序列化 context → inert 回显模板（绝不静默回退特权进程），保安全边界。
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=10.0)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=10.0)
     try:
         template = "${x + 1}"
         result = b.render(template, {"x": 5, "_lock": threading.Lock()}, _engine_provider())
@@ -174,8 +179,9 @@ def test_subprocess_backend_normalizes_rich_object_to_render_in_worker(backend):
     assert backend.render("${v}", {"v": v}, _engine_provider()) == "RichLike(2 rows)"
 
 
-def test_subprocess_backend_without_spec_uses_inprocess(backend):
-    # 传入不带 .spec() 的普通 builder（历史兼容）→ 无法隔离 → 进程内渲染（同一 PID）
+def test_subprocess_backend_without_spec_requires_explicit_fallback(backend):
+    backend.fallback_inprocess = True
+    # 仅显式 fallback 配置允许没有 spec 的 builder 回退进程内。
     parent_pid = os.getpid()
     result = backend.render("${probe()}", {"probe": _worker_pid_probe}, engine_sandbox.get)
     assert int(result) == parent_pid
@@ -190,7 +196,7 @@ def test_subprocess_backend_compile_error_is_inert(backend):
 def test_subprocess_worker_side_unpickle_failure_falls_back_fast():
     # 父进程可 pickle、worker 侧 unpickle 失败（无 __dict__ 故绕过归一化，模拟按引用重建失败的残余场景）：
     # 显式 fallback_inprocess=True 时必须快速、干净地回退进程内，而不是等满 timeout 再 inert。
-    b = SubprocessPoolRenderBackend(pool_size=1, max_uses=1000, timeout=2.0, fallback_inprocess=True)
+    b = _local_backend(pool_size=1, max_uses=1000, timeout=2.0, fallback_inprocess=True)
     try:
         context = {"x": 5, "_evil": _UnpicklableOnLoad()}
         start = time.time()
