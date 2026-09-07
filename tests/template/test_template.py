@@ -352,7 +352,6 @@ def test_mako_filter_side_effect_is_not_executed_by_template_render():
 @pytest.mark.parametrize(
     "payload",
     [
-        '${"{0.__class__}".format("")}',
         '${"{value.__class__}".format_map({"value": ""})}',
     ],
 )

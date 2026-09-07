@@ -236,6 +236,26 @@ class TestMakoNameWhitelist(TestCase):
         self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
         self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
 
+    def test_existing_format_expressions_only_blocked_in_enforce(self):
+        from types import SimpleNamespace
+
+        cases = [
+            (
+                '${"gamedb.{}.xzj.db".format(set_info.bk_set_name[_loop-1])}',
+                {"set_info": SimpleNamespace(bk_set_name=["zone1"]), "_loop": 1},
+                "gamedb.zone1.xzj.db",
+            ),
+            ('${",".join(["haha{}".format(g) for g in groups])}', {"groups": ["a", "b"]}, "hahaa,hahab"),
+        ]
+        for mode in ("off", "warn", "enforce"):
+            self._set_mode(mode)
+            for template, context, expected in cases:
+                with self.subTest(mode=mode, template=template):
+                    self.assertEqual(
+                        expression.ConstantTemplate(template).resolve_data(context),
+                        template if mode == "enforce" else expected,
+                    )
+
     def test_off_mode_also_blocks_self_module(self):
         # 保留命名空间属性链下沉 always-on 后，off 模式也 inert
         # （此前 off 会解析出真实 os 模块执行命令，这里回归为拦截）。
@@ -419,8 +439,13 @@ class TestMakoSafetyHardening(TestCase):
     def test_tag_level_text_filter_is_blocked(self):
         self._assert_forbidden('<%text filter="(side_effect() or str)">x</%text>')
 
-    def test_format_attribute_call_is_blocked(self):
-        self._assert_forbidden('${"{0.__class__}".format("")}')
+    def test_format_attribute_call_is_blocked_in_enforce(self):
+        with self.assertRaises(ForbiddenMakoTemplateException):
+            check_mako_template_safety(
+                '${"{0.__class__}".format("")}',
+                mako_safety.WhitelistNameVisitor(set(), mode="enforce"),
+                mako_safety.SingleLinCodeExtractor(),
+            )
 
     def test_format_map_attribute_call_is_blocked(self):
         self._assert_forbidden('${"{value.__class__}".format_map({"value": ""})}')
