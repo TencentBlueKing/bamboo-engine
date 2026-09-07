@@ -117,7 +117,8 @@ DANGEROUS_ATTR_NAMES = frozenset(
     }
 )
 
-FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
+# .format 保留 off/warn 下的存量兼容，仅 enforce 检查；format_map 仍始终拒绝。
+FORBIDDEN_TEMPLATE_METHODS = {"format_map"}
 SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
 SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
@@ -304,6 +305,9 @@ class WhitelistNameVisitor(ast.NodeVisitor):
             self._violate(node.id, "not in whitelist")
 
     def visit_Attribute(self, node):
+        if self.mode == "enforce" and node.attr == "format":
+            self._violate(node.attr, "forbidden method")
+            return
         if node.attr.startswith("__"):
             self._violate(node.attr, "private attribute")
             return
