@@ -66,7 +66,7 @@ tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>
 
 [[package]]
 name = "bamboo-engine"
-version = "2.6.5"
+version = "2.6.6"
 description = "Bamboo-engine is a general-purpose workflow engine"
 category = "main"
 optional = false
@@ -811,7 +811,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = ">= 3.6, < 3.8"
-content-hash = "2a19a92a3a25268cd9a8192e8cd0bd4020089c7f32aaf113271d190ffab1ec89"
+content-hash = "ace65a15ac0c2ac291de0d5971effb7a3c41276397bbd95a211ada2c33726812"
 
 [metadata.files]
 amqp = []
@@ -823,7 +823,10 @@ asgiref = [
 async-timeout = []
 atomicwrites = []
 attrs = []
-bamboo-engine = []
+bamboo-engine = [
+    {file = "bamboo_engine-2.6.6-py3-none-any.whl", hash = "sha256:980390778e08b8aa34909ce8cd94b4fc1a09560e329c7094ab9fc6e5b29801a6"},
+    {file = "bamboo_engine-2.6.6.tar.gz", hash = "sha256:bb5ca26d89acfb07547e84ec005a14202f5e5ad8db2a2c29b26e924fa1cec4e1"},
+]
 billiard = []
 black = []
 boto3 = []
