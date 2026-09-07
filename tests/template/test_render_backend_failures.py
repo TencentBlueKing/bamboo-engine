@@ -268,7 +268,7 @@ def test_pool_concurrent_requests_return_their_own_results():
 
 
 def test_unreaped_worker_keeps_its_slot(monkeypatch):
-    backend = pool(timeout=0.2, max_uses=1)
+    backend = pool(max_uses=1)
     entered = threading.Event()
     release = threading.Event()
     stop = rb._RenderWorker.stop
@@ -284,6 +284,8 @@ def test_unreaped_worker_keeps_its_slot(monkeypatch):
     try:
         assert backend.render("${x+1}", {"x": 2}, provider()) == "3"
         assert entered.wait(1)
+        # The short deadline tests admission while reaping, not worker startup.
+        backend.timeout = 0.2
         assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
     finally:
         release.set()
