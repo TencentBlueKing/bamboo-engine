@@ -182,13 +182,13 @@ def test_pause_and_resume_pipeline_with_subprocess_has_parallel():
 
     for _ in range(parallel_count):
         act = ServiceActivity(component_code="sleep_timer")
-        act.component.inputs.bk_timing = Var(type=Var.PLAIN, value=3)
+        act.component.inputs.bk_timing = Var(type=Var.PLAIN, value=30)
         sleep_group_1.append(act)
 
     sleep_group_2 = []
     for _ in range(parallel_count):
         act = ServiceActivity(component_code="sleep_timer")
-        act.component.inputs.bk_timing = Var(type=Var.PLAIN, value=3)
+        act.component.inputs.bk_timing = Var(type=Var.PLAIN, value=30)
         sleep_group_2.append(act)
 
     acts_group_1 = [ServiceActivity(component_code="debug_node") for _ in range(parallel_count)]
@@ -216,7 +216,9 @@ def test_pause_and_resume_pipeline_with_subprocess_has_parallel():
     engine = Engine(runtime)
     engine.run_pipeline(pipeline=pipeline, root_pipeline_data={})
 
-    sleep(2)
+    # Wait for every branch to start before pausing. The timers leave room
+    # for startup on slower runners and finish while the pipeline is paused.
+    assert_all_running([a.id for a in sleep_group_1 + sleep_group_2])
 
     engine.pause_pipeline(pipeline["id"])
 
