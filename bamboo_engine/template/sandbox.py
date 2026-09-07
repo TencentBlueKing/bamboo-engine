@@ -209,10 +209,18 @@ def _import_modules(sandbox: dict, modules: Dict[str, str]):
         sandbox[root] = ModuleObject(sub_paths[1:], obj)
 
 
-def get() -> dict:
+def build_sandbox(shield_words, import_modules) -> dict:
+    """从（shield_words, import_modules）配置构造一个全新的渲染沙箱命名空间（不读 Settings）。
+
+    与 :func:`get` 同源，但配置由参数传入，因此可在**无网无凭证的隔离渲染子进程**里用（从父进程
+    序列化过来的）配置本地重建沙箱，而不必依赖子进程侧的 Settings。engine flavor 不含 legacy 的
+    mock builtins。
+    """
     sandbox = {}
-
-    _shield_words(sandbox, Settings.MAKO_SANDBOX_SHIELD_WORDS)
-    _import_modules(sandbox, Settings.MAKO_SANDBOX_IMPORT_MODULES)
-
+    _shield_words(sandbox, shield_words or [])
+    _import_modules(sandbox, import_modules or {})
     return sandbox
+
+
+def get() -> dict:
+    return build_sandbox(Settings.MAKO_SANDBOX_SHIELD_WORDS, Settings.MAKO_SANDBOX_IMPORT_MODULES)

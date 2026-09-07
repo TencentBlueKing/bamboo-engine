@@ -15,13 +15,12 @@ import copy
 import re
 import logging
 
-from mako.template import Template
 from mako import lexer, codegen
 from mako.exceptions import MakoException
 
-from bamboo_engine.template.sandbox import harden_template_builtins
+from bamboo_engine.template.render_backend import get_render_backend, SandboxProvider, SandboxSpec
 from pipeline import exceptions
-from pipeline.conf.default_settings import MAKO_SAFETY_CHECK
+from pipeline.conf.default_settings import MAKO_SAFETY_CHECK, MAKO_SANDBOX_SHIELD_WORDS, MAKO_SANDBOX_IMPORT_MODULES
 from pipeline.core.data.sandbox import SANDBOX
 from pipeline.core.data import mako_safety
 from pipeline.utils.mako_utils.checker import check_mako_template_safety
@@ -31,6 +30,18 @@ from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 logger = logging.getLogger("root")
 # find mako template(format is ${xxx}，and ${}# not in xxx, # may raise memory error)
 TEMPLATE_PATTERN = re.compile(r"\${[^$#]+}")
+
+
+def _mako_render_sandbox():
+    """render backend 的 sandbox_builder：在调用时读取本模块的 ``SANDBOX`` 全局。
+
+    与历史实现 ``data.update(SANDBOX)`` 的语义严格一致——都以 *expression 模块此刻绑定的*
+    ``SANDBOX`` 为准。这一点很关键：部分测试会 ``sandbox.SANDBOX = deepcopy(...)`` 重新绑定
+    ``pipeline.core.data.sandbox`` 的全局，但历史渲染读的始终是 expression 侧捕获的对象，因此
+    这里也必须读 expression 的 ``SANDBOX``，而不是 ``pipeline.core.data.sandbox`` 的实时全局，
+    否则会在 rebind 后与历史行为分叉。该函数为模块级函数，可被隔离 backend 跨进程引用。
+    """
+    return SANDBOX
 
 
 def format_constant_key(key):
@@ -168,21 +179,14 @@ class ConstantTemplate(object):
 
     @staticmethod
     def resolve_template(template, value_maps):
-        data = {}
-        data.update(SANDBOX)
-        data.update(value_maps)
         if not isinstance(template, str):
             raise exceptions.ConstantTypeException("constant resolve error, template[%s] is not a string" % template)
-        try:
-            tm = Template(template)
-        except (MakoException, SyntaxError) as e:
-            logger.error("pipeline resolve template[{}] error[{}]".format(template, e))
-            return template
-        harden_template_builtins(tm)
-        try:
-            resolved = tm.render_unicode(**data)
-        except Exception as e:
-            logger.warning("constant content({}) is invalid, data({}), error: {}".format(template, data, e))
-            return template
-        else:
-            return resolved
+        # 与 ``bamboo_engine.template.template.Template._render_template`` 对齐：唯一的“执行用户
+        # 表达式”入口下沉到可插拔 render backend，默认行为完全不变。provider 同时提供：进程内
+        # ``_mako_render_sandbox`` 现场取沙箱（mock builtins + shield + 注入模块），与可序列化的
+        # ``SandboxSpec``（legacy flavor，供隔离 backend 在子进程本地重建沙箱、只序列化 value_maps）。
+        provider = SandboxProvider(
+            _mako_render_sandbox,
+            SandboxSpec("legacy", MAKO_SANDBOX_SHIELD_WORDS, MAKO_SANDBOX_IMPORT_MODULES),
+        )
+        return get_render_backend().render(template, value_maps, provider)
