@@ -1,4 +1,4 @@
-"""Trusted-base GLM review runner. Requires only Python's standard library."""
+"""Trusted-base AI review runner. Requires only Python's standard library."""
 
 import argparse
 import html
@@ -13,8 +13,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path, PurePosixPath
 
-MODEL = "glm-5.3-ioa"
-MARKER = "<!-- blueking-glm53-review -->"
+MARKER = "<!-- blueking-ai-review -->"
+LEGACY_MARKERS = ("<!-- blueking-glm53-review -->",)
 MAX_DIFF = 400_000
 MAX_FINDINGS = 8
 SCHEMA = {
@@ -277,6 +277,9 @@ def output_schema(anchors):
 
 
 def run_review(work, executable):
+    model = os.environ.get("AI_REVIEW_MODEL", "")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", model):
+        raise ValueError("Set AI_REVIEW_MODEL to a valid model ID in repository Actions variables")
     key = os.environ.get("CODEBUDDY_API_KEY", "")
     if not key:
         raise ValueError("Missing repository secret CODEBUDDY_API_KEY")
@@ -314,7 +317,7 @@ def run_review(work, executable):
         executable,
         "-p",
         "--model",
-        MODEL,
+        model,
         "--tools",
         "Read,Glob,Grep,StructuredOutput",
         "--allowedTools",
@@ -350,7 +353,7 @@ def run_review(work, executable):
     if key in json.dumps(value, ensure_ascii=False):
         raise ValueError("Credential detected in model output; refusing to publish")
     (work / "review.json").write_text(json.dumps(value, ensure_ascii=False))
-    logging.info("Validated %s findings from %s.", len(value["findings"]), MODEL)
+    logging.info("Validated %s findings from %s.", len(value["findings"]), model)
 
 
 def safe_text(value):
@@ -362,7 +365,7 @@ def safe_text(value):
 def render_review(value, metadata):
     lines = [
         MARKER,
-        f"### GLM‑5.3 代码审查 · `{metadata['head'][:12]}`",
+        f"### AI 代码审查 · `{metadata['head'][:12]}`",
         "仅辅助人工审查；未执行测试，也不代表已满足合入或发布条件。",
     ]
     for finding in value["findings"]:
@@ -402,7 +405,9 @@ def publish(work):
     while True:
         comments = api(f"repos/{repo}/issues/{number}/comments?per_page=100&page={page}")
         for comment in comments:
-            if comment["user"]["login"] == "github-actions[bot]" and comment["body"].startswith(MARKER):
+            if comment["user"]["login"] == "github-actions[bot]" and comment["body"].startswith(
+                (MARKER, *LEGACY_MARKERS)
+            ):
                 api(f"repos/{repo}/issues/comments/{comment['id']}", "PATCH", {"body": body})
                 return
         if len(comments) < 100:
