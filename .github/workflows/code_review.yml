@@ -38,8 +38,25 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Check target-branch review installation
+        id: installation
+        run: |
+          present=0
+          for file in .github/scripts/ai_review.py .ai/review/knowledge.md .ai/review/rules.md; do
+            if [ -f "$file" ]; then present=$((present + 1)); fi
+          done
+          if [ "$present" -eq 0 ]; then
+            echo '::notice::AI review is not installed on this target branch yet; no model review was performed.'
+            echo 'installed=false' >> "$GITHUB_OUTPUT"
+          elif [ "$present" -ne 3 ]; then
+            echo '::error::Target branch has an incomplete AI review installation.'
+            exit 1
+          else
+            echo 'installed=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Check access and prepare source snapshot
         id: prepare
+        if: steps.installation.outputs.installed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I .github/scripts/ai_review.py prepare --work-dir "$RUNNER_TEMP/ai-review"
