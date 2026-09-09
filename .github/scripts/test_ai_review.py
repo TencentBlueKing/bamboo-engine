@@ -102,6 +102,54 @@ class ReviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             review.validate_findings(self.value, self.anchors)
 
+    def test_model_process_has_no_github_credentials_or_external_tool_permissions(self):
+        metadata = {"number": 1, "merge_base": "b", "head": "a", "omitted": [], "anchors": self.anchors}
+        result = [{"type": "result", "subtype": "success", "structured_output": self.value}]
+        inherited = {
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/test-home",
+            "CODEBUDDY_API_KEY": "test-model-key",
+            "GH_TOKEN": "test-github-token",
+            "GITHUB_TOKEN": "test-github-token",
+            "GITHUB_ENV": "/runner/environment",
+            "GITHUB_OUTPUT": "/runner/output",
+            "GITHUB_PATH": "/runner/path",
+            "GITHUB_STEP_SUMMARY": "/runner/summary",
+            "CODEBUDDY_CONFIG_DIR": "/untrusted-config",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "source").mkdir()
+            (work / "metadata.json").write_text(json.dumps(metadata))
+            (work / "diff.txt").write_text("+changed line\n")
+            with patch.dict(os.environ, inherited, clear=True), patch.object(
+                review.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(result), "")
+            ) as run:
+                review.run_review(work, "codebuddy")
+            command = run.call_args.args[0]
+            options = run.call_args.kwargs
+            self.assertEqual(options["cwd"], work / "source")
+            self.assertEqual(
+                options["env"],
+                {
+                    "PATH": inherited["PATH"],
+                    "HOME": inherited["HOME"],
+                    "CODEBUDDY_API_KEY": "test-model-key",
+                    "CODEBUDDY_INTERNET_ENVIRONMENT": "iOA",
+                    "CODEBUDDY_CONFIG_DIR": str(work / "config"),
+                    "CI": "true",
+                    "CLIENT_INFO_PRODUCT_VERSION": "2.147.0",
+                },
+            )
+            self.assertEqual(command[command.index("--tools") + 1], "Read,Glob,Grep,StructuredOutput")
+            # Bare Read/Glob/Grep in allowedTools would bypass the snapshot's default read boundary.
+            self.assertEqual(command[command.index("--allowedTools") + 1], "StructuredOutput")
+            self.assertEqual(command[command.index("--permission-mode") + 1], "dontAsk")
+            self.assertEqual(command[command.index("--mcp-config") + 1], '{"mcpServers":{}}')
+            self.assertIn("--strict-mcp-config", command)
+            self.assertEqual(command[command.index("--setting-sources") + 1], "none")
+            self.assertEqual(json.loads((work / "review.json").read_text()), self.value)
+
     @contextmanager
     def snapshot_repository(self):
         previous = Path.cwd()
