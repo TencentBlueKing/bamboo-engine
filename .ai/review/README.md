@@ -6,12 +6,14 @@
 
 - PR 新建、更新、重新打开或退出草稿时运行；PR 作者和事件发起人都必须拥有仓库 write/maintain/admin 权限。外部贡献者的 PR 会明确跳过，可由维护者人工审查；不能靠加标签放开凭据。
 - 管理员在 GitHub 仓库 Actions Secrets 中配置 `CODEBUDDY_API_KEY`，值为公司 CodeBuddy API key；不使用 OpenClaw OAuth token。缺少或失效会失败，不发布“无问题”结论。密钥到期前由维护者更新该 Secret。
-- `pull_request_target` 只执行目标分支代码和知识库。当前接入 PR 合入前，不能据此 PR 的检查证明自动模型审查已生效；后续 PR 事件才会加载本方案。
+- `pull_request_target` 从仓库默认分支读取工作流；本工作流再显式检出 PR Base SHA，只执行该目标分支已合入的审查脚本和知识。接入 PR 的检查不证明其 head 配置已经生效；后续 PR 事件才会加载已合入的方案。
 - 不创建自动合入、自动批准或发布任务；暂不把 AI 判断设为必需合入门禁。
 
 ## LTS 与开发分支覆盖
 
-工作流、审查脚本和知识规则必须分别合入每条需要接收 PR 的目标分支。主分支已经接入、工作流没有 `branches` 过滤，都不意味着其他 LTS 自动获得这套检查。新建或保留维护分支时，应将这六份接入文件一起补齐，并按照该分支的真实模块、版本和兼容约束调整知识与规则。
+默认分支的工作流是全仓触发入口；每条 PR 目标分支还必须拥有审查脚本和知识规则。默认分支已经接入、工作流没有 `branches` 过滤，都不意味着其他 LTS 自动获得完整审查。新建或保留维护分支时，将六份接入文件一起补齐，并按该分支真实模块、版本和兼容约束调整知识与规则；各分支的工作流副本供维护回移使用，当前执行入口仍来自默认分支。
+
+目标 base 完全没有审查脚本/两份规则时，工作流明确标记尚未接入并跳过模型调用；仅缺少部分文件则失败，避免不完整配置静默运行。合入 LTS 的完整接入文件后，后续事件才执行该 LTS 的审查。工作流逻辑变更还必须合入默认分支，单独修改 LTS 的工作流副本不会改变当前入口。
 
 仓库级 `CODEBUDDY_API_KEY` Secret 由同一仓库的分支共享，无需逐分支创建。合入后用新的维护 PR 验证 `review` 调用模型、`publish` 发布对应 head 的评论；仅 `validate` 通过只能证明 runner 单测通过。已有 PR 不会因目标分支补接入而自动重跑，需要后续更新、重新打开或退出草稿事件。
 
@@ -39,4 +41,4 @@ python3 -I -m unittest discover -s .github/scripts -p test_ai_review.py -v
 
 该测试不需要模型凭据，覆盖 diff 定位、返回结构、链接与提及转义、路径穿越/符号链接、export-ignore/export-subst、特殊文件名、过期结果和评论更新；同时验证模型进程不继承 GitHub 凭据、runner 命令文件和外部工具授权，以及超过 1 MB 的 CLI JSON 在立即退出后仍完整读取。工作流的 `pull_request` 校验 job 不接收模型 Secret；业务代码应另按知识库列出的现有测试执行。
 
-参考：[GitHub Actions 安全指南](https://docs.github.com/en/actions/reference/security/secure-use)。
+参考：[GitHub Actions 安全指南](https://docs.github.com/en/actions/reference/security/secure-use)、[pull_request_target 默认分支语义](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)。
