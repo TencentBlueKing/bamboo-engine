@@ -27,7 +27,7 @@
 
 最多报告 8 个有触发条件、调用链、影响和修复建议的 P1/P2 问题，用中文输出到一条可更新的 PR 评论，附本次 commit 的源码行链接。仅允许引用本次新增/删除行。重复运行更新同一评论；发布前重新检查 head 和 base，过期结果不发布。
 
-模型任务只有仓库只读权限；评论发布在独立 job 中持有 PR 写权限。仅传递验证后的结果和提交元数据，不上传原始对话、源码快照或配置目录。Actions 固定到提交 SHA，CLI 固定 `@tencent-ai/codebuddy-code@2.147.0`。
+模型任务只有仓库只读权限；评论发布在独立 job 中持有 PR 写权限。CLI 原始输出由私有临时文件接收，避免进程退出时尚未写完的管道造成长 JSON 截断；文件关闭即删除。仅传递验证后的结果和提交元数据，不上传原始对话、源码快照或配置目录。Actions 固定到提交 SHA，CLI 固定 `@tencent-ai/codebuddy-code@2.147.0`。
 
 模型调用、JSON 校验或凭据失败会使检查失败；查看失败步骤处理，不能据“没有评论”认定通过。更新依赖或约束后先跑下列验证，再用正常业务 PR 检查结果。AI 输出有误由人工判定，修正知识规则后随 PR 更新重跑。
 
@@ -37,6 +37,6 @@
 python3 -I -m unittest discover -s .github/scripts -p test_ai_review.py -v
 ```
 
-该测试不需要模型凭据，覆盖 diff 定位、返回结构、链接与提及转义、路径穿越/符号链接、export-ignore/export-subst、特殊文件名、过期结果和评论更新；同时验证模型进程不继承 GitHub 凭据、runner 命令文件和外部工具授权。工作流的 `pull_request` 校验 job 不接收模型 Secret；业务代码应另按知识库列出的现有测试执行。
+该测试不需要模型凭据，覆盖 diff 定位、返回结构、链接与提及转义、路径穿越/符号链接、export-ignore/export-subst、特殊文件名、过期结果和评论更新；同时验证模型进程不继承 GitHub 凭据、runner 命令文件和外部工具授权，以及超过 1 MB 的 CLI JSON 在立即退出后仍完整读取。工作流的 `pull_request` 校验 job 不接收模型 Secret；业务代码应另按知识库列出的现有测试执行。
 
 参考：[GitHub Actions 安全指南](https://docs.github.com/en/actions/reference/security/secure-use)。

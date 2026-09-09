@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -122,8 +123,13 @@ class ReviewTests(unittest.TestCase):
             (work / "source").mkdir()
             (work / "metadata.json").write_text(json.dumps(metadata))
             (work / "diff.txt").write_text("+changed line\n")
+
+            def complete_review(*args, **kwargs):
+                kwargs["stdout"].write(json.dumps(result))
+                return subprocess.CompletedProcess([], 0)
+
             with patch.dict(os.environ, inherited, clear=True), patch.object(
-                review.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(result), "")
+                review.subprocess, "run", side_effect=complete_review
             ) as run:
                 review.run_review(work, "codebuddy")
             command = run.call_args.args[0]
@@ -148,6 +154,29 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(command[command.index("--mcp-config") + 1], '{"mcpServers":{}}')
             self.assertIn("--strict-mcp-config", command)
             self.assertEqual(command[command.index("--setting-sources") + 1], "none")
+            self.assertEqual(json.loads((work / "review.json").read_text()), self.value)
+
+    def test_large_cli_json_survives_immediate_process_exit(self):
+        metadata = {"number": 1, "merge_base": "b", "head": "a", "omitted": [], "anchors": self.anchors}
+        # Reproduce a CLI that exits before pending asynchronous pipe writes drain.
+        messages = [
+            {"type": "assistant", "text": "x" * 1_048_576},
+            {"type": "result", "subtype": "success", "structured_output": self.value},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "source").mkdir()
+            (work / "metadata.json").write_text(json.dumps(metadata))
+            (work / "diff.txt").write_text("+changed line\n")
+            executable = work / "fake-codebuddy"
+            executable.write_text(
+                "#!" + sys.executable + "\nimport os, sys\n"
+                "sys.stdin.read()\nos.set_blocking(1, False)\n"
+                "os.write(1, " + repr(json.dumps(messages).encode()) + ")\nos._exit(0)\n"
+            )
+            executable.chmod(0o700)
+            with patch.dict(os.environ, {"CODEBUDDY_API_KEY": "test-model-key"}):
+                review.run_review(work, str(executable))
             self.assertEqual(json.loads((work / "review.json").read_text()), self.value)
 
     @contextmanager
