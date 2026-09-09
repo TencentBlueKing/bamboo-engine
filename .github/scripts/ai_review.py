@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import subprocess
+import tempfile
 import urllib.parse
 import urllib.request
 from pathlib import Path, PurePosixPath
@@ -335,13 +336,17 @@ def run_review(work, executable):
         "--system-prompt",
         system,
     ]
-    completed = subprocess.run(
-        command, input=prompt, text=True, cwd=work / "source", env=env, capture_output=True, timeout=900
-    )
-    # Raw transcripts can contain source or secrets; never print or upload them.
-    if completed.returncode != 0:
-        raise ValueError(f"CodeBuddy failed (exit {completed.returncode}); no review published")
-    value = parse_result(completed.stdout, metadata["anchors"])
+    # A CLI can exit with asynchronous pipe writes still buffered, truncating long
+    # JSON even with exit 0. Regular files make Node's output writes synchronous.
+    # TemporaryFile is private and removed on close; transcripts are never uploaded.
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as stdout, tempfile.TemporaryFile() as stderr:
+        completed = subprocess.run(
+            command, input=prompt, text=True, cwd=work / "source", env=env, stdout=stdout, stderr=stderr, timeout=900
+        )
+        if completed.returncode != 0:
+            raise ValueError(f"CodeBuddy failed (exit {completed.returncode}); no review published")
+        stdout.seek(0)
+        value = parse_result(stdout.read(), metadata["anchors"])
     if key in json.dumps(value, ensure_ascii=False):
         raise ValueError("Credential detected in model output; refusing to publish")
     (work / "review.json").write_text(json.dumps(value, ensure_ascii=False))
