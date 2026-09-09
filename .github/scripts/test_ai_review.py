@@ -268,6 +268,60 @@ class ReviewTests(unittest.TestCase):
             live["state"] = "closed"
             self.assertFalse(review.current_pr("owner/repo", 1, expected))
 
+    def test_prepare_rejects_untrusted_author_or_sender_before_preparing_model_input(self):
+        pr = {"user": {"login": "author"}, "author_association": "OWNER"}
+        event = {"sender": {"login": "sender"}}
+        for untrusted in ("author", "sender"):
+            for permission in ("none", "read", "triage", "unexpected"):
+                permissions = {"author": "admin", "sender": "admin", untrusted: permission}
+                with self.subTest(
+                    untrusted=untrusted, permission=permission
+                ), tempfile.TemporaryDirectory() as directory:
+                    work = Path(directory) / "review"
+                    output = Path(directory) / "output"
+
+                    def collaborator_permission(path):
+                        login = path.split("/")[-2]
+                        return {"permission": permissions[login]}
+
+                    with patch.object(review, "event_context", return_value=(event, "owner/repo", pr, 1)), patch.object(
+                        review, "api", side_effect=collaborator_permission
+                    ), patch.object(review, "current_pr") as current, patch.object(review, "git") as git, patch.dict(
+                        os.environ, {"GITHUB_OUTPUT": str(output)}
+                    ):
+                        review.prepare(work)
+                    current.assert_not_called()
+                    git.assert_not_called()
+                    self.assertFalse(work.exists())
+                    self.assertFalse(output.exists())
+
+    def test_prepare_checks_both_current_permissions_before_checking_pr_state(self):
+        pr = {"user": {"login": "author"}, "author_association": "NONE"}
+        event = {"sender": {"login": "sender"}}
+        for author_permission in ("write", "maintain", "admin"):
+            for sender_permission in ("write", "maintain", "admin"):
+                permissions = {"author": author_permission, "sender": sender_permission}
+                with self.subTest(permissions=permissions), tempfile.TemporaryDirectory() as directory:
+                    checked = set()
+
+                    def collaborator_permission(path):
+                        login = path.split("/")[-2]
+                        checked.add(login)
+                        return {"permission": permissions[login]}
+
+                    def changed_pr(*args):
+                        self.assertEqual(checked, {"author", "sender"})
+                        return False
+
+                    with patch.object(review, "event_context", return_value=(event, "owner/repo", pr, 1)), patch.object(
+                        review, "api", side_effect=collaborator_permission
+                    ), patch.object(review, "current_pr", side_effect=changed_pr) as current, patch.object(
+                        review, "git"
+                    ) as git:
+                        review.prepare(Path(directory) / "review")
+                    current.assert_called_once_with("owner/repo", 1, pr)
+                    git.assert_not_called()
+
     def test_publish_updates_only_own_marker_and_checks_event(self):
         metadata = {
             "repo": "owner/repo",
