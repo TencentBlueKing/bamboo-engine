@@ -1,0 +1,89 @@
+name: GLM-5.3 AI Code Review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request:
+    paths: ['.github/scripts/ai_review.py', '.github/scripts/test_ai_review.py', '.github/workflows/code_review.yml', '.ai/review/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glm-review-${{ github.event_name }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate review runner without credentials
+        run: python3 -I -m unittest discover -s .github/scripts -p test_ai_review.py -v
+
+  review:
+    if: github.event_name == 'pull_request_target' && !github.event.pull_request.draft
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      ready: ${{ steps.prepare.outputs.ready }}
+    steps:
+      # Only trusted target-branch tooling and knowledge can execute.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check access and prepare source snapshot
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/ai_review.py prepare --work-dir "$RUNNER_TEMP/ai-review"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: steps.prepare.outputs.ready == 'true'
+        with:
+          node-version: '22'
+      - name: Install pinned CodeBuddy CLI outside the PR snapshot
+        if: steps.prepare.outputs.ready == 'true'
+        working-directory: ${{ runner.temp }}
+        run: npm install --global @tencent-ai/codebuddy-code@2.147.0
+      - name: Review with company GLM-5.3
+        if: steps.prepare.outputs.ready == 'true'
+        env:
+          CODEBUDDY_API_KEY: ${{ secrets.CODEBUDDY_API_KEY }}
+        run: python3 -I .github/scripts/ai_review.py review --work-dir "$RUNNER_TEMP/ai-review"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.prepare.outputs.ready == 'true'
+        with:
+          name: glm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ai-review/metadata.json
+            ${{ runner.temp }}/ai-review/review.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: review
+    if: needs.review.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: glm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-review
+      - name: Validate current PR and publish one updatable comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/ai_review.py publish --work-dir "$RUNNER_TEMP/ai-review"

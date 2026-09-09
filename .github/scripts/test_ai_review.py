@@ -1,0 +1,228 @@
+import importlib.util
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+from contextlib import contextmanager
+from pathlib import Path
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location("ai_review", Path(__file__).with_name("ai_review.py"))
+review = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(review)
+
+
+class ReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.anchors = {"src/app.py": {"LEFT": [3], "RIGHT": [3, 4]}}
+        self.value = {
+            "findings": [
+                {
+                    "path": "src/app.py",
+                    "line": 3,
+                    "side": "RIGHT",
+                    "priority": "P1",
+                    "title": "丢失租户过滤",
+                    "body": "跨租户查询会返回其他租户数据。",
+                }
+            ],
+            "limitations": "未执行测试",
+        }
+
+    def test_diff_anchors_exclude_context_and_handle_deleted_file(self):
+        self.assertEqual(
+            review.changed_lines("--- a/f\n+++ b/f\n@@ -2,3 +2,4 @@\n keep\n-old\n+new\n+extra\n keep"),
+            {"LEFT": [3], "RIGHT": [3, 4]},
+        )
+        self.assertEqual(review.changed_lines("@@ -1,2 +0,0 @@\n-a\n-b\n"), {"LEFT": [1, 2], "RIGHT": []})
+
+    def test_literal_git_paths_do_not_match_other_files(self):
+        previous = Path.cwd()
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                os.chdir(directory)
+                subprocess.run(["git", "init", "-q"], check=True)
+                for name in ("[id].py", "i.py", ":(glob)**.py"):
+                    Path(name).write_text("old\n")
+                review.git("add", ".")
+                review.git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "base")
+                for name in ("[id].py", "i.py", ":(glob)**.py"):
+                    Path(name).write_text("new\n")
+                for name in ("[id].py", ":(glob)**.py"):
+                    result = review.git("diff", "--", name).decode()
+                    self.assertEqual(result.count("diff --git"), 1)
+                    self.assertIn(name, result)
+            finally:
+                os.chdir(previous)
+
+    def test_refuse_off_diff_paths_and_lines(self):
+        for field, value in (
+            ("path", "../../secret"),
+            ("line", 2),
+            ("line", True),
+            ("priority", "P0"),
+            ("side", "UNKNOWN"),
+        ):
+            candidate = json.loads(json.dumps(self.value))
+            candidate["findings"][0][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                review.validate_findings(candidate, self.anchors)
+
+    def test_refuse_failed_truncated_or_malformed_model_responses(self):
+        for response in (
+            [],
+            [{"type": "result", "subtype": "error_max_turns", "is_error": True}],
+            [{"type": "result", "subtype": "success", "result": "not JSON"}],
+            [{"type": "result", "subtype": "success", "structured_output": {"findings": []}}],
+        ):
+            with self.subTest(response=response), self.assertRaises(ValueError):
+                review.parse_result(json.dumps(response), self.anchors)
+
+    def test_parse_structured_and_plain_json_success(self):
+        for key, value in (("structured_output", self.value), ("result", json.dumps(self.value))):
+            response = [{"type": "result", "subtype": "success", "is_error": False, key: value}]
+            self.assertEqual(review.parse_result(json.dumps(response), self.anchors), self.value)
+
+    def test_output_tool_schema_constrains_exact_changed_locations(self):
+        schema = json.loads(review.output_schema(self.anchors))
+        locations = schema["properties"]["findings"]["items"]["allOf"][0]["oneOf"]
+        self.assertEqual(locations[0]["properties"]["path"], {"const": "src/app.py"})
+        self.assertEqual(locations[0]["properties"]["side"], {"const": "LEFT"})
+        self.assertEqual(locations[0]["properties"]["line"], {"enum": [3]})
+        self.assertEqual(locations[1]["properties"]["line"], {"enum": [3, 4]})
+        self.assertEqual(json.loads(review.output_schema({}))["properties"]["findings"]["maxItems"], 0)
+
+    def test_refuse_duplicates_and_large_output(self):
+        self.value["findings"] *= 2
+        with self.assertRaises(ValueError):
+            review.validate_findings(self.value, self.anchors)
+        self.value["findings"] = []
+        self.value["limitations"] = "x" * 1601
+        with self.assertRaises(ValueError):
+            review.validate_findings(self.value, self.anchors)
+
+    @contextmanager
+    def snapshot_repository(self):
+        previous = Path.cwd()
+        with tempfile.TemporaryDirectory() as directory:
+            try:
+                os.chdir(directory)
+                subprocess.run(["git", "init", "-q"], check=True)
+                yield Path(directory)
+            finally:
+                os.chdir(previous)
+
+    def commit_snapshot(self):
+        review.git("add", ".")
+        review.git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "snapshot")
+
+    def test_snapshot_uses_raw_blobs_despite_export_attributes(self):
+        with self.snapshot_repository() as repository, tempfile.TemporaryDirectory() as directory:
+            (repository / ".gitattributes").write_text("app.py export-ignore\nversion.py export-subst\n")
+            (repository / "app.py").write_text("def authorization():\n    return False\n")
+            (repository / "version.py").write_text('version = "$Format:%H$"\n')
+            (repository / "nested").mkdir()
+            (repository / "nested" / "tab\tand\nnewline.py").write_text("value = 1\n")
+            self.commit_snapshot()
+            destination = Path(directory)
+            self.assertEqual(review.extract_snapshot("HEAD", destination), [])
+            for path in ("app.py", "version.py", "nested/tab\tand\nnewline.py"):
+                self.assertEqual((destination / path).read_bytes(), (repository / path).read_bytes())
+
+    def test_snapshot_drops_links_and_agent_control_files(self):
+        with self.snapshot_repository() as repository, tempfile.TemporaryDirectory() as directory:
+            for name in ("a.py", ".codebuddy/settings.json", "sub/AGENTS.md"):
+                path = repository / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("sample\n")
+            (repository / "a.py").chmod(0o755)
+            (repository / "link").symlink_to("/etc/passwd")
+            (repository / "large.py").write_bytes(b"x" * 250_001)
+            (repository / "limit.py").write_bytes(b"x" * 250_000)
+            self.commit_snapshot()
+            head = review.git("rev-parse", "HEAD").decode().strip()
+            review.git("update-index", "--add", "--cacheinfo", "160000," + head + ",vendor")
+            review.git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "submodule")
+            omitted = review.extract_snapshot("HEAD", Path(directory))
+            self.assertEqual((Path(directory) / "a.py").read_text(), "sample\n")
+            self.assertEqual((Path(directory) / "limit.py").stat().st_size, 250_000)
+            self.assertEqual(set(omitted), {"link", ".codebuddy/settings.json", "sub/AGENTS.md", "large.py", "vendor"})
+            for name in omitted:
+                self.assertFalse((Path(directory) / name).exists())
+                self.assertFalse((Path(directory) / name).is_symlink())
+
+    def test_snapshot_refuses_path_traversal(self):
+        for name in ("../outside", "/absolute", "safe/../../outside", "."):
+            tree = ("100644 blob " + "a" * 40 + " 1\t" + name + "\0").encode()
+            with tempfile.TemporaryDirectory() as directory, patch.object(review, "git", return_value=tree):
+                with self.subTest(path=name), self.assertRaisesRegex(ValueError, "Unsafe snapshot path"):
+                    review.extract_snapshot("HEAD", Path(directory))
+
+    def test_snapshot_refuses_nonempty_destination_with_external_symlink(self):
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
+            (Path(directory) / "linked").symlink_to(external, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                review.extract_snapshot("HEAD", Path(directory))
+            self.assertEqual(list(Path(external).iterdir()), [])
+
+    def test_snapshot_total_limit_is_checked_before_fetching_blobs(self):
+        tree = b"".join(("100644 blob " + "a" * 40 + " 250000\tfile%d.py\0" % i).encode() for i in range(241))
+        with tempfile.TemporaryDirectory() as directory, patch.object(review, "git", return_value=tree):
+            with patch.object(review.subprocess, "run") as fetch, self.assertRaisesRegex(ValueError, "60 MB"):
+                review.extract_snapshot("HEAD", Path(directory))
+            fetch.assert_not_called()
+
+    def test_model_text_cannot_create_mentions_links_or_images(self):
+        text = review.safe_text("@team ![x](https://evil.test) <img> <!--hidden-->")
+        self.assertNotIn("@team", text)
+        self.assertNotIn("![", text)
+        self.assertNotIn("<img>", text)
+        self.assertNotIn("<!--", text)
+
+    def test_stale_or_closed_pr_is_not_current(self):
+        expected = {"head": {"sha": "a"}, "base": {"sha": "b"}}
+        live = {**expected, "state": "open", "draft": False}
+        with patch.object(review, "api", return_value=live):
+            self.assertTrue(review.current_pr("owner/repo", 1, expected))
+            live["head"] = {"sha": "new"}
+            self.assertFalse(review.current_pr("owner/repo", 1, expected))
+            live["head"] = expected["head"]
+            live["state"] = "closed"
+            self.assertFalse(review.current_pr("owner/repo", 1, expected))
+
+    def test_publish_updates_only_own_marker_and_checks_event(self):
+        metadata = {
+            "repo": "owner/repo",
+            "number": 1,
+            "head": "a",
+            "base": "b",
+            "merge_base": "b",
+            "anchors": self.anchors,
+            "omitted": [],
+        }
+        pr = {"head": {"sha": "a"}, "base": {"sha": "b"}}
+        comments = [
+            {"id": 10, "user": {"login": "human"}, "body": review.MARKER},
+            {"id": 20, "user": {"login": "github-actions[bot]"}, "body": review.MARKER},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            (work / "metadata.json").write_text(json.dumps(metadata))
+            (work / "review.json").write_text(json.dumps(self.value))
+            with patch.object(review, "event_context", return_value=({}, "owner/repo", pr, 1)), patch.object(
+                review, "current_pr", return_value=True
+            ), patch.object(review, "api", side_effect=[comments, {}]) as api:
+                review.publish(work)
+                self.assertEqual(api.call_args.args[:2], ("repos/owner/repo/issues/comments/20", "PATCH"))
+            metadata["head"] = "different"
+            (work / "metadata.json").write_text(json.dumps(metadata))
+            with patch.object(review, "event_context", return_value=({}, "owner/repo", pr, 1)), patch.object(
+                review, "api"
+            ) as api, self.assertRaises(ValueError):
+                review.publish(work)
+            api.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
