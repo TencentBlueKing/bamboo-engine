@@ -110,6 +110,7 @@ class ReviewTests(unittest.TestCase):
             "PATH": "/usr/bin:/bin",
             "HOME": "/test-home",
             "CODEBUDDY_API_KEY": "test-model-key",
+            "AI_REVIEW_MODEL": "example-review-model",
             "GH_TOKEN": "test-github-token",
             "GITHUB_TOKEN": "test-github-token",
             "GITHUB_ENV": "/runner/environment",
@@ -134,6 +135,7 @@ class ReviewTests(unittest.TestCase):
                 review.run_review(work, "codebuddy")
             command = run.call_args.args[0]
             options = run.call_args.kwargs
+            self.assertEqual(command[command.index("--model") + 1], "example-review-model")
             self.assertEqual(options["cwd"], work / "source")
             self.assertEqual(
                 options["env"],
@@ -175,9 +177,38 @@ class ReviewTests(unittest.TestCase):
                 "os.write(1, " + repr(json.dumps(messages).encode()) + ")\nos._exit(0)\n"
             )
             executable.chmod(0o700)
-            with patch.dict(os.environ, {"CODEBUDDY_API_KEY": "test-model-key"}):
+            with patch.dict(
+                os.environ, {"CODEBUDDY_API_KEY": "test-model-key", "AI_REVIEW_MODEL": "example-review-model"}
+            ):
                 review.run_review(work, str(executable))
             self.assertEqual(json.loads((work / "review.json").read_text()), self.value)
+
+    def test_model_configuration_is_required_and_invalid_values_never_start_cli(self):
+        metadata = {"number": 1, "merge_base": "b", "head": "a", "omitted": [], "anchors": self.anchors}
+        result = [{"type": "result", "subtype": "success", "structured_output": self.value}]
+        for model in ("", "--unsafe-option", "model\nother", "x" * 129):
+            with self.subTest(model=model), tempfile.TemporaryDirectory() as directory:
+                work = Path(directory)
+                (work / "source").mkdir()
+                (work / "metadata.json").write_text(json.dumps(metadata))
+                (work / "diff.txt").write_text("+changed line\n")
+
+                def complete_review(*args, **kwargs):
+                    kwargs["stdout"].write(json.dumps(result))
+                    return subprocess.CompletedProcess([], 0)
+
+                with patch.dict(
+                    os.environ, {"CODEBUDDY_API_KEY": "test-model-key", "AI_REVIEW_MODEL": model}, clear=True
+                ), patch.object(review.subprocess, "run", side_effect=complete_review) as run:
+                    with self.assertRaisesRegex(ValueError, "AI_REVIEW_MODEL"):
+                        review.run_review(work, "codebuddy")
+                    run.assert_not_called()
+
+    def test_review_title_is_independent_of_the_model(self):
+        metadata = {"head": "a" * 40, "merge_base": "b" * 40, "repo": "owner/repo", "omitted": []}
+        body = review.render_review(self.value, metadata)
+        self.assertEqual(body.splitlines()[2], "### AI 代码审查 · `aaaaaaaaaaaa`")
+        self.assertTrue(body.startswith("<!-- blueking-ai-review -->"))
 
     @contextmanager
     def snapshot_repository(self):
@@ -353,6 +384,33 @@ class ReviewTests(unittest.TestCase):
             ) as api, self.assertRaises(ValueError):
                 review.publish(work)
             api.assert_not_called()
+
+    def test_publish_migrates_legacy_comment_without_creating_a_duplicate(self):
+        metadata = {
+            "repo": "owner/repo",
+            "number": 1,
+            "head": "a",
+            "base": "b",
+            "merge_base": "b",
+            "anchors": self.anchors,
+            "omitted": [],
+        }
+        pr = {"head": {"sha": "a"}, "base": {"sha": "b"}}
+        for marker in ("<!-- blueking-ai-review -->", "<!-- blueking-glm53-review -->"):
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as directory:
+                work = Path(directory)
+                (work / "metadata.json").write_text(json.dumps(metadata))
+                (work / "review.json").write_text(json.dumps(self.value))
+                comments = [
+                    {"id": 10, "user": {"login": "human"}, "body": marker},
+                    {"id": 20, "user": {"login": "github-actions[bot]"}, "body": marker},
+                ]
+                with patch.object(review, "event_context", return_value=({}, "owner/repo", pr, 1)), patch.object(
+                    review, "current_pr", return_value=True
+                ), patch.object(review, "api", side_effect=[comments, {}]) as api:
+                    review.publish(work)
+                self.assertEqual(api.call_args.args[:2], ("repos/owner/repo/issues/comments/20", "PATCH"))
+                self.assertTrue(api.call_args.args[2]["body"].startswith("<!-- blueking-ai-review -->"))
 
 
 if __name__ == "__main__":

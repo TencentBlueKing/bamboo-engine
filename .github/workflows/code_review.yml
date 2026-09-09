@@ -1,4 +1,4 @@
-name: GLM-5.3 AI Code Review
+name: AI Code Review
 
 on:
   pull_request_target:
@@ -9,8 +9,11 @@ on:
 permissions:
   contents: read
 
+env:
+  AI_REVIEW_MODEL: ${{ vars.AI_REVIEW_MODEL }}
+
 concurrency:
-  group: glm-review-${{ github.event_name }}-${{ github.event.pull_request.number }}
+  group: ai-review-${{ github.event_name }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -68,7 +71,7 @@ jobs:
         if: steps.prepare.outputs.ready == 'true'
         working-directory: ${{ runner.temp }}
         run: npm install --global @tencent-ai/codebuddy-code@2.147.0
-      - name: Review with company GLM-5.3
+      - name: Review pull request
         if: steps.prepare.outputs.ready == 'true'
         env:
           CODEBUDDY_API_KEY: ${{ secrets.CODEBUDDY_API_KEY }}
@@ -76,7 +79,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.prepare.outputs.ready == 'true'
         with:
-          name: glm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ai-review-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/ai-review/metadata.json
             ${{ runner.temp }}/ai-review/review.json
@@ -98,7 +101,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: glm-review-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ai-review-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ai-review
       - name: Validate current PR and publish one updatable comment
         env:
