@@ -14,6 +14,8 @@ specific language governing permissions and limitations under the License.
 import logging
 from abc import abstractmethod
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from pipeline import exceptions
 from pipeline.conf import settings
 from pipeline.core.data import library
@@ -63,6 +65,8 @@ class SpliceVariable(Variable):
         if not self._value:
             try:
                 self._resolve()
+            except RenderInfrastructureError:
+                raise
             except settings.VARIABLE_SPECIFIC_EXCEPTIONS as e:
                 logger.error("get value[{}] of Variable[{}] error[{}]".format(self.value, self.name, e))
                 return "Error: {}".format(e)
@@ -136,6 +140,8 @@ class LazyVariable(SpliceVariable, metaclass=RegisterVariableMeta):
         self.value = super(LazyVariable, self).get()
         try:
             return self.get_value()
+        except RenderInfrastructureError:
+            raise
         except settings.VARIABLE_SPECIFIC_EXCEPTIONS as e:
             logger.error("get value[{}] of Variable[{}] error[{}]".format(self.value, self.name, e))
             return "Error: {}".format(e)

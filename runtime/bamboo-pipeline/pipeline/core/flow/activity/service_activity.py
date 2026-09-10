@@ -16,6 +16,8 @@ from copy import deepcopy
 
 from django.utils.translation import ugettext_lazy as _
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
 from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
@@ -173,6 +175,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.execute(self.data, parent_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False
@@ -211,6 +215,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.schedule(self.data, parent_data, callback_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False

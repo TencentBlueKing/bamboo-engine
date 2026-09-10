@@ -28,10 +28,12 @@ class EndEventHandler(FlowElementHandler):
         raise NotImplementedError()
 
     def handle(self, process, element, status):
-        pipeline = process.pop_pipeline()
-        if process.pipeline_stack:
+        pipeline = process.pipeline_stack[-1]
+        if len(process.pipeline_stack) > 1:
             # pop subprocess and return to top of stack
             pipeline.context.write_output(pipeline)
+            # Preserve the stack and subprocess relationship if rendering fails.
+            process.pop_pipeline()
             Status.objects.finish(element)
             sub_process_node = process.top_pipeline.node(pipeline.id)
             Status.objects.finish(sub_process_node)
@@ -42,6 +44,7 @@ class EndEventHandler(FlowElementHandler):
             with Status.objects.lock(pipeline.id):
                 # save data and destroy process
                 pipeline.context.write_output(pipeline)
+                process.pop_pipeline()
                 Data.objects.write_node_data(pipeline)
                 Status.objects.finish(element)
 
