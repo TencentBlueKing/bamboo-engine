@@ -34,6 +34,39 @@ from bamboo_engine.handlers.service_activity import ServiceActivityHandler
 from tests.engine.test_engine_execute import recover_point
 
 
+def test_exact_values_and_render_disabled_scripts_do_not_require_worker(pi, node, interrupter, monkeypatch):
+    from bamboo_engine.template import template
+    from bamboo_engine.template.render_backend import SubprocessPoolRenderBackend
+
+    backend = SubprocessPoolRenderBackend(pool_size=1, os_harden=False, no_network=False)
+    backend.close()
+    monkeypatch.setattr(template, "get_render_backend", lambda: backend)
+    runtime = MagicMock()
+    runtime.get_data.return_value = Data(
+        {
+            "address": DataInput(need_render=True, value="${ip}"),
+            "script": DataInput(need_render=False, value="echo ${type}; echo ${x + 1}"),
+        },
+        {},
+    )
+    runtime.get_context_key_references.return_value = set()
+    runtime.get_context_values.return_value = [
+        ContextValue(key="${ip}", type=ContextValueType.PLAIN, value="192.0.2.1")
+    ]
+    runtime.get_service.return_value.execute.return_value = True
+    runtime.get_service.return_value.need_schedule.return_value = False
+    runtime.serialize_execution_data.return_value = ("{}", "json")
+
+    result = ServiceActivityHandler(node, runtime, interrupter).execute(pi, 1, 1, "v1")
+
+    saved = runtime.set_execution_data.call_args.kwargs["data"]
+    assert saved.inputs["address"] == "192.0.2.1"
+    assert saved.inputs["script"] == "echo ${type}; echo ${x + 1}"
+    assert saved.outputs._result is True
+    assert runtime.set_state.call_args.kwargs["to_state"] == states.FINISHED
+    assert result.next_node_id == node.target_nodes[0]
+
+
 @pytest.fixture
 def pi():
     return ProcessInfo(

@@ -17,6 +17,7 @@ from typing import Optional
 
 from bamboo_engine import states, metrics
 from bamboo_engine.config import Settings
+from bamboo_engine.exceptions import RenderInfrastructureError
 
 from bamboo_engine.context import Context
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
@@ -218,8 +219,10 @@ class ServiceActivityHandler(NodeHandler):
         node_type = "{}_{}".format(self.node.code, self.node.version)
         # try recover from executed recover point
         execute_success = False
+        render_infrastructure_failed = False
         if recover_point and recover_point.handler_data.service_executed:
-            execute_success = not recover_point.handler_data.service_execute_fail
+            render_infrastructure_failed = getattr(recover_point.handler_data, "render_infrastructure_failed", False)
+            execute_success = not (recover_point.handler_data.service_execute_fail or render_infrastructure_failed)
             service_data.outputs = FancyDict(
                 self.runtime.deserialize_execution_data(
                     recover_point.handler_data.execute_serialize_outputs,
@@ -229,7 +232,8 @@ class ServiceActivityHandler(NodeHandler):
         else:
             try:
                 execute_success = service.execute(data=service_data, root_pipeline_data=root_pipeline_data)
-            except Exception:
+            except Exception as exc:
+                render_infrastructure_failed = isinstance(exc, RenderInfrastructureError)
                 ENGINE_EXECUTE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 ex_data = traceback.format_exc()
                 service_data.outputs.ex_data = ex_data
@@ -247,6 +251,7 @@ class ServiceActivityHandler(NodeHandler):
                 ExecuteKeyPoint.SA_SERVICE_EXECUTE_DONE,
                 service_executed=True,
                 service_execute_fail=not execute_success,
+                render_infrastructure_failed=render_infrastructure_failed,
                 execute_serialize_outputs=serialize_ouputs,
                 execute_outputs_serializer=ouputs_serializer,
                 from_handler=True,
@@ -293,7 +298,7 @@ class ServiceActivityHandler(NodeHandler):
                     next_node_id=next_node_id,
                 )
 
-            if not self.node.error_ignorable:
+            if not self.node.error_ignorable or render_infrastructure_failed:
                 self.runtime.set_state(
                     node_id=self.node.id,
                     version=version,
@@ -304,11 +309,12 @@ class ServiceActivityHandler(NodeHandler):
 
                 self.runtime.set_execution_data(node_id=self.node.id, data=service_data)
 
-                context.extract_outputs(
-                    pipeline_id=top_pipeline_id,
-                    data_outputs=data.outputs,
-                    execution_data_outputs=service_data.outputs,
-                )
+                if not render_infrastructure_failed:
+                    context.extract_outputs(
+                        pipeline_id=top_pipeline_id,
+                        data_outputs=data.outputs,
+                        execution_data_outputs=service_data.outputs,
+                    )
 
                 return ExecuteResult(
                     should_sleep=True,
@@ -435,9 +441,11 @@ class ServiceActivityHandler(NodeHandler):
         # schedule
         schedule_success = False
         is_schedule_done = False
+        render_infrastructure_failed = False
         schedule.times += 1
         if recover_point and recover_point.handler_data.service_scheduled:
-            schedule_success = not recover_point.handler_data.service_schedule_fail
+            render_infrastructure_failed = getattr(recover_point.handler_data, "render_infrastructure_failed", False)
+            schedule_success = not (recover_point.handler_data.service_schedule_fail or render_infrastructure_failed)
             is_schedule_done = recover_point.handler_data.is_schedule_done
             service_data.outputs = FancyDict(
                 self.runtime.deserialize_execution_data(
@@ -453,7 +461,8 @@ class ServiceActivityHandler(NodeHandler):
                     root_pipeline_data=root_pipeline_data,
                     callback_data=callback_data,
                 )
-            except Exception:
+            except Exception as exc:
+                render_infrastructure_failed = isinstance(exc, RenderInfrastructureError)
                 ENGINE_SCHEDULE_EXCEPTION_COUNT.labels(type=node_type, hostname=self._hostname).inc()
                 service_data.outputs.ex_data = traceback.format_exc()
             else:
@@ -471,6 +480,7 @@ class ServiceActivityHandler(NodeHandler):
                 service_scheduled=True,
                 is_schedule_done=is_schedule_done,
                 service_schedule_fail=not schedule_success,
+                render_infrastructure_failed=render_infrastructure_failed,
                 schedule_serialize_outputs=serialize_ouputs,
                 schedule_outputs_serializer=ouputs_serializer,
                 from_handler=True,
@@ -527,7 +537,7 @@ class ServiceActivityHandler(NodeHandler):
                     )
 
             # schedule fail
-            if not self.node.error_ignorable:
+            if not self.node.error_ignorable or render_infrastructure_failed:
                 self.runtime.set_state(
                     node_id=self.node.id,
                     version=schedule.version,
@@ -536,12 +546,13 @@ class ServiceActivityHandler(NodeHandler):
                     ignore_boring_set=recover_point is not None,
                 )
 
-                context = Context(self.runtime, [], root_pipeline_inputs)
-                context.extract_outputs(
-                    pipeline_id=process_info.top_pipeline_id,
-                    data_outputs=data_outputs,
-                    execution_data_outputs=service_data.outputs,
-                )
+                if not render_infrastructure_failed:
+                    context = Context(self.runtime, [], root_pipeline_inputs)
+                    context.extract_outputs(
+                        pipeline_id=process_info.top_pipeline_id,
+                        data_outputs=data_outputs,
+                        execution_data_outputs=service_data.outputs,
+                    )
 
                 return ScheduleResult(
                     has_next_schedule=False,

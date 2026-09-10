@@ -28,8 +28,9 @@ from .eri import (
     NodeType,
     ScheduleType,
     State,
+    ExecuteResult,
 )
-from .exceptions import InvalidOperationError, NotFoundError
+from .exceptions import InvalidOperationError, NotFoundError, RenderInfrastructureError
 from .handler import HandlerFactory
 from .interrupt import (
     ExecuteInterrupter,
@@ -863,13 +864,36 @@ class Engine:
                     ENGINE_EXECUTE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                         time.time() - engine_pre_execute_start_at
                     )
-                    execute_result = handler.execute(
-                        process_info=process_info,
-                        loop=loop,
-                        inner_loop=inner_loop,
-                        version=version,
-                        recover_point=interrupter.recover_point,
-                    )
+                    try:
+                        execute_result = handler.execute(
+                            process_info=process_info,
+                            loop=loop,
+                            inner_loop=inner_loop,
+                            version=version,
+                            recover_point=interrupter.recover_point,
+                        )
+                    except RenderInfrastructureError as exc:
+                        # A renderer failure must not dispatch a plugin, child pipeline or branch.
+                        # Use the current state version so concurrent manual operations still win.
+                        logger.warning("root_pipeline[%s] node(%s) %s", root_pipeline_id, node.id, exc)
+                        outputs = self.runtime.get_execution_data_outputs(node.id)
+                        outputs.update(ex_data=str(exc), _result=False, _loop=loop, _inner_loop=inner_loop)
+                        self.runtime.set_execution_data_outputs(node.id, outputs)
+                        self.runtime.set_state(
+                            node_id=node.id,
+                            version=version,
+                            to_state=states.FAILED,
+                            set_archive_time=True,
+                            ignore_boring_set=ignore_boring_set,
+                        )
+                        execute_result = ExecuteResult(
+                            should_sleep=True,
+                            schedule_ready=False,
+                            schedule_type=None,
+                            schedule_after=-1,
+                            dispatch_processes=[],
+                            next_node_id=None,
+                        )
 
                 engine_post_execute_start_at = time.time()
                 interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_NODE_DONE, execute_result=execute_result)

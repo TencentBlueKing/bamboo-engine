@@ -15,6 +15,8 @@ from abc import ABCMeta
 
 import ujson as json
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from pipeline.core.constants import ESCAPED_CHARS
 from pipeline.core.data.expression import ConstantTemplate, deformat_constant_key
 from pipeline.core.flow.base import FlowNode
@@ -87,6 +89,8 @@ class ExclusiveGateway(Gateway):
                 logger.info("[{}] test {} with data {}".format(self.id, resolved_evaluate, data))
                 result = BoolRule(resolved_evaluate).test(data)
                 logger.info("[{}] {} test result: {}".format(self.id, resolved_evaluate, result))
+            except RenderInfrastructureError:
+                raise
             except Exception as e:
                 raise EvaluationException(
                     "evaluate[%s] fail with data[%s] message: %s"
@@ -132,6 +136,8 @@ class ConditionalParallelGateway(Gateway):
                 logger.info("[{}] test {} with data {}".format(self.id, resolved_evaluate, data))
                 result = BoolRule(resolved_evaluate).test(data)
                 logger.info("[{}] {} test result: {}".format(self.id, resolved_evaluate, result))
+            except RenderInfrastructureError:
+                raise
             except Exception as e:
                 raise EvaluationException(
                     "evaluate[%s] fail with data[%s] message: %s"

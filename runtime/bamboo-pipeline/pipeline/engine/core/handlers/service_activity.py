@@ -14,6 +14,8 @@ specific language governing permissions and limitations under the License.
 import logging
 import traceback
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from pipeline.conf import default_settings
 from pipeline.core.data.hydration import hydrate_node_data
 from pipeline.core.flow.activity import ServiceActivity
@@ -71,7 +73,8 @@ class ServiceActivityHandler(FlowElementHandler):
             monitoring = True
 
         element.setup_runtime_attrs(
-            id=element.id, root_pipeline_id=root_pipeline.id,
+            id=element.id,
+            root_pipeline_id=root_pipeline.id,
         )
 
         # pre_process inputs and execute service
@@ -79,6 +82,13 @@ class ServiceActivityHandler(FlowElementHandler):
             pre_execute_success = element.execute_pre_process(root_pipeline.data)
             if pre_execute_success:
                 success = element.execute(root_pipeline.data)
+        except RenderInfrastructureError:
+            # Let the runtime fail the node, bypassing business error-ignore handling.
+            if monitoring:
+                signals.service_activity_timeout_monitor_end.send(
+                    sender=element.__class__, node_id=element.id, version=version
+                )
+            raise
         except Exception:
             if element.error_ignorable:
                 # ignore exception

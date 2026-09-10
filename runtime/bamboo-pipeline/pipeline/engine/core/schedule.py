@@ -17,6 +17,8 @@ import traceback
 
 from django.db import transaction
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from pipeline.django_signal_valve import valve
 from pipeline.engine.core import context
 from pipeline.engine import exceptions, signals, states
@@ -145,6 +147,10 @@ def schedule(process_id, schedule_id, data_id=None):
                 success = service_act.schedule(parent_data, schedule_data)
                 if success is None:
                     success = True
+            except RenderInfrastructureError:
+                # Keep success=False so infrastructure failures cannot be auto-ignored.
+                ex_data = traceback.format_exc()
+                logger.error(ex_data)
             except Exception:
                 if service_act.error_ignorable:
                     success = True
