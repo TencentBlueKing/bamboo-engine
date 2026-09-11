@@ -42,6 +42,11 @@ def stall_threshold_seconds():
     return _get_setting("STALL_THRESHOLD_SECONDS", 1800)
 
 
+def scan_max_silent_seconds():
+    """周期扫描的静默上界，超过该时长的 root 视为历史遗留，不再进入取样池。0 表示不设上界。"""
+    return _get_setting("SCAN_MAX_SILENT_SECONDS", 7 * 24 * 3600)
+
+
 def scan_batch():
     return _get_setting("SCAN_BATCH", 200)
 
