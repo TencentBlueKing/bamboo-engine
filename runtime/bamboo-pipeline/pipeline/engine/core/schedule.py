@@ -77,7 +77,6 @@ def schedule(process_id, schedule_id, data_id=None):
             return
 
         # check whether the node is in a state waiting for scheduling
-        service_act = sched_service.service_act
         act_id = sched_service.activity_id
         version = sched_service.version
 
@@ -120,6 +119,16 @@ def schedule(process_id, schedule_id, data_id=None):
 
         celery_logger.info("[pipeline-trace] schedule node %s with version %s" % (act_id, version))
         with auto_release_schedule_lock(schedule_id):
+            # Another callback may have committed after our first read but before we acquired the lock.
+            # Use its latest outputs/counter and never revive a schedule it already finished.
+            try:
+                sched_service = ScheduleService.objects.get(id=schedule_id)
+            except ScheduleService.DoesNotExist:
+                return
+            if sched_service.is_finished:
+                return
+            service_act = sched_service.service_act
+
             # get data
             parent_data = get_schedule_parent_data(sched_service.id)
             if parent_data is None:
