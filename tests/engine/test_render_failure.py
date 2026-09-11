@@ -88,6 +88,7 @@ def test_render_failure_stops_node_before_business_dispatch(monkeypatch, node_ki
     runtime.set_state.return_value = "version"
     runtime.get_data_inputs.return_value = {}
     runtime.get_execution_data_outputs.return_value = {}
+    runtime.serialize_execution_data.return_value = ("{}", "json")
     runtime.get_service.side_effect = lambda **kwargs: pytest.fail("plugin resolved despite failed rendering")
     runtime.upsert_plain_context_values.side_effect = lambda *args, **kwargs: pytest.fail(
         "child context written after failed render"

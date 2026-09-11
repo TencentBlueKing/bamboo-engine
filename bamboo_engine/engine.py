@@ -30,6 +30,7 @@ from .eri import (
     Node,
     NodeType,
     ProcessInfo,
+    ScheduleResult,
     ScheduleType,
     Service,
     State,
@@ -793,8 +794,65 @@ class Engine:
             ]:
                 # 保存数据
                 self.runtime.set_execution_data(node_id=node.id, data=service_data)
+        except RenderInfrastructureError:
+            # Other operation hooks retain their historical best-effort behavior.
+            if hook == HookType.NODE_FINISH:
+                raise
         except Exception:
             pass
+
+    def _fail_rendering(self, node_id, version, loop, inner_loop, interrupter, exc=None, scheduling=False):
+        """Checkpoint the failure before database writes, without replaying service or hook work."""
+        action = "schedule" if scheduling else "execute"
+        if exc is None:
+            handler_data = interrupter.recover_point.handler_data
+            outputs = self.runtime.deserialize_execution_data(
+                getattr(handler_data, action + "_serialize_outputs"),
+                getattr(handler_data, action + "_outputs_serializer"),
+            )
+        else:
+            outputs = {"ex_data": str(exc)}
+        outputs.update(_result=False, _loop=loop, _inner_loop=inner_loop)
+        serialized, serializer = self.runtime.serialize_execution_data(outputs)
+        key_point = ScheduleKeyPoint.SCHEDULE_NODE_DONE if scheduling else ExecuteKeyPoint.EXECUTE_NODE_DONE
+        interrupter.check_and_set(
+            key_point,
+            from_handler=True,
+            render_infrastructure_failed=True,
+            **{
+                "service_" + action + "d": True,
+                "service_" + action + "_fail": True,
+                action + "_serialize_outputs": serialized,
+                action + "_outputs_serializer": serializer,
+            },
+        )
+        if scheduling:
+            result = ScheduleResult(has_next_schedule=False, schedule_after=-1, schedule_done=False, next_node_id=None)
+            interrupter.check_and_set(key_point, schedule_result=result)
+        else:
+            result = ExecuteResult(
+                should_sleep=True,
+                schedule_ready=False,
+                schedule_type=None,
+                schedule_after=-1,
+                dispatch_processes=[],
+                next_node_id=None,
+            )
+            interrupter.check_and_set(key_point, execute_result=result)
+
+        # The checkpoint above also covers interruptions while reading/writing the outputs or state.
+        saved_outputs = self.runtime.get_execution_data_outputs(node_id)
+        saved_outputs.update(outputs)
+        self.runtime.set_execution_data_outputs(node_id, saved_outputs)
+        self.runtime.set_state(
+            node_id=node_id,
+            version=version,
+            to_state=states.FAILED,
+            set_archive_time=True,
+            reset_error_ignored=True,
+            ignore_boring_set=interrupter.recover_point is not None,
+        )
+        return result
 
     # engine event
     @setup_gauge(ENGINE_RUNNING_PROCESSES)
@@ -903,6 +961,24 @@ class Engine:
 
                 node = self.runtime.get_node(current_node_id)
                 node_state = self.runtime.get_state_or_none(current_node_id)
+
+                if interrupter.recover_point and getattr(
+                    interrupter.recover_point.handler_data, "render_infrastructure_failed", False
+                ):
+                    # Keep the original version guard across repeated database interruptions.
+                    interrupter.check_and_set(
+                        ExecuteKeyPoint.SET_NODE_RUNNING_DONE,
+                        running_node_version=interrupter.recover_point.running_node_version,
+                    )
+                    self._fail_rendering(
+                        node.id,
+                        interrupter.recover_point.running_node_version,
+                        node_state.loop if node_state else 1,
+                        node_state.inner_loop if node_state else 1,
+                        interrupter,
+                    )
+                    self.runtime.sleep(process_id)
+                    return
 
                 loop = 1
                 inner_loop = 1
@@ -1043,27 +1119,8 @@ class Engine:
                             recover_point=interrupter.recover_point,
                         )
                     except RenderInfrastructureError as exc:
-                        # A renderer failure must not dispatch a plugin, child pipeline or branch.
-                        # Use the current state version so concurrent manual operations still win.
                         logger.warning("root_pipeline[%s] node(%s) %s", root_pipeline_id, node.id, exc)
-                        outputs = self.runtime.get_execution_data_outputs(node.id)
-                        outputs.update(ex_data=str(exc), _result=False, _loop=loop, _inner_loop=inner_loop)
-                        self.runtime.set_execution_data_outputs(node.id, outputs)
-                        self.runtime.set_state(
-                            node_id=node.id,
-                            version=version,
-                            to_state=states.FAILED,
-                            set_archive_time=True,
-                            ignore_boring_set=ignore_boring_set,
-                        )
-                        execute_result = ExecuteResult(
-                            should_sleep=True,
-                            schedule_ready=False,
-                            schedule_type=None,
-                            schedule_after=-1,
-                            dispatch_processes=[],
-                            next_node_id=None,
-                        )
+                        execute_result = self._fail_rendering(node.id, version, loop, inner_loop, interrupter, exc)
 
                 engine_post_execute_start_at = time.time()
                 interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_NODE_DONE, execute_result=execute_result)
@@ -1081,17 +1138,22 @@ class Engine:
 
                 # 节点运行成功并且不需要进行调度
                 if not execute_result.should_sleep and execute_result.next_node_id != node.id:
-                    self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
-                    if process_info.pipeline_stack:
-                        self.hook_dispatch(
-                            top_pipeline_id=process_info.top_pipeline_id,
-                            root_pipeline_id=process_info.root_pipeline_id,
-                            node_id=node.id,
-                            hook=HookType.NODE_FINISH,
-                            node=node,
-                        )
-                    if node.type == NodeType.ServiceActivity and self.runtime.get_config(
-                        RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
+                    try:
+                        self.runtime.node_finish(root_pipeline_id=root_pipeline_id, node_id=node.id)
+                        if process_info.pipeline_stack:
+                            self.hook_dispatch(
+                                top_pipeline_id=process_info.top_pipeline_id,
+                                root_pipeline_id=process_info.root_pipeline_id,
+                                node_id=node.id,
+                                hook=HookType.NODE_FINISH,
+                                node=node,
+                            )
+                    except RenderInfrastructureError as exc:
+                        execute_result = self._fail_rendering(node.id, version, loop, inner_loop, interrupter, exc)
+                    if (
+                        not execute_result.should_sleep
+                        and node.type == NodeType.ServiceActivity
+                        and self.runtime.get_config(RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value)
                     ):
                         self._set_snapshot(root_pipeline_id, node)
                         # 判断是否已经预约了回滚，如果已经预约，则kill掉当前的process，直接return
@@ -1372,7 +1434,13 @@ class Engine:
             )
             schedule_start = time.time()
 
-            if interrupter.recover_point and interrupter.recover_point.schedule_result:
+            if interrupter.recover_point and getattr(
+                interrupter.recover_point.handler_data, "render_infrastructure_failed", False
+            ):
+                schedule_result = self._fail_rendering(
+                    node.id, schedule.version, state.loop, state.inner_loop, interrupter, scheduling=True
+                )
+            elif interrupter.recover_point and interrupter.recover_point.schedule_result:
                 logger.info(
                     "root pipeline[%s] skip real schedule node %s, using recover result",
                     root_pipeline_id,
@@ -1384,14 +1452,19 @@ class Engine:
                 ENGINE_SCHEDULE_PRE_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                     time.time() - engine_pre_schedule_start_at
                 )
-                schedule_result = handler.schedule(
-                    process_info=process_info,
-                    loop=state.loop,
-                    inner_loop=state.inner_loop,
-                    schedule=schedule,
-                    callback_data=callback_data,
-                    recover_point=interrupter.recover_point,
-                )
+                try:
+                    schedule_result = handler.schedule(
+                        process_info=process_info,
+                        loop=state.loop,
+                        inner_loop=state.inner_loop,
+                        schedule=schedule,
+                        callback_data=callback_data,
+                        recover_point=interrupter.recover_point,
+                    )
+                except RenderInfrastructureError as exc:
+                    schedule_result = self._fail_rendering(
+                        node.id, schedule.version, state.loop, state.inner_loop, interrupter, exc, scheduling=True
+                    )
 
             engine_post_schedule_start_at = time.time()
             interrupter.check_and_set(ScheduleKeyPoint.SCHEDULE_NODE_DONE, schedule_result=schedule_result)
@@ -1421,16 +1494,27 @@ class Engine:
                 )
 
             if schedule_result.schedule_done:
+                try:
+                    self.runtime.node_finish(root_pipeline_id, node.id)
+                    self.hook_dispatch(
+                        top_pipeline_id=process_info.top_pipeline_id,
+                        root_pipeline_id=process_info.root_pipeline_id,
+                        node_id=node.id,
+                        hook=HookType.NODE_FINISH,
+                        node=node,
+                        callback_data=callback_data,
+                    )
+                except RenderInfrastructureError as exc:
+                    schedule_result = self._fail_rendering(
+                        node.id, schedule.version, state.loop, state.inner_loop, interrupter, exc, scheduling=True
+                    )
+                except Exception:
+                    # Preserve the old completion behavior for ordinary runtime hook errors.
+                    self.runtime.finish_schedule(schedule_id)
+                    raise
+
+            if schedule_result.schedule_done:
                 self.runtime.finish_schedule(schedule_id)
-                self.runtime.node_finish(root_pipeline_id, node.id)
-                self.hook_dispatch(
-                    top_pipeline_id=process_info.top_pipeline_id,
-                    root_pipeline_id=process_info.root_pipeline_id,
-                    node_id=node.id,
-                    hook=HookType.NODE_FINISH,
-                    node=node,
-                    callback_data=callback_data,
-                )
                 if node.type == NodeType.ServiceActivity and self.runtime.get_config(
                     RuntimeSettings.PIPELINE_ENABLE_ROLLBACK.value
                 ):
