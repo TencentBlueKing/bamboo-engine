@@ -19,6 +19,7 @@ from mako.template import Template
 from mako import lexer, codegen
 from mako.exceptions import MakoException
 
+from bamboo_engine.template.sandbox import harden_template_builtins
 from pipeline import exceptions
 from pipeline.conf.default_settings import MAKO_SAFETY_CHECK
 from pipeline.core.data.sandbox import SANDBOX
@@ -155,9 +156,7 @@ class ConstantTemplate(object):
                             mako_safety.SingleLinCodeExtractor(),
                         )
                     except ForbiddenMakoTemplateException as e:
-                        logger.warning(
-                            "forbidden by whitelist: {}, exception: {}".format(tpl, e)
-                        )
+                        logger.warning("forbidden by whitelist: {}, exception: {}".format(tpl, e))
                         continue
                     except Exception:
                         logger.exception("{} whitelist check error.".format(tpl))
@@ -179,6 +178,7 @@ class ConstantTemplate(object):
         except (MakoException, SyntaxError) as e:
             logger.error("pipeline resolve template[{}] error[{}]".format(template, e))
             return template
+        harden_template_builtins(tm)
         try:
             resolved = tm.render_unicode(**data)
         except Exception as e:

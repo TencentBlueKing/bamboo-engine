@@ -26,9 +26,6 @@ from .mako_utils.exceptions import ForbiddenMakoTemplateException
 
 logger = logging.getLogger("root")
 
-FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
-SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
-SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 # 与 ``MAKO_SANDBOX_SHIELD_WORDS`` 不重叠的"安全内建函数"集合。
 # 用于白名单模式下默认放行的根标识符。
@@ -144,6 +141,56 @@ DANGEROUS_ATTR_NAMES = frozenset(
 )
 
 
+# 生成器 / 协程 / 异步生成器 / traceback / frame 对象的反射属性。
+#
+# 这些名字都不是 ``__`` 前缀，因此逃过私有属性检查，也不在 :data:`DANGEROUS_ATTR_NAMES`
+# 里；但任意一个都能拿到一个 ``frame`` 对象，再顺着 ``frame.f_builtins`` /
+# ``frame.f_globals`` 直接取回**真实** builtins（``eval`` / ``exec`` / ``open`` /
+# ``__import__`` ...），是 deny-list 之外与配置无关的通用 RCE 入口：
+#
+#     ``${(i for i in [1]).gi_frame.f_builtins['eval']("__import__('os').system('id')")}``
+#
+# ``eval`` / ``exec`` 的实参是字符串常量，AST 不会解析其内容，所以一旦摸到 builtins
+# 字典，白名单 / 黑名单全部失效。这里把"通向 frame 的属性名"整体拒绝，从入口切断。
+FRAME_INTROSPECTION_ATTRS = frozenset(
+    {
+        # generator
+        "gi_frame",
+        "gi_code",
+        "gi_yieldfrom",
+        # coroutine
+        "cr_frame",
+        "cr_code",
+        "cr_await",
+        "cr_origin",
+        # async generator
+        "ag_frame",
+        "ag_code",
+        "ag_await",
+        # frame 对象
+        "f_back",
+        "f_builtins",
+        "f_globals",
+        "f_locals",
+        "f_code",
+        "f_trace",
+        # traceback 对象
+        "tb_frame",
+        "tb_next",
+        # 兼容老式函数内部属性别名（py2 时代，拦住无副作用）
+        "func_globals",
+        "func_code",
+        "func_closure",
+        "func_builtins",
+    }
+)
+
+# .format 保留 off/warn 下的存量兼容，仅 enforce 检查；format_map 仍始终拒绝。
+FORBIDDEN_TEMPLATE_METHODS = {"format_map"}
+SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
+SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
 class SingleLineNodeVisitor(ast.NodeVisitor):
     """
     遍历语法树节点，遇到魔术方法使用或 import 时，抛出异常
@@ -164,8 +211,21 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node):
         if node.attr.startswith("__"):
             raise ForbiddenMakoTemplateException("can not access private attribute")
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            raise ForbiddenMakoTemplateException("can not access frame or generator internals")
+        # 危险属性名（``os / sys / builtins / modules / system / popen ...``）与保留命名空间
+        # 属性链（``self.module... / context....``）改为 always-on 无条件拦截：它们原本只在
+        # ``WhitelistNameVisitor``（warn/enforce）里挡，导致 ``off`` 模式下仍可用
+        # ``${self.module.cache.util.os.system(...)}`` / ``${os.path.os.system(...)}`` /
+        # ``${json.codecs.builtins.exec(...)}`` 反向 pivot 到真实模块拿 RCE。这里下沉到
+        # ``SingleLineNodeVisitor``，任何模式（含 off）都切断这两条公共必经路径。
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            raise ForbiddenMakoTemplateException("can not access dangerous attribute")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
+        root_kind, root_name, _attrs = resolve_attr_chain(node)
+        if root_kind == "name" and root_name in MAKO_RESERVED_NAMESPACES:
+            raise ForbiddenMakoTemplateException("can not access mako reserved namespace attribute")
         self.generic_visit(node)
 
     def visit_Name(self, node):
@@ -223,6 +283,45 @@ def _deformat_var_key(key):
     return key
 
 
+def resolve_attr_chain(node):
+    attrs = [node.attr]
+    cur = node.value
+    while isinstance(cur, ast.Attribute):
+        attrs.append(cur.attr)
+        cur = cur.value
+    attrs.reverse()
+    if isinstance(cur, ast.Name):
+        return "name", cur.id, attrs
+    if isinstance(cur, ast.Call):
+        return "call_result", None, attrs
+    return "other", None, attrs
+
+
+def import_chain_violation(root, attrs, aliases):
+    if not root:
+        return None
+    roots = set(alias.split(".", 1)[0] for alias in aliases)
+    if root not in roots:
+        return None
+    best_len = -1
+    for index in range(len(attrs) + 1):
+        candidate = root if index == 0 else "{}.{}".format(root, ".".join(attrs[:index]))
+        if candidate in aliases:
+            best_len = index
+    if best_len < 0:
+        return "import path not configured"
+    if len(attrs[best_len:]) > 1:
+        return "import attr deeper than one level"
+    return None
+
+
+def configured_import_aliases():
+    from bamboo_engine.config import Settings
+
+    modules = getattr(Settings, "MAKO_SANDBOX_IMPORT_MODULES", None) or {}
+    return frozenset(alias for alias in modules.values() if alias)
+
+
 def build_allowed_names(context, *, extra=()):
     """根据当前渲染 context 与全局 ``Settings`` 计算白名单的根标识符集合。
 
@@ -264,9 +363,9 @@ class WhitelistNameVisitor(ast.NodeVisitor):
       * ``enforce``：抛 :exc:`ForbiddenMakoTemplateException`，由
         :func:`bamboo_engine.utils.mako_utils.checker.check_mako_template_safety` 捕获。
 
-    本 visitor 还显式拦截 :data:`MAKO_RESERVED_NAMESPACES` 中的标识符，
-    无论是否被传入 ``allowed_names`` 都会被拒，避免误把 ``self/context/...`` 加进
-    上下文导致 SSTI 链路被放行。
+    光杆保留名（:data:`MAKO_RESERVED_NAMESPACES`）放行；保留名上的属性链仍拒，
+    避免 ``self.module...`` 一类 SSTI 链路被放行。单下划线 attr 不再一刀切，
+    仅双下划线与 :data:`DANGEROUS_ATTR_NAMES` 在属性节点上拦截。
 
     支持 ``ListComp / SetComp / DictComp / GeneratorExp / Lambda`` 引入的局部
     绑定——这些临时变量会被压入作用域栈，在子树访问完后自动弹出。
@@ -316,23 +415,32 @@ class WhitelistNameVisitor(ast.NodeVisitor):
         if not isinstance(node.ctx, ast.Load):
             return
         if node.id in MAKO_RESERVED_NAMESPACES:
-            self._violate(node.id, "mako reserved namespace")
             return
         if not self._name_allowed(node.id):
             self._violate(node.id, "not in whitelist")
 
     def visit_Attribute(self, node):
-        # 单下划线 attr 拒绝：堵 ``context._with_template / context._kwargs`` 这类
-        # Python "半私有" 通道（双下划线已经在 ``SingleLineNodeVisitor`` 拦过，这里
-        # 顺手收紧成单下划线，覆盖更广）。
-        if node.attr.startswith("_"):
+        if self.mode == "enforce" and node.attr == "format":
+            self._violate(node.attr, "forbidden method")
+            return
+        if node.attr.startswith("__"):
             self._violate(node.attr, "private attribute")
             return
-        # 危险 attr 名拒绝：堵 ``${os.path.os.popen(...)}`` /
-        # ``${datetime.sys.modules['os'].popen(...)}`` 类反向引用链路。
         if node.attr in DANGEROUS_ATTR_NAMES:
             self._violate(node.attr, "dangerous attribute")
             return
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            self._violate(node.attr, "frame or generator internals")
+            return
+        kind, root, attrs = resolve_attr_chain(node)
+        if kind == "name" and root in MAKO_RESERVED_NAMESPACES:
+            self._violate(root, "mako reserved namespace attribute")
+            return
+        if kind == "name":
+            reason = import_chain_violation(root, attrs, configured_import_aliases())
+            if reason:
+                self._violate(root, reason)
+                return
         self.generic_visit(node)
 
     def _enter_comprehension(self, node):
