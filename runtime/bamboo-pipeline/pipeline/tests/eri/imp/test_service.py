@@ -132,6 +132,24 @@ class ServiceWrapperTestCase(TestCase):
         self.assertEqual(ServiceWrapper(S3()).schedule_type(), ScheduleType.CALLBACK)
         self.assertEqual(ServiceWrapper(S4()).schedule_type(), ScheduleType.MULTIPLE_CALLBACK)
 
+    def test_callback_lock_retryable(self):
+        class S(Service):
+            def __init__(self):
+                self.callback_data = None
+
+            def execute(self, data, parent_data):
+                pass
+
+            def callback_lock_retryable(self, callback_data=None):
+                self.callback_data = callback_data
+                return True
+
+        service = S()
+        callback_data = {"task_success": True}
+
+        self.assertTrue(ServiceWrapper(service).callback_lock_retryable(callback_data=callback_data))
+        self.assertEqual(service.callback_data, callback_data)
+
     def test_is_schedule_done(self):
         class S(Service):
             __need_schedule__ = True
