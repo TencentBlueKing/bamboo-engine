@@ -51,6 +51,7 @@ jobs:
         cd runtime/bamboo-pipeline/test
         poetry run coverage run --source="." manage.py test pipeline.tests
         poetry run coverage report -m
+        poetry run pytest --ds=pipeline_sdk_use.settings pipeline/contrib/diagnostics/tests -q
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
