@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from datetime import timedelta
+from io import StringIO
 
+from django.core.management import call_command
 from django.utils import timezone
 
 from pipeline.contrib.diagnostics import scanner
@@ -53,3 +55,33 @@ class ScanStalledRootsTest(DiagnosticsTestCase):
     def test_disabled_returns_empty(self):
         with self.settings(PIPELINE_DIAGNOSTICS_SCAN_ENABLED=False):
             self.assertEqual(scanner.scan_stalled_roots(), [])
+
+    def test_default_bound_keeps_recent_case_ahead_of_history(self):
+        self._proc("root-ancient", beat_delta=8 * 24 * 3600)
+        self._proc("root-recent", beat_delta=3600)
+
+        cases = scanner.scan_stalled_roots(threshold_seconds=1800, batch=1, confirm_seconds=0)
+
+        self.assertEqual([case.root_pipeline_id for case in cases], ["root-recent"])
+
+    def test_configured_bound_and_explicit_zero_override(self):
+        self._proc("root-old", beat_delta=3 * 3600)
+        with self.settings(PIPELINE_DIAGNOSTICS_SCAN_MAX_SILENT_SECONDS=7200):
+            self.assertEqual(scanner.scan_stalled_roots(threshold_seconds=1800, confirm_seconds=0), [])
+            cases = scanner.scan_stalled_roots(
+                threshold_seconds=1800, confirm_seconds=0, max_silent_seconds=0
+            )
+
+        self.assertEqual([case.root_pipeline_id for case in cases], ["root-old"])
+
+    def test_command_max_silent_zero_backfills_ancient_case(self):
+        self._proc("root-ancient", beat_delta=400 * 24 * 3600)
+        output = StringIO()
+
+        call_command("scan_stuck_cases", "--threshold", "1800", "--confirm", "0", stdout=output)
+        self.assertFalse(DiagnosticCase.objects.filter(root_pipeline_id="root-ancient").exists())
+        call_command(
+            "scan_stuck_cases", "--threshold", "1800", "--confirm", "0", "--max-silent", "0", stdout=output
+        )
+
+        self.assertTrue(DiagnosticCase.objects.filter(root_pipeline_id="root-ancient").exists())

@@ -21,6 +21,8 @@ from pipeline.django_signal_valve import valve
 from pipeline.engine import signals
 from pipeline.engine.models import Data, ScheduleService, Status
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 from .base import FlowElementHandler
 
 logger = logging.getLogger("pipeline_engine")
@@ -80,6 +82,13 @@ class ServiceActivityHandler(FlowElementHandler):
             pre_execute_success = element.execute_pre_process(root_pipeline.data)
             if pre_execute_success:
                 success = element.execute(root_pipeline.data)
+        except RenderInfrastructureError:
+            # Let the runtime fail the node, bypassing business error-ignore handling.
+            if monitoring:
+                signals.service_activity_timeout_monitor_end.send(
+                    sender=element.__class__, node_id=element.id, version=version
+                )
+            raise
         except Exception:
             if element.error_ignorable:
                 # ignore exception

@@ -12,63 +12,40 @@ specific language governing permissions and limitations under the License.
 """
 
 # mock str return value of Built-in Functions，make str(func) return "func" rather than "<built-in function func>"
+#
+# 渲染沙箱的构造原语已下沉到 Django-free 的 ``pipeline.core.data.sandbox_builder``，使无网无凭证的
+# 隔离渲染子进程能复用**同一套**构造逻辑重建沙箱（不必 import Django / 业务 app / 凭证）。本模块保留
+# Django 侧入口（读 settings、维护进程内全局 ``SANDBOX``）与历史向后兼容符号
+# （``MockStrMeta`` / ``_shield_words`` / ``_import_modules`` / ``ModuleObject``）。
 
-import builtins
-import importlib
-
+from pipeline.core.data import sandbox_builder
 from pipeline.conf import default_settings
 
 SANDBOX = {}
 
+# 向后兼容原语：re-export Django-free 实现，保证进程内构造与隔离 worker 重建同源、不漂移。
+ModuleObject = sandbox_builder.ModuleObject
+_shield_words = sandbox_builder.shield_words
+_import_modules = sandbox_builder.import_modules
 
-class MockStrMeta(type):
+
+class MockStrMeta(sandbox_builder.MockStrMeta):
+    """历史 ``MockStrMeta``：动态定义 mock 类时自动注册进模块级 ``SANDBOX``。
+
+    外部代码与既有测试依赖这一副作用，故保留；``__str__`` / ``__call__`` 复用
+    ``sandbox_builder.MockStrMeta``，此处仅额外维持全局注册行为。
+    """
+
     def __new__(cls, name, bases, attrs):
-        new_cls = super(MockStrMeta, cls).__new__(cls, name, bases, attrs)
+        new_cls = super().__new__(cls, name, bases, attrs)
         SANDBOX.update({new_cls.str_return: new_cls})
         return new_cls
 
-    def __str__(cls):
-        return cls.str_return
 
-    def __call__(cls, *args, **kwargs):
-        return cls.call(*args, **kwargs)
-
-
-def _shield_words(sandbox, words):
-    for shield_word in words:
-        sandbox[shield_word] = None
-
-
-class ModuleObject:
-    def __init__(self, sub_paths, module):
-        if len(sub_paths) == 1:
-            setattr(self, sub_paths[0], module)
-            return
-        setattr(self, sub_paths[0], ModuleObject(sub_paths[1:], module))
-
-
-def _import_modules(sandbox, modules):
-    for mod_path, alias in modules.items():
-        mod = importlib.import_module(mod_path)
-        sub_paths = alias.split(".")
-        if len(sub_paths) == 1:
-            sandbox[alias] = mod
-        else:
-            sandbox[sub_paths[0]] = ModuleObject(sub_paths[1:], mod)
-
-
-def _mock_builtins():
-    """
-    @summary: generate mock class of built-in functions like id,int
-    """
-    for func_name in dir(builtins):
-        if func_name.lower() == func_name and not func_name.startswith("_"):
-            new_func_name = "Mock{}".format(func_name.capitalize())
-            MockStrMeta(new_func_name, (object,), {"call": getattr(builtins, func_name), "str_return": func_name})
-
-
-_mock_builtins()
-
-_shield_words(SANDBOX, default_settings.MAKO_SANDBOX_SHIELD_WORDS)
-
-_import_modules(SANDBOX, default_settings.MAKO_SANDBOX_IMPORT_MODULES)
+# 进程内渲染沙箱：委托同源 Django-free builder 构造，仅在此读取 Django settings。
+SANDBOX.update(
+    sandbox_builder.build_sandbox(
+        default_settings.MAKO_SANDBOX_SHIELD_WORDS,
+        default_settings.MAKO_SANDBOX_IMPORT_MODULES,
+    )
+)

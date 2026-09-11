@@ -13,7 +13,6 @@ specific language governing permissions and limitations under the License.
 
 
 from django.db import migrations
-from django.db.models.signals import post_save
 
 
 def reverse_func(apps, schema_editor):

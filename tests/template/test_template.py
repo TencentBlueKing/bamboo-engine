@@ -85,7 +85,7 @@ def test_render():
     assert simple_dict_template.render({"a": {"a": "b"}}) == {"a": "b"}
 
     nested_dict_template = Template("${a[0][3]['a']}")
-    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1,2,3]}], [5, 6, 7, 8]]}) == [1,2,3]
+    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1, 2, 3]}], [5, 6, 7, 8]]}) == [1, 2, 3]
 
     type_error_template = Template("${a[1]}")
     assert type_error_template.render({"a": 1}) == "${a[1]}"
@@ -94,14 +94,16 @@ def test_render():
 
 
 def test_render__with_sandbox():
-
     r1 = Template("""${exec(print(''))}""").render({})
     assert r1 == """${exec(print(''))}"""
 
     r2 = Template("""${datetime.datetime.now().strftime("%Y")}""").render({})
     assert r2 == """${datetime.datetime.now().strftime("%Y")}"""
 
-    Settings.MAKO_SANDBOX_IMPORT_MODULES = {"datetime": "datetime"}
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "datetime": "datetime",
+        "datetime.datetime": "datetime.datetime",
+    }
 
     r2 = Template("""${datetime.datetime.now().strftime("%Y")}""").render({})
     year = datetime.datetime.now().strftime("%Y")
@@ -154,11 +156,13 @@ def whitelist_mode():
         Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = original_extra
 
 
-def test_mako_self_module_namespace_executes_when_whitelist_off(whitelist_mode):
-    whitelist_mode("off")
+@pytest.mark.parametrize("mode", ["off", "warn", "enforce"])
+def test_mako_self_module_namespace_blocked_in_all_modes(whitelist_mode, mode):
+    # 保留命名空间属性链下沉到 always-on 层后，off / warn 也不再解析出真实模块，
+    # 经典 ``${self.module.cache.util.os...}`` 链在所有模式下都 inert。
+    whitelist_mode(mode)
     payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
-    rendered = Template(payload).render({})
-    assert "OFF" in rendered
+    assert Template(payload).render({}) == payload
 
 
 def test_mako_whitelist_default_blocks_self_module_namespace():
@@ -207,19 +211,26 @@ def test_mako_whitelist_blocks_dangerous_attr_chain(whitelist_mode, payload):
         Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        "${context._kwargs}",
-        "${context._with_template}",
-        "${context._data}",
-        "${obj._secret}",
-        "${obj.public._private}",
-    ],
-)
-def test_mako_whitelist_blocks_single_underscore_attr(whitelist_mode, payload):
+def test_mako_whitelist_allows_user_single_underscore_attr(whitelist_mode):
     whitelist_mode("enforce")
-    rendered = Template({"x": payload}).render({"obj": object()})
+
+    class Bag(object):
+        def __init__(self):
+            self._module = [{"gamesvr": "1.1.1.1"}]
+
+    out = Template("${obj._module[0]['gamesvr']}").render({"obj": Bag()})
+    assert out == "1.1.1.1"
+
+
+def test_mako_whitelist_allows_bare_reserved_name(whitelist_mode):
+    whitelist_mode("enforce")
+    assert Template("${parent + ''}").render({"parent": "alice"}) == "alice"
+
+
+def test_mako_whitelist_blocks_self_module_even_if_self_in_context(whitelist_mode):
+    whitelist_mode("enforce")
+    payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+    rendered = Template({"x": payload}).render({"self": "ignored"})
     assert rendered["x"] == payload
 
 
@@ -242,12 +253,31 @@ def test_mako_whitelist_allows_imported_modules(whitelist_mode):
     original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
     Settings.MAKO_SANDBOX_IMPORT_MODULES = {
         "datetime": "datetime",
+        "datetime.datetime": "datetime.datetime",
         "os.path": "os.path",
+        "json": "json",
+        "hashlib": "hashlib",
     }
     try:
         assert Template('${os.path.join("a", "b")}').render({}) == "a/b"
         out = Template('${datetime.datetime.now().strftime("%Y")}').render({})
         assert len(out) == 4 and out.isdigit()
+        assert Template("${json.dumps({'a': 1})}").render({})
+        digest = Template("${hashlib.md5(b'x').hexdigest()}").render({})
+        assert len(digest) == 32
+        deep = "${json.codecs.builtins.exec('1')}"
+        assert Template({"x": deep}).render({})["x"] == deep
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+
+def test_mako_whitelist_datetime_now_requires_configured_class_alias(whitelist_mode):
+    whitelist_mode("enforce")
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {"datetime": "datetime"}
+    try:
+        payload = '${datetime.datetime.now().strftime("%Y")}'
+        assert Template({"x": payload}).render({})["x"] == payload
     finally:
         Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
 
@@ -355,7 +385,6 @@ def test_mako_nested_dunder_expression_is_blocked():
 @pytest.mark.parametrize(
     "payload",
     [
-        '${"{0.__class__}".format("")}',
         '${"{value.__class__}".format_map({"value": ""})}',
     ],
 )
@@ -380,10 +409,7 @@ def test_mako_format_private_lookup_is_blocked(payload):
         # BinOp 字符串拼接绕过字面量 dunder 检测
         "${getattr('', '__cl' + 'ass__')}",
         # 完整 subclasses RCE 链（多重 getattr + 字符串拼接）
-        (
-            "${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__'),"
-            " '__sub' + 'classes__')()}"
-        ),
+        ("${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__')," " '__sub' + 'classes__')()}"),
         # 通过 dir(0)[0][0] 间接得到下划线字符再拼出 __class__
         "${getattr('', dir(0)[0][0] + dir(0)[0][0] + 'class' + dir(0)[0][0] + dir(0)[0][0])}",
         # type / object / vars 等 callable 走 Name 调用
@@ -409,3 +435,141 @@ def test_mako_latent_bypass_is_inert_at_render(payload):
         "Mako sandbox bypass regression: payload {!r} rendered to {!r}, expected inert echo. "
         "Check Settings.MAKO_SANDBOX_SHIELD_WORDS completeness."
     ).format(payload, rendered)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    [
+        "gi_frame",
+        "gi_code",
+        "cr_frame",
+        "ag_frame",
+        "f_back",
+        "f_builtins",
+        "f_globals",
+        "f_locals",
+        "f_code",
+        "tb_frame",
+        "tb_next",
+        "func_globals",
+    ],
+)
+def test_mako_frame_introspection_attr_is_blocked(attr):
+    # 无论根对象是什么，通向 frame 的反射属性名一律在 always-on 的 SingleLineNodeVisitor 拒绝。
+    _assert_forbidden_template("${obj.%s}" % attr)
+
+
+def test_mako_generator_frame_builtins_gadget_is_inert_in_all_modes(whitelist_mode):
+    # 生成器帧 -> 真实 builtins -> eval 的通用 RCE：off / warn / enforce 三档都必须拦。
+    payload = "${(i for i in [1]).gi_frame.f_builtins['eval']" "(\"__import__('os').popen('echo PWNED').read()\")}"
+    for mode in ("off", "warn", "enforce"):
+        whitelist_mode(mode)
+        assert Template(payload).render({}) == payload
+
+
+def test_restricted_builtins_strips_execution_primitives():
+    from bamboo_engine.template import sandbox
+
+    rb = sandbox.restricted_builtins()
+    for name in ("eval", "exec", "compile", "open", "input", "breakpoint"):
+        assert name not in rb
+    # 不能误伤 Mako codegen / 业务表达式需要的安全内建，以及 C 扩展惰性 import 依赖的 __import__。
+    for name in ("len", "str", "range", "int", "dict", "enumerate", "__import__"):
+        assert name in rb
+
+
+def test_harden_template_builtins_is_defense_in_depth(whitelist_mode, monkeypatch):
+    # 模拟未来某条未被枚举到的"通向 frame"链路：临时清空属性 deny-list，证明即便 AST 放过，
+    # 渲染期受限 builtins 也已摘掉 eval，攻击者拿不到执行原语；同时不影响安全内建（len）。
+    whitelist_mode("off")
+    monkeypatch.setattr(mako_safety, "FRAME_INTROSPECTION_ATTRS", frozenset())
+    pwn = "${(i for i in [1]).gi_frame.f_builtins['eval']('1+1')}"
+    assert Template(pwn).render({}) == pwn
+    safe = "${(i for i in [1]).gi_frame.f_builtins['len']([1, 2, 3])}"
+    assert Template(safe).render({}) == "3"
+
+
+@pytest.mark.parametrize("mode", ["off", "warn", "enforce"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '${os.path.os.system("echo PWNED")}',
+        '${os.path.genericpath.os.popen("echo PWNED").read()}',
+        '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+        '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+        '${json.codecs.builtins.exec("import os")}',
+    ],
+)
+def test_mako_dangerous_attr_chain_blocked_in_all_modes(whitelist_mode, mode, payload):
+    # 危险属性名下沉 always-on 后，模块反向 pivot 在 off / warn / enforce 三档都 inert，
+    # 不再依赖白名单模式（此前 off 模式可直接拿到真实 os / builtins 模块执行命令）。
+    whitelist_mode(mode)
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "datetime": "datetime",
+        "re": "re",
+        "os.path": "os.path",
+        "json": "json",
+    }
+    try:
+        assert Template({"x": payload}).render({})["x"] == payload
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+
+@pytest.mark.parametrize("mode", ["off", "warn", "enforce"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "${context.lookup}",
+        "${local.something}",
+        "${parent.foo}",
+        "${caller.body()}",
+        "${pageargs.x}",
+    ],
+)
+def test_mako_reserved_namespace_chain_blocked_in_all_modes(whitelist_mode, mode, payload):
+    # 保留命名空间属性链（即使不以危险属性收尾）在所有模式下 inert。
+    whitelist_mode(mode)
+    assert Template(payload).render({}) == payload
+
+
+def test_filter_import_modules_rejects_dangerous_keeps_safe():
+    from bamboo_engine.template import sandbox
+
+    src = {
+        "os": "os",
+        "subprocess": "subprocess",
+        "operator": "operator",
+        "pickle": "pickle",
+        "importlib": "importlib",
+        "ctypes": "ctypes",
+        "os.path": "os.path",
+        "json": "json",
+        "re": "re",
+    }
+    safe = sandbox.filter_import_modules(src)
+    # 危险模块被拒绝；os.path（安全子模块）与普通模块保留。
+    assert set(safe) == {"os.path", "json", "re"}
+
+
+def test_sandbox_get_does_not_expose_dangerous_module():
+    from bamboo_engine.template import sandbox
+
+    original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
+    Settings.MAKO_SANDBOX_IMPORT_MODULES = {
+        "os": "os",
+        "subprocess": "subprocess",
+        "os.path": "os.path",
+        "json": "json",
+    }
+    try:
+        data = sandbox.get()
+        # 直接注入的 os / subprocess 被 deny-list 拦掉，不进入渲染命名空间。
+        assert "subprocess" not in data
+        assert getattr(data.get("os"), "system", None) is None
+        # os.path 仍作为 ModuleObject 暴露 join 等安全路径操作；普通模块保留。
+        assert data.get("os") is not None and hasattr(data["os"], "path")
+        assert "json" in data
+    finally:
+        Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports

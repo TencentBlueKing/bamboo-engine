@@ -17,15 +17,18 @@ import re
 
 from mako import parsetree
 
+from bamboo_engine.utils.mako_safety import (
+    FRAME_INTROSPECTION_ATTRS,
+    configured_import_aliases,
+    import_chain_violation,
+    resolve_attr_chain,
+)
 from pipeline.utils.mako_utils.code_extract import MakoNodeCodeExtractor
 from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
 
 
 logger = logging.getLogger("root")
 
-FORBIDDEN_TEMPLATE_METHODS = {"format", "format_map"}
-SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
-SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 # 与 ``MAKO_SANDBOX_SHIELD_WORDS`` 不重叠的"安全内建函数"集合。
 # 详见 ``bamboo_engine.utils.mako_safety.SAFE_BUILTIN_NAMES`` 的同步实现。
@@ -116,6 +119,11 @@ DANGEROUS_ATTR_NAMES = frozenset(
     }
 )
 
+# .format 保留 off/warn 下的存量兼容，仅 enforce 检查；format_map 仍始终拒绝。
+FORBIDDEN_TEMPLATE_METHODS = {"format_map"}
+SAFE_FILTERS = {"n", "h", "x", "u", "trim", "entity", "unicode", "str"}
+SAFE_DECODE_FILTER_PATTERN = re.compile(r"^decode\.[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
 
 class SingleLineNodeVisitor(ast.NodeVisitor):
     """
@@ -137,8 +145,18 @@ class SingleLineNodeVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node):
         if node.attr.startswith("__"):
             raise ForbiddenMakoTemplateException("can not access private attribute")
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            raise ForbiddenMakoTemplateException("can not access frame or generator internals")
+        # 与 ``bamboo_engine.utils.mako_safety.SingleLineNodeVisitor`` 对齐：危险属性名与保留
+        # 命名空间属性链下沉为 always-on 无条件拦截，堵住 off 模式下的模块反向 pivot 与
+        # ``self.module...`` 链路。
+        if node.attr in DANGEROUS_ATTR_NAMES:
+            raise ForbiddenMakoTemplateException("can not access dangerous attribute")
         if node.attr in FORBIDDEN_TEMPLATE_METHODS:
             raise ForbiddenMakoTemplateException("can not call forbidden method")
+        root_kind, root_name, _attrs = resolve_attr_chain(node)
+        if root_kind == "name" and root_name in MAKO_RESERVED_NAMESPACES:
+            raise ForbiddenMakoTemplateException("can not access mako reserved namespace attribute")
         self.generic_visit(node)
 
     def visit_Name(self, node):
@@ -281,20 +299,32 @@ class WhitelistNameVisitor(ast.NodeVisitor):
         if not isinstance(node.ctx, ast.Load):
             return
         if node.id in MAKO_RESERVED_NAMESPACES:
-            self._violate(node.id, "mako reserved namespace")
             return
         if not self._name_allowed(node.id):
             self._violate(node.id, "not in whitelist")
 
     def visit_Attribute(self, node):
-        # 与新引擎 ``bamboo_engine.utils.mako_safety.WhitelistNameVisitor.visit_Attribute``
-        # 保持一致：单下划线前缀 + 危险 attr 名一律拒绝，堵反向引用 SSTI 链路。
-        if node.attr.startswith("_"):
+        if self.mode == "enforce" and node.attr == "format":
+            self._violate(node.attr, "forbidden method")
+            return
+        if node.attr.startswith("__"):
             self._violate(node.attr, "private attribute")
             return
         if node.attr in DANGEROUS_ATTR_NAMES:
             self._violate(node.attr, "dangerous attribute")
             return
+        if node.attr in FRAME_INTROSPECTION_ATTRS:
+            self._violate(node.attr, "frame or generator internals")
+            return
+        kind, root, attrs = resolve_attr_chain(node)
+        if kind == "name" and root in MAKO_RESERVED_NAMESPACES:
+            self._violate(root, "mako reserved namespace attribute")
+            return
+        if kind == "name":
+            reason = import_chain_violation(root, attrs, configured_import_aliases())
+            if reason:
+                self._violate(root, reason)
+                return
         self.generic_visit(node)
 
     def _enter_comprehension(self, node):

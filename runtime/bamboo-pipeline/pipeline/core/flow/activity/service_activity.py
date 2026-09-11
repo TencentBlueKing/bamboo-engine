@@ -17,13 +17,10 @@ from copy import deepcopy
 from django.utils.translation import gettext_lazy as _
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
-from pipeline.core.flow.io import (
-    BooleanItemSchema,
-    InputItem,
-    IntItemSchema,
-    OutputItem,
-)
+from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
 from pipeline.utils.utils import convert_bytes_to_str
+
+from bamboo_engine.exceptions import RenderInfrastructureError
 
 
 class Service(object, metaclass=ABCMeta):
@@ -46,9 +43,7 @@ class Service(object, metaclass=ABCMeta):
             name=_("当前流程循环次数"),
             key="_inner_loop",
             type="int",
-            schema=IntItemSchema(
-                description=_("在当前流程节点循环执行次数，由父流程重新进入时会重置（仅支持新版引擎）")
-            ),
+            schema=IntItemSchema(description=_("在当前流程节点循环执行次数，由父流程重新进入时会重置（仅支持新版引擎）")),
         ),
     ]
 
@@ -113,6 +108,9 @@ class Service(object, metaclass=ABCMeta):
 
     def multi_callback_enabled(self):
         return getattr(self, self.multi_callback_determine_attr, False)
+
+    def callback_lock_retryable(self, callback_data=None):
+        return False
 
     def clean_status(self):
         setattr(self, self.schedule_result_attr, False)
@@ -241,7 +239,6 @@ class ServiceActivity(Activity):
             self._prepared_outputs = self.data.outputs_copy()
 
     def __setstate__(self, state):
-
         for attr, obj in list(state.items()):
             # py2 pickle dumps data compatible
             if isinstance(attr, bytes):
@@ -271,6 +268,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.execute(self.data, parent_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False
@@ -309,6 +308,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.schedule(self.data, parent_data, callback_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False

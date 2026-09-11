@@ -33,6 +33,57 @@ from bamboo_engine.handler import ScheduleResult
 from bamboo_engine.interrupt import ScheduleInterrupter, ScheduleKeyPoint
 
 
+@pytest.mark.parametrize("schedule_type", [ScheduleType.POLL, ScheduleType.CALLBACK, ScheduleType.MULTIPLE_CALLBACK])
+def test_render_failure_during_schedule_cannot_be_ignored(
+    node_id, pi, state, schedule, node, interrupter, monkeypatch, schedule_type
+):
+    from bamboo_engine.eri import ExecutionData
+    from bamboo_engine.handlers.service_activity import ServiceActivityHandler  # noqa
+    from bamboo_engine.template import Template, template
+    from tests.template.test_render_backend_failures import pool
+
+    node.id = node_id
+    node.error_ignorable = True
+    schedule.type = schedule_type
+    runtime = MagicMock()
+    runtime.get_process_info.return_value = pi
+    runtime.get_state.return_value = state
+    runtime.get_schedule.return_value = schedule
+    runtime.get_node.return_value = node
+    runtime.apply_schedule_lock.return_value = True
+    runtime.get_data_inputs.return_value = {}
+    runtime.get_data_outputs.return_value = {}
+    runtime.get_execution_data.return_value = ExecutionData(inputs={}, outputs={})
+    runtime.get_execution_data_outputs.return_value = {}
+    runtime.serialize_execution_data.return_value = ("{}", "json")
+    service = runtime.get_service.return_value
+    service.schedule_type.return_value = schedule_type
+    service.schedule.side_effect = lambda **kwargs: Template("${x + 1}").render({"x": 2})
+    interrupter.runtime.interrupt_errors.return_value = ()
+    backend = pool(fallback_inprocess=True)
+
+    def fail_start():
+        raise OSError("synthetic process quota")
+
+    monkeypatch.setattr(backend, "_spawn_worker", fail_start)
+    monkeypatch.setattr(template, "get_render_backend", lambda: backend)
+    try:
+        Engine(runtime).schedule(pi.process_id, node_id, schedule.id, interrupter, {})
+    finally:
+        backend.close()
+
+    assert runtime.set_state.call_args.kwargs["to_state"] == states.FAILED
+    assert runtime.set_state.call_args.kwargs["version"] == state.version
+    outputs = runtime.set_execution_data.call_args.kwargs["data"].outputs
+    assert outputs["_result"] is False
+    assert "isolated render failed" in outputs["ex_data"]
+    runtime.release_schedule_lock.assert_called_once_with(schedule.id)
+    runtime.execute.assert_not_called()
+    runtime.finish_schedule.assert_not_called()
+    runtime.set_next_schedule.assert_not_called()
+    assert ScheduleInterruptPoint.from_json(interrupter.check_point.to_json()).handler_data.render_infrastructure_failed
+
+
 @pytest.fixture
 def node_id():
     return "nid"
@@ -127,7 +178,8 @@ def recover_point():
     return ScheduleInterruptPoint(name="name")
 
 
-def test_schedule__lock_get_failed(node_id, schedule_id, state, pi, schedule, interrupter):
+@mock.patch("bamboo_engine.engine.random.randint", return_value=5)
+def test_schedule__lock_get_failed(random_randint, node_id, schedule_id, state, pi, schedule, interrupter):
     runtime = MagicMock()
     runtime.get_process_info = MagicMock(return_value=pi)
     runtime.apply_schedule_lock = MagicMock(return_value=False)
@@ -145,7 +197,8 @@ def test_schedule__lock_get_failed(node_id, schedule_id, state, pi, schedule, in
     assert runtime.set_next_schedule.call_args.kwargs["node_id"] == node_id
     assert runtime.set_next_schedule.call_args.kwargs["schedule_id"] == schedule_id
     assert runtime.set_next_schedule.call_args.kwargs["callback_data_id"] is None
-    assert runtime.set_next_schedule.call_args.kwargs["schedule_after"] <= 5
+    assert runtime.set_next_schedule.call_args.kwargs["schedule_after"] == 5
+    random_randint.assert_called_once_with(1, 5)
     runtime.beat.assert_not_called()
 
     assert interrupter.check_point.name == ScheduleKeyPoint.APPLY_LOCK_DONE
@@ -169,6 +222,181 @@ def test_schedule__lock_get_failed_but_not_retry(node_id, schedule_id, state, pi
     runtime.get_process_info.assert_called_once_with(pi.process_id)
     runtime.get_state.assert_called_once_with(node_id)
     runtime.get_schedule.assert_called_once_with(schedule_id)
+    runtime.set_next_schedule.assert_not_called()
+    runtime.beat.assert_not_called()
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.APPLY_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is False
+
+
+@mock.patch("bamboo_engine.engine.random.randint", return_value=3)
+def test_schedule__lock_get_failed_and_retry_enabled_callback(
+    random_randint, node_id, schedule_id, state, pi, schedule, interrupter
+):
+    schedule.type = ScheduleType.CALLBACK
+    callback_data = CallbackData(
+        id=1,
+        node_id=node_id,
+        version=state.version,
+        data={"task_success": True},
+    )
+    service = MagicMock()
+    service.callback_lock_retryable = MagicMock(return_value=True)
+    node = ServiceActivity(
+        id=node_id,
+        type=NodeType.ServiceActivity,
+        target_flows=["f1"],
+        target_nodes=["t1"],
+        targets={"f1": "t1"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        code="subprocess_plugin",
+        version="1.0.0",
+        error_ignorable=False,
+    )
+
+    interrupter.headers = {"route_info": {"queue": "default", "priority": 500}}
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=False)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_callback_data = MagicMock(return_value=callback_data)
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_service = MagicMock(return_value=service)
+
+    engine = Engine(runtime=runtime)
+    engine.schedule(
+        pi.process_id, node_id, schedule_id, interrupter, callback_data_id=callback_data.id, headers=interrupter.headers
+    )
+
+    runtime.get_callback_data.assert_called_once_with(callback_data.id)
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
+    set_next_schedule_kwargs = runtime.set_next_schedule.call_args[1]
+    assert set_next_schedule_kwargs["process_id"] == pi.process_id
+    assert set_next_schedule_kwargs["node_id"] == node_id
+    assert set_next_schedule_kwargs["schedule_id"] == schedule_id
+    assert set_next_schedule_kwargs["callback_data_id"] == callback_data.id
+    assert set_next_schedule_kwargs["schedule_after"] == 3
+    assert set_next_schedule_kwargs["headers"]["callback_lock_retry_times"] == 1
+    random_randint.assert_called_once_with(1, 3)
+    runtime.beat.assert_not_called()
+
+    assert interrupter.check_point.name == ScheduleKeyPoint.APPLY_LOCK_DONE
+    assert interrupter.check_point.version_mismatch is False
+    assert interrupter.check_point.node_not_running is False
+    assert interrupter.check_point.lock_get is False
+
+
+@pytest.mark.parametrize(
+    "headers, expected_range, expected_retry_count",
+    [
+        ({}, (1, 3), 1),
+        ({"callback_lock_retry_times": 1}, (3, 6), 2),
+        ({"callback_lock_retry_times": 2}, (6, 10), 3),
+    ],
+)
+def test_schedule__lock_get_failed_and_retry_enabled_callback_uses_incremental_jitter(
+    headers, expected_range, expected_retry_count, node_id, schedule_id, state, pi, schedule, interrupter
+):
+    schedule.type = ScheduleType.CALLBACK
+    callback_data = CallbackData(
+        id=1,
+        node_id=node_id,
+        version=state.version,
+        data={"task_success": True},
+    )
+    service = MagicMock()
+    service.callback_lock_retryable = MagicMock(return_value=True)
+    node = ServiceActivity(
+        id=node_id,
+        type=NodeType.ServiceActivity,
+        target_flows=["f1"],
+        target_nodes=["t1"],
+        targets={"f1": "t1"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        code="subprocess_plugin",
+        version="1.0.0",
+        error_ignorable=False,
+    )
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=False)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_callback_data = MagicMock(return_value=callback_data)
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_service = MagicMock(return_value=service)
+
+    with mock.patch("bamboo_engine.engine.random.randint", return_value=expected_range[1]) as random_randint:
+        Engine(runtime=runtime).schedule(
+            pi.process_id,
+            node_id,
+            schedule_id,
+            interrupter,
+            callback_data_id=callback_data.id,
+            headers=headers,
+        )
+
+    set_next_schedule_kwargs = runtime.set_next_schedule.call_args[1]
+    assert set_next_schedule_kwargs["schedule_after"] == expected_range[1]
+    assert set_next_schedule_kwargs["headers"]["callback_lock_retry_times"] == expected_retry_count
+    random_randint.assert_called_once_with(*expected_range)
+
+
+def test_schedule__lock_get_failed_and_retry_enabled_callback_reaches_retry_limit(
+    node_id, schedule_id, state, pi, schedule, interrupter
+):
+    schedule.type = ScheduleType.CALLBACK
+    callback_data = CallbackData(
+        id=1,
+        node_id=node_id,
+        version=state.version,
+        data={"task_success": True},
+    )
+    service = MagicMock()
+    service.callback_lock_retryable = MagicMock(return_value=True)
+    node = ServiceActivity(
+        id=node_id,
+        type=NodeType.ServiceActivity,
+        target_flows=["f1"],
+        target_nodes=["t1"],
+        targets={"f1": "t1"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        code="subprocess_plugin",
+        version="1.0.0",
+        error_ignorable=False,
+    )
+
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.apply_schedule_lock = MagicMock(return_value=False)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_callback_data = MagicMock(return_value=callback_data)
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_service = MagicMock(return_value=service)
+
+    engine = Engine(runtime=runtime)
+    engine.schedule(
+        pi.process_id,
+        node_id,
+        schedule_id,
+        interrupter,
+        callback_data_id=callback_data.id,
+        headers={"callback_lock_retry_times": 3},
+    )
+
+    runtime.get_callback_data.assert_called_once_with(callback_data.id)
+    runtime.get_node.assert_called_once_with(node_id)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version)
     runtime.set_next_schedule.assert_not_called()
     runtime.beat.assert_not_called()
 
