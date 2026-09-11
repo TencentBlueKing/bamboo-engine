@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):

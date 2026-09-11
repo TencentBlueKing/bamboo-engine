@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0014_auto_20181127_1053"),
     ]
@@ -38,7 +37,7 @@ class Migration(migrations.Migration):
             name="snapshot",
             field=models.ForeignKey(
                 related_name="snapshot_instances",
-                verbose_name="\u5b9e\u4f8b\u7ed3\u6784\u6570\u636e\uff0c\u6307\u5411\u5b9e\u4f8b\u5bf9\u5e94\u7684\u6a21\u677f\u7684\u7ed3\u6784\u6570\u636e",
+                verbose_name="实例结构数据，指向实例对应的模板的结构数据",
                 to="pipeline.Snapshot",
                 on_delete=models.SET_NULL,
             ),

@@ -17,7 +17,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("pipeline", "0020_auto_20190906_1119"),
     ]
@@ -44,7 +43,7 @@ class Migration(migrations.Migration):
                 on_delete=django.db.models.deletion.CASCADE,
                 related_name="snapshot_instances",
                 to="pipeline.Snapshot",
-                verbose_name="\u5b9e\u4f8b\u7ed3\u6784\u6570\u636e\uff0c\u6307\u5411\u5b9e\u4f8b\u5bf9\u5e94\u7684\u6a21\u677f\u7684\u7ed3\u6784\u6570\u636e",
+                verbose_name="实例结构数据，指向实例对应的模板的结构数据",
             ),
         ),
         migrations.AlterField(
