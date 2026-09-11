@@ -35,14 +35,30 @@ class ModuleObject:
         setattr(self, sub_paths[0], ModuleObject(sub_paths[1:], module))
 
 
+def resolve_import_object(mod_path):
+    try:
+        return importlib.import_module(mod_path)
+    except ImportError:
+        parts = mod_path.split(".")
+        obj = importlib.import_module(parts[0])
+        for part in parts[1:]:
+            obj = getattr(obj, part)
+        return obj
+
+
 def _import_modules(sandbox: dict, modules: Dict[str, str]):
-    for mod_path, alias in modules.items():
-        mod = importlib.import_module(mod_path)
+    items = sorted(modules.items(), key=lambda kv: kv[1].count("."))
+    for mod_path, alias in items:
+        obj = resolve_import_object(mod_path)
         sub_paths = alias.split(".")
         if len(sub_paths) == 1:
-            sandbox[alias] = mod
-        else:
-            sandbox[sub_paths[0]] = ModuleObject(sub_paths[1:], mod)
+            sandbox[alias] = obj
+            continue
+        root = sub_paths[0]
+        existing = sandbox.get(root)
+        if existing is not None and not isinstance(existing, ModuleObject):
+            continue
+        sandbox[root] = ModuleObject(sub_paths[1:], obj)
 
 
 def get() -> dict:
