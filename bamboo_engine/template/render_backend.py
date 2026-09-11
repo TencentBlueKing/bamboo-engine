@@ -23,41 +23,35 @@ specific language governing permissions and limitations under the License.
 #     构造沙箱命名空间并与 ``context`` 合并。之所以传入 ``sandbox_builder`` 而不是已合并好的
 #     ``data``，是为了让隔离 backend 能在**子进程本地重建沙箱**（``datetime/re/json`` 等模块
 #     不可跨进程序列化），只需序列化 ``context``。
-#   * 编译失败 / 渲染失败一律 inert：返回原始 ``template`` 字符串并留日志，与历史行为一致，
-#     绝不因渲染异常打断整条流程。
+#   * 表达式编译/求值失败保留原文；隔离设施失败抛出 RenderInfrastructureError，
+#     由调用方停止节点执行，不能把未渲染的输入交给业务插件。
 
 import atexit
-import inspect
-import logging
 import datetime
 import decimal
-from collections import Counter
+import inspect
+import logging
 import os
 import pickle
 import queue
-import sys
-import socket
 import signal
+import socket
 import subprocess
+import sys
+import threading
 import time
 import uuid
+from collections import Counter
 from types import SimpleNamespace
-import threading
 
-from mako.template import Template as MakoTemplate
 from mako.exceptions import MakoException
+from mako.template import Template as MakoTemplate
 
-from bamboo_engine.template.render_transport import (
-    MAX_REQUEST_BYTES,
-    MAX_RESPONSE_BYTES,
-    ProtocolError,
-    RenderTimeout as _RenderTimeout,
-    SocketConnection,
-    decode_reply,
-    encode_reply,
-    remaining,
-)
 from bamboo_engine.config import Settings
+from bamboo_engine.exceptions import RenderInfrastructureError
+from bamboo_engine.template.render_transport import MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, ProtocolError
+from bamboo_engine.template.render_transport import RenderTimeout as _RenderTimeout
+from bamboo_engine.template.render_transport import SocketConnection, decode_reply, encode_reply, remaining
 from bamboo_engine.template.sandbox import harden_template_builtins
 
 logger = logging.getLogger("root")
@@ -88,7 +82,7 @@ def _render_with_sandbox(template, context, sandbox_dict):
 
 
 class RenderBackend(object):
-    """渲染后端接口。实现方需保证：编译/渲染失败时返回原始 template（inert），不得抛出。"""
+    """表达式编译/求值失败保留原文；基础设施故障以 RenderInfrastructureError 显式传递。"""
 
     def render(self, template, context, sandbox_builder):
         raise NotImplementedError
@@ -735,11 +729,11 @@ class SubprocessPoolRenderBackend(RenderBackend):
         self._ensure_process()
         deadline = time.monotonic() + self.timeout
         if self._closed:
-            return template
+            raise RenderInfrastructureError("backend_closed")
         try:
             while True:
                 if self._closed:
-                    return template
+                    raise RenderInfrastructureError("backend_closed")
                 try:
                     slot = self._idle.get(timeout=min(0.05, remaining(deadline)))
                     break
@@ -747,12 +741,12 @@ class SubprocessPoolRenderBackend(RenderBackend):
                     continue
         except _RenderTimeout:
             logger.warning("isolated render admission timeout")
-            return template
+            raise RenderInfrastructureError("admission_timeout")
         job = _RenderJob(slot, deadline)
         with self._lock:
             if self._closed:
                 slot.jobs.put(None)
-                return template
+                raise RenderInfrastructureError("backend_closed")
             self._jobs.add(job)
             with slot.lock:
                 slot.active = job
@@ -771,7 +765,7 @@ class SubprocessPoolRenderBackend(RenderBackend):
                 if not self._closed:
                     self._idle.put(slot)
             logger.warning("isolated render supervisor could not start")
-            return template
+            raise RenderInfrastructureError("supervisor_start_failed")
         try:
             if not job.done.wait(remaining(deadline)):
                 raise _RenderTimeout()
@@ -779,19 +773,21 @@ class SubprocessPoolRenderBackend(RenderBackend):
         except _RenderTimeout:
             job.cancel()
             logger.warning("isolated render deadline exceeded (%ss)", self.timeout)
-            return template
+            raise RenderInfrastructureError("deadline_exceeded")
         except BaseException:
             job.cancel()
             raise
         if job.cancelled.is_set() or self._closed:
-            return template
+            raise RenderInfrastructureError("backend_closed")
         if job.error is not None:
             logger.warning("isolated render failed: %s", type(job.error).__name__)
             # Only a trusted parent-side compatibility decision may request fallback.
             # A compromised/slow worker must never force rendering in the host.
             if isinstance(job.error, UnsupportedContext):
                 return self._fallback(template, context, sandbox_builder)
-            return template
+            if isinstance(job.error, _RenderTimeout):
+                raise RenderInfrastructureError("deadline_exceeded") from job.error
+            raise RenderInfrastructureError("worker_failure") from job.error
         return job.result
 
 

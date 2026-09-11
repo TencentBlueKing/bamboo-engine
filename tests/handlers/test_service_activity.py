@@ -16,6 +16,8 @@ from mock import MagicMock, call, patch
 
 from bamboo_engine import states
 from bamboo_engine.eri import (
+    ContextValue,
+    ContextValueType,
     Data,
     DataInput,
     ExecuteInterruptPoint,
@@ -27,18 +29,42 @@ from bamboo_engine.eri import (
     ScheduleType,
     ServiceActivity,
 )
-from bamboo_engine.eri.models.interrupt import (
-    HandlerExecuteData,
-    HandlerScheduleData,
-    ScheduleInterruptPoint,
-)
+from bamboo_engine.eri.models.interrupt import HandlerExecuteData, HandlerScheduleData, ScheduleInterruptPoint
 from bamboo_engine.handlers.service_activity import ServiceActivityHandler
-from bamboo_engine.interrupt import (
-    ExecuteInterrupter,
-    ExecuteKeyPoint,
-    ScheduleInterrupter,
-    ScheduleKeyPoint,
-)
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint
+
+
+def test_exact_values_and_render_disabled_scripts_do_not_require_worker(pi, node, interrupter, monkeypatch):
+    from bamboo_engine.template import template
+    from bamboo_engine.template.render_backend import SubprocessPoolRenderBackend
+
+    backend = SubprocessPoolRenderBackend(pool_size=1, os_harden=False, no_network=False)
+    backend.close()
+    monkeypatch.setattr(template, "get_render_backend", lambda: backend)
+    runtime = MagicMock()
+    runtime.get_data.return_value = Data(
+        {
+            "address": DataInput(need_render=True, value="${ip}"),
+            "script": DataInput(need_render=False, value="echo ${type}; echo ${x + 1}"),
+        },
+        {},
+    )
+    runtime.get_context_key_references.return_value = set()
+    runtime.get_context_values.return_value = [
+        ContextValue(key="${ip}", type=ContextValueType.PLAIN, value="192.0.2.1")
+    ]
+    runtime.get_service.return_value.execute.return_value = True
+    runtime.get_service.return_value.need_schedule.return_value = False
+    runtime.serialize_execution_data.return_value = ("{}", "json")
+
+    result = ServiceActivityHandler(node, runtime, interrupter).execute(pi, 1, 1, "v1")
+
+    saved = runtime.set_execution_data.call_args.kwargs["data"]
+    assert saved.inputs["address"] == "192.0.2.1"
+    assert saved.inputs["script"] == "echo ${type}; echo ${x + 1}"
+    assert saved.outputs._result is True
+    assert runtime.set_state.call_args.kwargs["to_state"] == states.FINISHED
+    assert result.next_node_id == node.target_nodes[0]
 
 
 @pytest.fixture
@@ -119,7 +145,6 @@ def schedule_interrupter():
     ],
 )
 def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -275,7 +300,6 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     ],
 )
 def test_context_hydrate__raise(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -338,7 +362,6 @@ def test_context_hydrate__raise(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -430,7 +453,6 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, loop_key):
-
     data = Data(
         {
             "k1": DataInput(need_render=True, value="${k4}"),
@@ -558,7 +580,6 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
     ],
 )
 def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -652,7 +673,6 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -734,7 +754,6 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     node.error_ignorable = True
 
     service_data = ExecutionData({}, {})
@@ -815,7 +834,6 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     ],
 )
 def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -898,7 +916,6 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
     ],
 )
 def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -988,7 +1005,6 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     ],
 )
 def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1077,7 +1093,6 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.MULTIPLE_CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1251,7 +1266,6 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     ],
 )
 def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 

@@ -10,6 +10,7 @@ from collections import Counter, namedtuple
 
 import pytest
 
+from bamboo_engine.exceptions import RenderInfrastructureError
 from bamboo_engine.template import render_backend as rb
 from bamboo_engine.template import sandbox
 
@@ -128,7 +129,8 @@ def test_recycle_does_not_mask_success_and_spawn_failure_can_recover(monkeypatch
     monkeypatch.setattr(backend, "_spawn_worker", fail_second_spawn)
     try:
         assert backend.render("${x+1}", {"x": 2}, provider()) == "3"
-        assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
+        with pytest.raises(RenderInfrastructureError, match="worker_failure"):
+            backend.render("${x+1}", {"x": 2}, provider())
         assert backend.render("${x+1}", {"x": 2}, provider()) == "3"
     finally:
         backend.close()
@@ -148,11 +150,13 @@ def test_startup_and_admission_share_deadline(monkeypatch):
     monkeypatch.setattr(backend, "_spawn_worker", stalled_spawn)
     try:
         start = time.monotonic()
-        assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
+        with pytest.raises(RenderInfrastructureError, match="deadline_exceeded"):
+            backend.render("${x+1}", {"x": 2}, provider())
         assert time.monotonic() - start < 0.5
         assert entered.is_set()
         start = time.monotonic()
-        assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
+        with pytest.raises(RenderInfrastructureError, match="admission_timeout"):
+            backend.render("${x+1}", {"x": 2}, provider())
         assert time.monotonic() - start < 0.5
     finally:
         release.set()
@@ -175,7 +179,8 @@ def test_worker_error_cannot_force_opted_in_fallback(monkeypatch):
 
     monkeypatch.setattr(rb._RenderWorker, "request", broken_reply)
     try:
-        assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
+        with pytest.raises(RenderInfrastructureError, match="worker_failure"):
+            backend.render("${x+1}", {"x": 2}, provider())
     finally:
         backend.close()
 
@@ -222,10 +227,14 @@ def test_close_wakes_callers_waiting_for_a_slot(monkeypatch):
         raise OSError("cancelled synthetic launch")
 
     monkeypatch.setattr(backend, "_spawn_worker", stalled_spawn)
-    callers = [
-        threading.Thread(target=lambda: results.append(backend.render("${x+1}", {"x": 2}, provider())))
-        for _ in range(2)
-    ]
+
+    def render_until_closed():
+        try:
+            results.append(backend.render("${x+1}", {"x": 2}, provider()))
+        except RenderInfrastructureError as exc:
+            results.append(exc.reason)
+
+    callers = [threading.Thread(target=render_until_closed) for _ in range(2)]
     try:
         callers[0].start()
         assert entered.wait(1)
@@ -234,7 +243,7 @@ def test_close_wakes_callers_waiting_for_a_slot(monkeypatch):
         for caller in callers:
             caller.join(0.5)
             assert not caller.is_alive()
-        assert results == ["${x+1}", "${x+1}"]
+        assert results == ["backend_closed", "backend_closed"]
     finally:
         release.set()
         backend.close()
@@ -286,7 +295,8 @@ def test_unreaped_worker_keeps_its_slot(monkeypatch):
         assert entered.wait(1)
         # The short deadline tests admission while reaping, not worker startup.
         backend.timeout = 0.2
-        assert backend.render("${x+1}", {"x": 2}, provider()) == "${x+1}"
+        with pytest.raises(RenderInfrastructureError, match="admission_timeout"):
+            backend.render("${x+1}", {"x": 2}, provider())
     finally:
         release.set()
         backend.close()
@@ -307,13 +317,22 @@ def test_close_handles_dequeued_but_not_registered_slot(monkeypatch):
         return slot
 
     monkeypatch.setattr(backend._idle, "get", delayed_get)
-    caller = threading.Thread(target=lambda: backend.render("${x+1}", {"x": 2}, provider()))
+    errors = []
+
+    def render_until_closed():
+        try:
+            backend.render("${x+1}", {"x": 2}, provider())
+        except RenderInfrastructureError as exc:
+            errors.append(exc.reason)
+
+    caller = threading.Thread(target=render_until_closed)
     try:
         caller.start()
         assert entered.wait(1)
         backend.close()
         release.set()
         caller.join(1)
+        assert errors == ["backend_closed"]
         for slot in backend._slots:
             if slot.thread is not None:
                 slot.thread.join(1)

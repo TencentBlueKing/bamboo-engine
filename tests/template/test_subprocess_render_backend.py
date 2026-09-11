@@ -12,11 +12,13 @@ specific language governing permissions and limitations under the License.
 """
 
 import os
-import time
 import threading
+import time
 
 import pytest
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+from bamboo_engine.template import sandbox as engine_sandbox
 from bamboo_engine.template.render_backend import (
     PortableRenderObject,
     SandboxProvider,
@@ -24,8 +26,6 @@ from bamboo_engine.template.render_backend import (
     SubprocessPoolRenderBackend,
     _portable_context,
 )
-from bamboo_engine.template import sandbox as engine_sandbox
-
 
 # ---- module-level, picklable probes injected into render context (spawn needs top-level refs) ----
 
@@ -135,14 +135,14 @@ def test_subprocess_backend_scrubs_credentials_from_env():
         os.environ.pop("MAKO_TEST_APP_SECRET", None)
 
 
-def test_subprocess_backend_timeout_returns_inert_without_hanging():
+def test_subprocess_backend_timeout_raises_without_hanging():
     b = _local_backend(pool_size=1, max_uses=1000, timeout=0.5)
     try:
         start = time.time()
         template = "${probe()}"
-        result = b.render(template, {"probe": _slow_probe}, _engine_provider())
+        with pytest.raises(RenderInfrastructureError, match="deadline_exceeded"):
+            b.render(template, {"probe": _slow_probe}, _engine_provider())
         elapsed = time.time() - start
-        assert result == template  # 超时 → inert 回显原始模板（绝不回退进程内，避免把 DoS 带回主进程）
         assert elapsed < 4  # 及时超时，未被拖挂
     finally:
         b.close()
