@@ -119,7 +119,6 @@ def schedule_interrupter():
     ],
 )
 def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -150,7 +149,7 @@ def test_execute__raise_not_ignore(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None, inner_loop=1)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -228,7 +227,7 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None, inner_loop=1)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -275,7 +274,6 @@ def test_execute__raise_ignore(pi, node, interrupter, recover_point):
     ],
 )
 def test_context_hydrate__raise(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -338,7 +336,6 @@ def test_context_hydrate__raise(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -371,7 +368,7 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None, inner_loop=1)
     runtime.set_state.assert_not_called()
     assert runtime.set_execution_data.call_args.kwargs["node_id"] == node.id
     assert runtime.set_execution_data.call_args.kwargs["data"].inputs == {"_loop": 1, "_inner_loop": 1}
@@ -430,7 +427,6 @@ def test_execute__success_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, loop_key):
-
     data = Data(
         {
             "k1": DataInput(need_render=True, value="${k4}"),
@@ -486,7 +482,7 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
         get_context_values_keys.add("${loop_key}")
 
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=get_context_values_keys)
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None, inner_loop=1)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -558,7 +554,6 @@ def test_execute__success_and_no_schedule(pi, node, interrupter, recover_point, 
     ],
 )
 def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
-
     data = Data({}, {})
 
     service = MagicMock()
@@ -591,7 +586,7 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     runtime.get_data_inputs.assert_called_once_with(pi.root_pipeline_id)
     runtime.get_context_key_references.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
     runtime.get_context_values.assert_called_once_with(pipeline_id=pi.top_pipeline_id, keys=set())
-    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None)
+    runtime.get_service.assert_called_once_with(code=node.code, version=node.version, name=None, inner_loop=1)
     runtime.set_state.assert_called_once_with(
         node_id=node.id,
         version="v1",
@@ -652,7 +647,6 @@ def test_execute__fail_and_schedule(pi, node, interrupter, recover_point):
     ],
 )
 def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -734,7 +728,6 @@ def test_schedule__raise_not_ignore(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recover_point):
-
     node.error_ignorable = True
 
     service_data = ExecutionData({}, {})
@@ -815,7 +808,6 @@ def test_schedule__raise_ignore(pi, node, schedule_interrupter, schedule, recove
     ],
 )
 def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -898,7 +890,6 @@ def test_schedule__poll_success_and_not_done(pi, node, schedule_interrupter, sch
     ],
 )
 def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 
@@ -988,7 +979,6 @@ def test_schedule__poll_success_and_done(pi, node, schedule_interrupter, schedul
     ],
 )
 def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1077,7 +1067,6 @@ def test_schedule__callback_success(pi, node, schedule_interrupter, schedule, re
     ],
 )
 def test_schedule__multi_callback_success_and_not_done(pi, node, schedule_interrupter, schedule, recover_point):
-
     schedule.type = ScheduleType.MULTIPLE_CALLBACK
 
     service_data = ExecutionData({}, {})
@@ -1251,7 +1240,6 @@ def test_schedule__multi_callback_success_and_done(pi, node, schedule_interrupte
     ],
 )
 def test_schedule__fail(pi, node, schedule_interrupter, schedule, recover_point):
-
     service_data = ExecutionData({}, {})
     data_outputs = {}
 

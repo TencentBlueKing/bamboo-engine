@@ -85,7 +85,7 @@ def test_render():
     assert simple_dict_template.render({"a": {"a": "b"}}) == {"a": "b"}
 
     nested_dict_template = Template("${a[0][3]['a']}")
-    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1,2,3]}], [5, 6, 7, 8]]}) == [1,2,3]
+    assert nested_dict_template.render({"a": [[1, 2, 3, {"a": [1, 2, 3]}], [5, 6, 7, 8]]}) == [1, 2, 3]
 
     type_error_template = Template("${a[1]}")
     assert type_error_template.render({"a": 1}) == "${a[1]}"
@@ -94,7 +94,6 @@ def test_render():
 
 
 def test_render__with_sandbox():
-
     r1 = Template("""${exec(print(''))}""").render({})
     assert r1 == """${exec(print(''))}"""
 
@@ -198,6 +197,12 @@ def test_mako_filter_side_effect_expression_is_blocked():
 
 def test_mako_filter_dunder_chain_is_blocked():
     payload = "${'x'|().__class__.__bases__[0].__subclasses__}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_subscript_dunder_key_is_blocked():
+    payload = "${a['__class__']}"
 
     _assert_forbidden_template(payload)
 
@@ -421,10 +426,7 @@ def test_mako_format_private_lookup_is_blocked(payload):
         # BinOp 字符串拼接绕过字面量 dunder 检测
         "${getattr('', '__cl' + 'ass__')}",
         # 完整 subclasses RCE 链（多重 getattr + 字符串拼接）
-        (
-            "${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__'),"
-            " '__sub' + 'classes__')()}"
-        ),
+        ("${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__')," " '__sub' + 'classes__')()}"),
         # 通过 dir(0)[0][0] 间接得到下划线字符再拼出 __class__
         "${getattr('', dir(0)[0][0] + dir(0)[0][0] + 'class' + dir(0)[0][0] + dir(0)[0][0])}",
         # type / object / vars 等 callable 走 Name 调用

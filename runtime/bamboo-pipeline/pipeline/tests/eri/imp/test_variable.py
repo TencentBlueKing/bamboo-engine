@@ -29,6 +29,7 @@ class TestVariable(LazyVariable):
     def get_value(self):
         assert self.value == "1-2"
         assert self.pipeline_data == {"1": 1, "2": 2}
+        assert self.inner_loop == 1
         return "heihei"
 
 
@@ -48,6 +49,7 @@ class VariableWrapperTestCase(TestCase):
             original_value=SpliceVariable(key="${c}", value="${a}-${b}", pool=context.pool),
             var_cls=TestVariable,
             additional_data={"1": 1, "2": 2},
+            inner_loop=1,
         )
 
         self.assertEqual(w.get(), "heihei")
