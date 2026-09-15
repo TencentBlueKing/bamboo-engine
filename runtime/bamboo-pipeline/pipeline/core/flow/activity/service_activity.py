@@ -112,6 +112,9 @@ class Service(object, metaclass=ABCMeta):
     def multi_callback_enabled(self):
         return getattr(self, self.multi_callback_determine_attr, False)
 
+    def callback_lock_retryable(self, callback_data=None):
+        return False
+
     def clean_status(self):
         setattr(self, self.schedule_result_attr, False)
 
@@ -239,7 +242,6 @@ class ServiceActivity(Activity):
             self._prepared_outputs = self.data.outputs_copy()
 
     def __setstate__(self, state):
-
         for attr, obj in list(state.items()):
             # py2 pickle dumps data compatible
             if isinstance(attr, bytes):

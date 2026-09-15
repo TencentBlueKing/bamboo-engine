@@ -62,6 +62,7 @@ INSTALLED_APPS = (
     "pipeline.contrib.node_timeout",
     "pipeline.contrib.rollback",
     "pipeline.contrib.plugin_execute",
+    "pipeline.contrib.diagnostics",
     "django_celery_beat",
     "pipeline_test_use",
     "variable_app",

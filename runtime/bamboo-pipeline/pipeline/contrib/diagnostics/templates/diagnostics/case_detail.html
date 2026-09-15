@@ -1,0 +1,74 @@
+{% extends "diagnostics/base.html" %}
+
+{% block content %}
+<p><a href="{% url 'pipeline_diagnostics:case_list' %}">Back to cases</a></p>
+
+<div class="header">
+  <div>
+    <h1>Diagnostic Case #{{ case.id }}</h1>
+    <p class="muted">{{ case.root_pipeline_id }} / {{ case.node_id }}</p>
+  </div>
+  <div>
+    <span class="badge">{{ case.status }}</span>
+  </div>
+</div>
+
+<table>
+  <tbody>
+    <tr><th>Type</th><td>{{ case.stuck_type }}</td></tr>
+    <tr><th>Severity</th><td>{{ case.severity }}</td></tr>
+    <tr><th>Confidence</th><td>{{ case.confidence }}</td></tr>
+    <tr><th>Hits</th><td>{{ case.hit_count }}</td></tr>
+    <tr><th>First Seen</th><td>{{ case.first_seen_at }}</td></tr>
+    <tr><th>Last Seen</th><td>{{ case.last_seen_at }}</td></tr>
+    <tr><th>Message</th><td>{{ case.message }}</td></tr>
+  </tbody>
+</table>
+
+<h2>Evidence</h2>
+<pre>{{ case.evidence }}</pre>
+
+<h2>Related Objects</h2>
+<pre>{{ case.related_objects }}</pre>
+
+<h2>Actions</h2>
+<p><strong>Recommended:</strong> {{ case.recommended_actions }}</p>
+<p><strong>Forbidden:</strong> {{ case.forbidden_actions }}</p>
+
+<h2>Audit</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Operator</th>
+      <th>Operation</th>
+      <th>Mode</th>
+      <th>Risk</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for audit in audits %}
+    <tr>
+      <td>{{ audit.created_at }}</td>
+      <td>{{ audit.operator }}</td>
+      <td>{{ audit.operation_type }}</td>
+      <td>{{ audit.mode }}</td>
+      <td>{{ audit.risk_level }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5">No audit records.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<form method="post" action="{% url 'pipeline_diagnostics:update_case_status' case.id %}">
+  {% csrf_token %}
+  <div class="actions">
+    <button name="status" value="open">Mark Open</button>
+    <button name="status" value="resolved">Mark Resolved</button>
+    <button name="status" value="ignored">Mark Ignored</button>
+  </div>
+</form>
+{% endblock %}
