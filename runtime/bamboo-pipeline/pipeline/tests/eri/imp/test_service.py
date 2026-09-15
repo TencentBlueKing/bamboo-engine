@@ -11,13 +11,11 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+from bamboo_engine.eri import CallbackData, ExecutionData, ScheduleType
+from django.test import TestCase
 from mock import MagicMock, patch
 
-from django.test import TestCase
-
-from bamboo_engine.eri import ExecutionData, CallbackData, ScheduleType
-
-from pipeline.core.flow.activity import Service, StaticIntervalGenerator, SquareIntervalGenerator
+from pipeline.core.flow.activity import Service, SquareIntervalGenerator, StaticIntervalGenerator
 from pipeline.eri.imp.service import ServiceWrapper
 
 
@@ -131,6 +129,24 @@ class ServiceWrapperTestCase(TestCase):
         self.assertEqual(ServiceWrapper(S2()).schedule_type(), ScheduleType.POLL)
         self.assertEqual(ServiceWrapper(S3()).schedule_type(), ScheduleType.CALLBACK)
         self.assertEqual(ServiceWrapper(S4()).schedule_type(), ScheduleType.MULTIPLE_CALLBACK)
+
+    def test_callback_lock_retryable(self):
+        class S(Service):
+            def __init__(self):
+                self.callback_data = None
+
+            def execute(self, data, parent_data):
+                pass
+
+            def callback_lock_retryable(self, callback_data=None):
+                self.callback_data = callback_data
+                return True
+
+        service = S()
+        callback_data = {"task_success": True}
+
+        self.assertTrue(ServiceWrapper(service).callback_lock_retryable(callback_data=callback_data))
+        self.assertEqual(service.callback_data, callback_data)
 
     def test_is_schedule_done(self):
         class S(Service):

@@ -13,19 +13,13 @@ specific language governing permissions and limitations under the License.
 import typing
 from typing import Callable, Optional
 
+from bamboo_engine.eri import CallbackData, ExecutionData, HookType, Schedule, ScheduleType
+from bamboo_engine.eri import Service as ServiceInterface
+
 from pipeline.core.data.base import DataObject
 from pipeline.core.flow.activity import Service
 from pipeline.eri.log import get_logger
 from pipeline.eri.signals import pre_service_execute, pre_service_schedule
-
-from bamboo_engine.eri import (
-    CallbackData,
-    ExecutionData,
-    HookType,
-    Schedule,
-    ScheduleType,
-)
-from bamboo_engine.eri import Service as ServiceInterface
 
 
 class ServiceWrapper(ServiceInterface):
@@ -188,6 +182,16 @@ class ServiceWrapper(ServiceInterface):
         :rtype: bool
         """
         return self.service.is_schedule_finished()
+
+    def callback_lock_retryable(self, callback_data=None) -> bool:
+        """
+        回调调度锁冲突时是否允许重试
+
+        :param callback_data: 回调数据
+        :return: 是否允许重试
+        :rtype: bool
+        """
+        return self.service.callback_lock_retryable(callback_data=callback_data)
 
     def schedule_after(
         self, schedule: Optional[Schedule], data: ExecutionData, root_pipeline_data: ExecutionData

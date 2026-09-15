@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Pipeline Diagnostics</title>
+  <style>
+    body {
+      margin: 24px;
+      color: #243447;
+      background: #f5f7fb;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+    a { color: #2252a6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #fff;
+      border: 1px solid #dde5f2;
+      border-radius: 4px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .muted { color: #6b7c93; }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
+      gap: 12px;
+      margin: 16px 0 24px;
+      align-items: end;
+    }
+    input, select, button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #c5d2e3;
+      border-radius: 3px;
+      background: #fff;
+      color: #243447;
+    }
+    label { display: block; font-size: 12px; color: #52606d; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #dde5f2;
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #eef3fb; color: #334e68; }
+    pre {
+      background: #f4f7fb;
+      border: 1px solid #dde5f2;
+      border-radius: 3px;
+      padding: 12px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #eef3fb;
+      color: #334e68;
+      font-size: 12px;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .actions button {
+      width: auto;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

@@ -58,6 +58,34 @@ from .utils.string import get_lower_case_name
 logger = logging.getLogger("bamboo_engine")
 
 
+def emit_diagnostic_event(*args, **kwargs):
+    try:
+        from pipeline.contrib.diagnostics.events import emit_event
+    except Exception:
+        logger.debug("pipeline diagnostics event module is unavailable", exc_info=True)
+        return None
+
+    try:
+        return emit_event(*args, **kwargs)
+    except Exception:
+        logger.debug("pipeline diagnostics event emit failed", exc_info=True)
+        return None
+
+
+def emit_diagnostic_alert(*args, **kwargs):
+    try:
+        from pipeline.contrib.diagnostics.metrics import emit_alert_log
+    except Exception:
+        logger.debug("pipeline diagnostics alert module is unavailable", exc_info=True)
+        return None
+
+    try:
+        return emit_alert_log(*args, **kwargs)
+    except Exception:
+        logger.debug("pipeline diagnostics alert emit failed", exc_info=True)
+        return None
+
+
 def interrupt_exception_catcher(func):
     @wraps(func)
     def _wrapper(*args, **kwargs):
@@ -77,10 +105,37 @@ class Engine:
     """
 
     PURE_SKIP_ENABLE_NODE_TYPE = {NodeType.ServiceActivity, NodeType.EmptyStartEvent}
+    CALLBACK_LOCK_RETRY_HEADER = "callback_lock_retry_times"
+    CALLBACK_LOCK_RETRY_LIMIT = 3
+    CALLBACK_LOCK_RETRY_DELAY_RANGES = ((1, 3), (3, 6), (6, 10))
 
     def __init__(self, runtime: EngineRuntimeInterface):
         self.runtime = runtime
         self._hostname = get_hostname()
+
+    def _schedule_lock_retry_count(self, headers: Optional[dict]) -> int:
+        if not headers:
+            return 0
+
+        try:
+            return int(headers.get(self.CALLBACK_LOCK_RETRY_HEADER, 0))
+        except (TypeError, ValueError):
+            return 0
+
+    def _callback_lock_retry_context(self, node_id: str, callback_data_id: Optional[int]):
+        if not callback_data_id:
+            return None, False
+
+        callback_data = self.runtime.get_callback_data(callback_data_id)
+        node = self.runtime.get_node(node_id)
+        service = self.runtime.get_service(code=node.code, version=node.version)
+        return callback_data, service.callback_lock_retryable(callback_data=callback_data.data)
+
+    def _callback_lock_retry_delay(self, retry_count: int) -> int:
+        delay_range = self.CALLBACK_LOCK_RETRY_DELAY_RANGES[
+            min(retry_count, len(self.CALLBACK_LOCK_RETRY_DELAY_RANGES) - 1)
+        ]
+        return random.randint(*delay_range)
 
     # api
     def run_pipeline(
@@ -1184,27 +1239,77 @@ class Engine:
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
+                event_payload = {
+                    "schedule_type": getattr(schedule.type, "name", schedule.type),
+                    "headers": headers or {},
+                }
+                emit_diagnostic_event(
+                    event_type="schedule_lock_conflict",
+                    root_pipeline_id=root_pipeline_id,
+                    node_id=node_id,
+                    version=schedule.version,
+                    result="failed",
+                    reason="lock_busy",
+                    process_id=process_id,
+                    schedule_id=schedule_id,
+                    callback_data_id=callback_data_id,
+                    payload=event_payload,
+                )
+                emit_diagnostic_alert(
+                    alert_type="schedule_lock_conflict",
+                    root_pipeline_id=root_pipeline_id,
+                    node_id=node_id,
+                    payload=event_payload,
+                )
+                callback_data = None
                 # only retry at multiple callback type
-                if schedule.type is not ScheduleType.MULTIPLE_CALLBACK:
+                should_retry = schedule.type is ScheduleType.MULTIPLE_CALLBACK
+                if not should_retry:
+                    callback_data, should_retry = self._callback_lock_retry_context(node_id, callback_data_id)
+                    retry_count = self._schedule_lock_retry_count(headers)
+                    if should_retry and retry_count >= self.CALLBACK_LOCK_RETRY_LIMIT:
+                        logger.error(
+                            "root pipeline[%s] schedule(%s) %s with version %s callback data(%s) retry exhausted "
+                            "after %s attempts, callback_data=%s",
+                            root_pipeline_id,
+                            schedule_id,
+                            node_id,
+                            schedule.version,
+                            callback_data_id,
+                            retry_count,
+                            callback_data.data if callback_data else None,
+                        )
+                        return
+
+                if not should_retry:
                     logger.info(
-                        "root pipeline[%s] schedule(%s) %s with version %s is not multiple callback type, "
+                        "root pipeline[%s] schedule(%s) %s with version %s callback data(%s) "
                         "will not retry to get lock",
-                        # noqa
                         root_pipeline_id,
                         schedule_id,
                         node_id,
                         schedule.version,
+                        callback_data_id,
                     )
                     return
 
-                try_after = random.randint(1, 5)
+                retry_headers = dict(headers or {})
+                if schedule.type is ScheduleType.CALLBACK:
+                    current_retry_count = self._schedule_lock_retry_count(headers)
+                    try_after = self._callback_lock_retry_delay(current_retry_count)
+                    retry_headers[self.CALLBACK_LOCK_RETRY_HEADER] = current_retry_count + 1
+                else:
+                    try_after = random.randint(1, 5)
                 logger.info(
-                    "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s",
+                    "root pipeline[%s] schedule(%s) lock %s with data %s fetch fail, try after %s, "
+                    "retry_count=%s, callback_data=%s",
                     root_pipeline_id,
                     node_id,
                     schedule_id,
                     callback_data_id,
                     try_after,
+                    retry_headers.get(self.CALLBACK_LOCK_RETRY_HEADER, 0),
+                    callback_data.data if callback_data else None,
                 )
                 self.runtime.set_next_schedule(
                     process_id=process_id,
@@ -1212,7 +1317,7 @@ class Engine:
                     schedule_id=schedule_id,
                     callback_data_id=callback_data_id,
                     schedule_after=try_after,
-                    headers=headers,
+                    headers=retry_headers,
                 )
                 return
 

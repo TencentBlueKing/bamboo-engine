@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 import os
 
 from celery import Celery
+
 from pipeline.celery.queues import ScalableQueues  # noqa
 from pipeline.celery.settings import *  # noqa
 from pipeline.eri.celery import queues, step
@@ -62,6 +63,7 @@ INSTALLED_APPS = (
     "pipeline.contrib.node_timeout",
     "pipeline.contrib.rollback",
     "pipeline.contrib.plugin_execute",
+    "pipeline.contrib.diagnostics",
     "django_celery_beat",
     "pipeline_test_use",
     "variable_app",

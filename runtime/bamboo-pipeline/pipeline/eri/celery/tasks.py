@@ -10,29 +10,23 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-import time
 import logging
+import time
 from typing import Optional
 
+from bamboo_engine import metrics
+from bamboo_engine.engine import Engine
+from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
+from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteKeyPoint, ScheduleInterrupter, ScheduleKeyPoint
+from bamboo_engine.utils.host import get_hostname
 from celery import current_app
 from celery.schedules import crontab
-from pipeline.contrib.celery_tools.periodic import periodic_task
 from django.conf import settings
 
-from bamboo_engine import metrics
-from bamboo_engine.utils.host import get_hostname
-from bamboo_engine.eri import ExecuteInterruptPoint, ScheduleInterruptPoint
-from bamboo_engine.engine import Engine
-from bamboo_engine.interrupt import (
-    ExecuteInterrupter,
-    ExecuteKeyPoint,
-    ScheduleInterrupter,
-    ScheduleKeyPoint,
-)
-
+from pipeline.contrib.celery_tools.periodic import periodic_task
+from pipeline.contrib.diagnostics.events import emit_event
 from pipeline.eri.models import LogEntry
 from pipeline.eri.runtime import BambooDjangoRuntime
-
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +95,16 @@ def schedule(
         f"(process_id: {process_id}, node_id: {node_id}, schedule_id: {schedule_id}, headers: {headers})"
     )
     _observe_message_delay(metrics.ENGINE_RUNTIME_SCHEDULE_TASK_CLAIM_DELAY, headers)
+    emit_event(
+        event_type="schedule_received",
+        root_pipeline_id="",
+        node_id=node_id,
+        result="received",
+        process_id=process_id,
+        schedule_id=schedule_id,
+        callback_data_id=callback_data_id,
+        payload={"headers": headers or {}},
+    )
 
     runtime = BambooDjangoRuntime()
     recover_point = ScheduleInterruptPoint.from_json(recover_point)
