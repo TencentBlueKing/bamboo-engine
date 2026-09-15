@@ -13,9 +13,10 @@ jobs:
       DB_PASSWORD: root
       PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
     strategy:
+      fail-fast: false
       matrix:
         python-version: [3.6.12, 3.7.16]
-        django-version: ["2.2", "3.0"]
+        django-version: ["2.2", "3.2"]
 
     steps:
 
