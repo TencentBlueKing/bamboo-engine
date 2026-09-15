@@ -52,7 +52,7 @@ jobs:
       run: |
         cd runtime/bamboo-pipeline/test
         poetry install
-        poetry run pip install "Django>${{ matrix.django-version }}"
+        poetry run pip install "Django>=4.2,<4.3"
 
     - name: Run test
       run: |

@@ -23,7 +23,7 @@ jobs:
           python -VV
           python -m site
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install --upgrade coverage[toml] virtualenv tox tox-gh-actions
+          python -m pip install "coverage[toml]" virtualenv==20.29.1 tox==4.24.1 tox-gh-actions==3.2.0
           python -m pip install poetry==2.0.0
           python -m pip install urllib3==2.3.0
 
