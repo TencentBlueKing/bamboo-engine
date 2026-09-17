@@ -43,6 +43,10 @@
         - [example](#1201-example)
     - [get_node_short_histories](#121-get_node_short_histories)
         - [example](#1211-example)
+    - [get_node_execution_time](#122-get_node_execution_time)
+        - [example](#1221-example)
+    - [get_pipeline_execution_time](#123-get_pipeline_execution_time)
+        - [example](#1231-example)
 
 <!-- /TOC -->
 
@@ -879,3 +883,71 @@ api.get_node_histories(runtime=runtime, node_id="node_id").data
     }
 ]
 ```
+
+<a id="toc_anchor" name="#122-get_node_execution_time"></a>
+
+### 1.22 get_node_execution_time
+
+> 节点的运行时间指的是节点从开始到结束状态的时间，单位: 秒。 当节点未结束时，表示节点运行到此刻的持续时间。
+```python
+def get_node_execution_time(runtime: EngineRuntimeInterface, node_id: str):
+    """
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param node_id: node_id 
+    :type node_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+```
+
+<a id="toc_anchor" name="#1221-example"></a>
+
+### 1.22.1. example
+
+```python
+runtime = BambooDjangoRuntime()
+api.get_node_execution_time(runtime=runtime, node_id="node_id").data
+
+{
+    "state": "FINISHED", # 节点状态
+    "started_time": datetime.datetime(2021, 3, 10, 11, 10, 9, 350028, tzinfo=<UTC>), # 节点开始执行时间
+    "archived_time": datetime.datetime(2021, 3, 10, 11, 10, 9, 352609, tzinfo=<UTC>), # 执行完成（成功或失败）时间
+    "execution_time": 10.0, #执行的秒数
+}
+```
+
+<a id="toc_anchor" name="#123-get_node_execution_time"></a>
+
+### 1.23 get_pipeline_execution_time
+
+> 任务的运行时间指的是任务从开始到结束状态的时间，单位: 秒。 当任务未结束时，表示任务运行到此刻的持续时间。
+```python
+def get_pipeline_execution_time(runtime: EngineRuntimeInterface, pipeline_id: str):
+    """
+    获取节点或者流程的运行时间信息，
+    :param runtime: 引擎运行时实例
+    :type runtime: EngineRuntimeInterface
+    :param pipeline_id:  pipeline_id
+    :type pipeline_id: str
+    :return: 执行结果
+    :rtype: EngineAPIResult
+    """
+```
+
+<a id="toc_anchor" name="#1231-example"></a>
+
+### 1.23.1. example
+
+```python
+runtime = BambooDjangoRuntime()
+api.get_pipeline_execution_time(runtime=runtime, pipeline_id="pipeline_id").data
+
+{
+    "state": "FINISHED", # 节点状态
+    "started_time": datetime.datetime(2021, 3, 10, 11, 10, 9, 350028, tzinfo=<UTC>), # 节点开始执行时间
+    "archived_time": datetime.datetime(2021, 3, 10, 11, 10, 9, 352609, tzinfo=<UTC>), # 执行完成（成功或失败）时间
+    "execution_time": 10.0, #执行的秒数
+}
+```
+
