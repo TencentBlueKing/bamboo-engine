@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import time
 from collections import Counter
 
 from django.utils import timezone
@@ -60,7 +61,7 @@ def classify(callback, state, schedule, root_state=None):
         return OUTCOME_NOT_CALLBACK
     if schedule.schedule_times > 0:
         return OUTCOME_CONSUMED
-    if root_state is not None and root_state != states.RUNNING:
+    if root_state != states.RUNNING:
         return OUTCOME_ROOT_INACTIVE
     if schedule.scheduling:
         return OUTCOME_SCHEDULING
@@ -110,7 +111,7 @@ def _settle(pending, now_ts, confirm_seconds, pending_max_seconds):
             continue
         first_seen = pending[str(callback.id)]
         age = None if first_seen is None else now_ts - first_seen
-        if outcome == OUTCOME_PENDING and (age is None or age >= confirm_seconds):
+        if outcome == OUTCOME_PENDING and (age is None or age > confirm_seconds):
             lost.append((callback, state, schedule, age))
         elif age is not None and age >= pending_max_seconds:
             outcomes["watch_timeout"] += 1
@@ -228,15 +229,26 @@ def scan_callbacks(now=None, dry_run=False, max_rows=None, force=False):
     return report
 
 
-def backfill_callbacks(from_id, to_id=None, now=None, dry_run=True, max_rows=None):
-    """一次性回扫 [from_id, to_id] 的存量回调。数据年龄未知，按当前状态直接判定；默认只预演、不立案。"""
+def backfill_callbacks(from_id, to_id=None, now=None, dry_run=True, max_rows=None, confirm_seconds=None):
+    """一次性回扫 [from_id, to_id] 的存量回调；默认只预演、不立案。
+
+    数据年龄未知，先按当前状态判定一次；判为丢失的等 confirm_seconds（默认 CALLBACK_CONFIRM_SECONDS，0 不等）后
+    再判一次，两次都判为丢失才报告，避免把刚落库、仍在排队或回调锁重试中的回调误报为丢失。
+    """
     now = now or timezone.now()
     max_rows = conf.callback_max_rows() if max_rows is None else max_rows
+    confirm_seconds = conf.callback_confirm_seconds() if confirm_seconds is None else confirm_seconds
     queryset = CallbackData.objects.filter(id__gte=from_id).order_by("id")
     if to_id is not None:
         queryset = queryset.filter(id__lte=to_id)
     ids = list(queryset.values_list("id", flat=True)[:max_rows])
     lost, _keep, outcomes = _settle({str(callback_id): None for callback_id in ids}, now.timestamp(), 0, 0)
+    if lost:
+        if confirm_seconds:
+            time.sleep(confirm_seconds)
+        confirmed, _keep, _outcomes = _settle({str(item[0].id): None for item in lost}, now.timestamp(), 0, 0)
+        outcomes["backfill_unconfirmed"] = len(lost) - len(confirmed)
+        lost = confirmed
     hits, cases = _emit(lost, dry_run)
     report = ScanReport(
         BACKFILL_NAME, len(ids), len(lost), hits, cases, None, len(ids) >= max_rows, dry_run, dict(outcomes)

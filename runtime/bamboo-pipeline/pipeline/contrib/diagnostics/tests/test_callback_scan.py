@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from types import SimpleNamespace
+from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
@@ -28,7 +29,7 @@ from pipeline.contrib.diagnostics.tests.factories import (
     callback_shape,
     running_root,
 )
-from pipeline.eri.models import CallbackData, Schedule
+from pipeline.eri.models import CallbackData, Schedule, State
 
 
 def _shape(state_version="v1", state_name="RUNNING", schedule_type=CALLBACK, **schedule_fields):
@@ -59,6 +60,9 @@ class ClassifyTest(SimpleTestCase):
     def test_scheduling_and_inactive_root(self):
         self.assertEqual(classify(*_shape(scheduling=True), root_state="RUNNING"), OUTCOME_SCHEDULING)
         self.assertEqual(classify(*_shape(), root_state="REVOKED"), OUTCOME_ROOT_INACTIVE)
+
+    def test_missing_root_state_is_inactive(self):
+        self.assertEqual(classify(*_shape(), root_state=None), OUTCOME_ROOT_INACTIVE)
 
 
 def _prime():
@@ -93,6 +97,23 @@ class CallbackScanTest(DiagnosticsTestCase):
         self.assertIn("callback_data_id=", hit.evidence["derived_message"])
         self.assertTrue(DiagnosticCase.objects.filter(stuck_type=CALLBACK_DISPATCH_LOST).exists())
 
+    def test_age_equal_to_confirm_window_stays_pending(self):
+        now = self.now.replace(microsecond=0)
+        _process, _schedule, callback = callback_shape()
+        _prime()
+        scan_callbacks(now=now)
+        report = scan_callbacks(now=now + timedelta(seconds=120))
+        self.assertEqual(report.hits, [])
+        self.assertIn(str(callback.id), load_cursor(CURSOR_NAME).extra["pending"])
+
+    def test_missing_root_state_opens_no_case(self):
+        State.objects.filter(node_id="root-1").delete()
+        callback_shape()
+        _prime()
+        scan_callbacks(now=self.now)
+        self.assertEqual(scan_callbacks(now=self.later(130)).hits, [])
+        self.assertFalse(DiagnosticCase.objects.exists())
+
     def test_consumed_callback_is_not_tracked(self):
         callback_shape(finished=True)
         _prime()
@@ -125,10 +146,30 @@ class CallbackScanTest(DiagnosticsTestCase):
 
     def test_backfill_dry_run_reports_without_writing(self):
         _process, _schedule, callback = callback_shape()
-        report = backfill_callbacks(callback.id, now=self.now)
+        report = backfill_callbacks(callback.id, now=self.now, confirm_seconds=0)
         self.assertEqual(len(report.hits), 1)
         self.assertTrue(report.dry_run)
         self.assertFalse(DiagnosticCase.objects.exists())
+
+    def test_backfill_drops_callback_consumed_while_confirming(self):
+        _process, schedule, callback = callback_shape()
+
+        def consume(_seconds):
+            Schedule.objects.filter(id=schedule.id).update(schedule_times=1)
+
+        with mock.patch("pipeline.contrib.diagnostics.callback_scan.time.sleep", side_effect=consume) as sleep:
+            report = backfill_callbacks(callback.id, now=self.now, confirm_seconds=120)
+        sleep.assert_called_once_with(120)
+        self.assertEqual(report.hits, [])
+        self.assertEqual(report.outcomes["backfill_unconfirmed"], 1)
+
+    def test_backfill_reports_callback_still_pending_after_confirm(self):
+        _process, _schedule, callback = callback_shape()
+        with mock.patch("pipeline.contrib.diagnostics.callback_scan.time.sleep") as sleep:
+            report = backfill_callbacks(callback.id, now=self.now, confirm_seconds=120)
+        sleep.assert_called_once_with(120)
+        self.assertEqual(len(report.hits), 1)
+        self.assertEqual(report.outcomes["backfill_unconfirmed"], 0)
 
     @override_settings(PIPELINE_DIAGNOSTICS_CALLBACK_SCAN_ENABLED=False)
     def test_disabled_by_default(self):
