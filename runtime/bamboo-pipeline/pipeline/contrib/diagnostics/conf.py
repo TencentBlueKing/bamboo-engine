@@ -69,3 +69,73 @@ def case_retention_days():
 
 def audit_retention_days():
     return _get_setting("AUDIT_RETENTION_DAYS", 365)
+
+
+def _split(value):
+    if isinstance(value, str):
+        value = value.split(",")
+    return [str(item).strip() for item in (value or ()) if str(item).strip()]
+
+
+def window_scan_enabled():
+    return _get_setting("WINDOW_SCAN_ENABLED", False)
+
+
+def window_tiers_seconds():
+    """静默窗口扫描的阈值档位（秒），升序；接受元组、列表或逗号分隔的字符串。"""
+    return tuple(sorted(int(item) for item in _split(_get_setting("WINDOW_TIERS", (3600, 86400)))))
+
+
+def signature_scan_enabled():
+    return _get_setting("SIGNATURE_SCAN_ENABLED", False)
+
+
+def signature_fast_threshold_seconds():
+    return _get_setting("SIGNATURE_FAST_THRESHOLD_SECONDS", 300)
+
+
+def signature_slow_threshold_seconds():
+    return _get_setting("SIGNATURE_SLOW_THRESHOLD_SECONDS", 1800)
+
+
+def poll_exclude_codes():
+    """轮询续派（S3）不检查的插件 code，例如轮询间隔天然很长的定时插件。"""
+    return frozenset(_split(_get_setting("POLL_EXCLUDE_CODES", ())))
+
+
+def signature_close_batch():
+    return _get_setting("SIGNATURE_CLOSE_BATCH", 500)
+
+
+def callback_scan_enabled():
+    return _get_setting("CALLBACK_SCAN_ENABLED", False)
+
+
+def callback_confirm_seconds():
+    """回调持续未被消费多久才立案；要长于引擎回调锁重试的总时长（约 19 秒）。"""
+    return _get_setting("CALLBACK_CONFIRM_SECONDS", 120)
+
+
+def callback_pending_max_seconds():
+    return _get_setting("CALLBACK_PENDING_MAX_SECONDS", 1800)
+
+
+def callback_pending_limit():
+    return _get_setting("CALLBACK_PENDING_LIMIT", 5000)
+
+
+def callback_max_rows():
+    return _get_setting("CALLBACK_MAX_ROWS", 5000)
+
+
+def scan_page_size():
+    return _get_setting("SCAN_PAGE_SIZE", 500)
+
+
+def scan_max_rows():
+    return _get_setting("SCAN_MAX_ROWS", 20000)
+
+
+def scan_initial_lookback_seconds():
+    """水位表里还没有记录时，首轮只回看这么久；更早的存量用预演命令单独看。"""
+    return _get_setting("SCAN_INITIAL_LOOKBACK_SECONDS", 3600)
