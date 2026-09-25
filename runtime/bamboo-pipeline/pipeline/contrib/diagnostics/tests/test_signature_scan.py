@@ -27,6 +27,16 @@ class SignatureScanTest(DiagnosticsTestCase):
         self.assertEqual(len(reports[0].hits), 1)
         self.assertTrue(DiagnosticCase.objects.filter(stuck_type=EXECUTE_DISPATCH_LOST).exists())
 
+    def test_fast_tier_catches_execute_finished_after_heartbeat(self):
+        s1_shape(beat=305, archived=265)
+        now = timezone.now()
+        runs = []
+        for minute in range(5):
+            (fast,) = scan_signatures(now=now + timedelta(minutes=minute), confirm_seconds=0, tiers=[TIER_FAST])
+            runs.append((fast.rows, len(fast.hits), fast.cases))
+        self.assertEqual(runs, [(0, 0, 0), (1, 1, 1), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
+        self.assertTrue(DiagnosticCase.objects.filter(stuck_type=EXECUTE_DISPATCH_LOST).exists())
+
     def test_slow_tier_catches_poll_continuation(self):
         poll_shape(beat=2000, times=3)
         fast, slow = scan_signatures(confirm_seconds=0)

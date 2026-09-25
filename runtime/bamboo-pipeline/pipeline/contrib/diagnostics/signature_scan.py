@@ -33,6 +33,9 @@ from pipeline.eri.models import Process
 
 TIER_FAST = "signature_fast"
 TIER_SLOW = "signature_slow"
+# S1 按节点完成时间判静默，完成时间比心跳晚一段调度处理耗时；快档窗口多留一分钟，
+# 让处理耗时在一分钟内的 S1 在快档读到它的那一轮就已满足阈值
+FAST_WINDOW_GRACE_SECONDS = 60
 
 
 def _candidates():
@@ -96,7 +99,7 @@ def _scan_tier(name, threshold_seconds, slow, now, dry_run, max_rows, confirm_se
 def scan_signatures(
     now=None, dry_run=False, max_rows=None, confirm_seconds=None, start_override=None, force=False, tiers=None
 ):
-    """快档（心跳刚跨过 5 分钟）查 S1/S2/S5/S6，慢档（跨过 30 分钟）再查一遍并加上 S3。
+    """快档（心跳刚跨过快档阈值加一分钟，默认 5+1 分钟）查 S1/S2/S5/S6，慢档（跨过 30 分钟）再查一遍并加上 S3。
 
     每个进程在每一档只在跨线那一轮被检查一次；跨线之后才出现的形态由慢档或窗口扫描兜底。
     """
@@ -106,7 +109,7 @@ def scan_signatures(
     max_rows = conf.scan_max_rows() if max_rows is None else max_rows
     confirm_seconds = conf.second_confirm_seconds() if confirm_seconds is None else confirm_seconds
     plan = [
-        (TIER_FAST, conf.signature_fast_threshold_seconds(), False),
+        (TIER_FAST, conf.signature_fast_threshold_seconds() + FAST_WINDOW_GRACE_SECONDS, False),
         (TIER_SLOW, conf.signature_slow_threshold_seconds(), True),
     ]
     reports = [
