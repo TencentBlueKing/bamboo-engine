@@ -208,6 +208,10 @@ def detect_parent_wakeup_lost(child, ctx):
     parent = ctx.parents.get(child.parent_id)
     if not child.dead or parent is None or not _asleep_alive(parent):
         return None
+    state = ctx.states.get(parent.current_node_id)
+    # 循环里上一轮的子进程仍以同一父进程、同一终点保持 dead；本轮子进程的心跳都严格晚于网关本轮的完成时间
+    if state is None or state.archived_time is None or child.last_heartbeat <= state.archived_time:
+        return None
     if parent.need_ack != -1 or ctx.live_children.get(parent.id, 0) != 0:
         return None
     detail = ctx.nodes.get(parent.current_node_id) or {}
@@ -215,14 +219,13 @@ def detect_parent_wakeup_lost(child, ctx):
         return None
     if child.last_heartbeat > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
         return None
-    state = ctx.states.get(parent.current_node_id)
     return _hit(
         PARENT_WAKEUP_LOST,
         "S5",
         "critical",
         parent,
         parent.current_node_id,
-        state.version if state is not None else "",
+        state.version,
         derived_message="execute(process_id={}, node_id={})".format(parent.id, child.destination_id),
         message="并行分支已全部结束，但唤醒父进程的执行消息没有被消费",
         extra_evidence={"child_process_id": child.id, "child_last_heartbeat": child.last_heartbeat.isoformat()},

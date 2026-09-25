@@ -141,13 +141,18 @@ class ParentWakeupLostTest(SignatureTestCase):
         self.assertIn("node_id=cg", hit.evidence["derived_message"])
 
     def test_live_sibling_means_not_converged_yet(self):
-        parent = fork_parent(need_ack=2)
+        parent = fork_parent(need_ack=-1)
         make_process(node="b2", beat=ago(900), parent_id=parent.id, destination_id="cg")
         self.assertIsNone(self.detect(detect_parent_wakeup_lost, self._dead_child(parent, 600)))
 
     def test_recent_finish_waits_for_threshold(self):
         parent = fork_parent(need_ack=-1)
         self.assertIsNone(self.detect(detect_parent_wakeup_lost, self._dead_child(parent, 60)))
+
+    def test_child_from_earlier_loop_round_is_ignored(self):
+        parent = fork_parent(need_ack=-1)
+        self.assertIsNone(self.detect(detect_parent_wakeup_lost, self._dead_child(parent, 1500)))
+        self.assertIsNotNone(self.detect(detect_parent_wakeup_lost, self._dead_child(parent, 600)))
 
 
 class ChildStartLostTest(SignatureTestCase):
