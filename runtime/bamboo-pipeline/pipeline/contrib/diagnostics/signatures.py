@@ -21,14 +21,22 @@ from django.utils import timezone
 from bamboo_engine.eri import ScheduleType
 
 from pipeline.contrib.diagnostics import conf
-from pipeline.contrib.diagnostics.case_types import EXECUTE_DISPATCH_LOST, POLL_DISPATCH_LOST
+from pipeline.contrib.diagnostics.case_types import (
+    CHILD_START_LOST,
+    EXECUTE_DISPATCH_LOST,
+    PARENT_WAKEUP_LOST,
+    POLL_DISPATCH_LOST,
+)
+from pipeline.contrib.diagnostics.cases import resolve_case
 from pipeline.contrib.diagnostics.cursor import chunks
+from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.contrib.diagnostics.progress import root_states
 from pipeline.contrib.diagnostics.types import DiagnosticHit
 from pipeline.engine import states
 from pipeline.eri.models import Node, Process, Schedule, State
 
 POLL = ScheduleType.POLL.value
+FORK_GATEWAY_TYPES = ("ParallelGateway", "ConditionalParallelGateway")
 
 SignatureContext = namedtuple(
     "SignatureContext", ["now", "roots", "states", "schedules", "nodes", "parents", "live_children"]
@@ -195,18 +203,77 @@ def detect_poll_dispatch_lost(process, ctx, continuation):
     )
 
 
+def detect_parent_wakeup_lost(child, ctx):
+    """S5：最后一个子进程已把父进程的 ACK 记满（need_ack 归为 -1），但唤醒父进程的执行消息没有被消费。"""
+    parent = ctx.parents.get(child.parent_id)
+    if not child.dead or parent is None or not _asleep_alive(parent):
+        return None
+    if parent.need_ack != -1 or ctx.live_children.get(parent.id, 0) != 0:
+        return None
+    detail = ctx.nodes.get(parent.current_node_id) or {}
+    if detail.get("type") not in FORK_GATEWAY_TYPES or detail.get("converge_gateway_id") != child.destination_id:
+        return None
+    if child.last_heartbeat > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
+        return None
+    state = ctx.states.get(parent.current_node_id)
+    return _hit(
+        PARENT_WAKEUP_LOST,
+        "S5",
+        "critical",
+        parent,
+        parent.current_node_id,
+        state.version if state is not None else "",
+        derived_message="execute(process_id={}, node_id={})".format(parent.id, child.destination_id),
+        message="并行分支已全部结束，但唤醒父进程的执行消息没有被消费",
+        extra_evidence={"child_process_id": child.id, "child_last_heartbeat": child.last_heartbeat.isoformat()},
+        related_extra={"converge_gateway_id": child.destination_id},
+    )
+
+
+def detect_child_start_lost(child, ctx):
+    """S6：父进程已 fork 并开始等待，但启动子进程的执行消息没有被消费，子进程从未跑过。"""
+    parent = ctx.parents.get(child.parent_id)
+    if not _asleep_alive(child) or parent is None or not _asleep_alive(parent) or parent.need_ack <= 0:
+        return None
+    node_id = child.current_node_id
+    state = ctx.states.get(node_id)
+    if state is not None:
+        # 只接受上一轮循环残留的完成状态：它早于子进程创建时写下的唯一一次心跳；相等时无法区分，不判
+        leftover = state.name == states.FINISHED and state.archived_time is not None
+        if not leftover or state.archived_time >= child.last_heartbeat:
+            return None
+    if child.last_heartbeat > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
+        return None
+    return _hit(
+        CHILD_START_LOST,
+        "S6",
+        "critical",
+        child,
+        node_id,
+        state.version if state is not None else "",
+        derived_message="execute(process_id={}, node_id={})".format(child.id, node_id),
+        message="子进程已创建，但启动它的执行消息没有被消费",
+        extra_evidence={"parent_process_id": parent.id, "destination_id": child.destination_id},
+        related_extra={"parent_process_id": parent.id},
+    )
+
+
 def evaluate(processes, ctx, slow):
-    """返回 [(触发进程, 命中)]。慢档额外检查轮询续派。"""
+    """返回 [(触发进程, 命中)]。已结束的子进程只用来发现父进程没被唤醒；慢档额外检查轮询续派。"""
     hits = []
     for process in processes:
-        if process.dead or not _root_running(process, ctx):
+        if not _root_running(process, ctx):
             continue
-        found = [
-            detect_execute_dispatch_lost(process, ctx),
-            detect_poll_dispatch_lost(process, ctx, continuation=False),
-        ]
-        if slow:
-            found.append(detect_poll_dispatch_lost(process, ctx, continuation=True))
+        if process.dead:
+            found = [detect_parent_wakeup_lost(process, ctx)]
+        else:
+            found = [
+                detect_execute_dispatch_lost(process, ctx),
+                detect_poll_dispatch_lost(process, ctx, continuation=False),
+                detect_child_start_lost(process, ctx),
+            ]
+            if slow:
+                found.append(detect_poll_dispatch_lost(process, ctx, continuation=True))
         hits.extend((process, hit) for hit in found if hit is not None)
     return hits
 
@@ -214,3 +281,44 @@ def evaluate(processes, ctx, slow):
 def hit_identity(hit):
     related = hit.related_objects
     return hit.type, related["process_id"], related["node_id"], hit.evidence.get("state_version", "")
+
+
+def _trigger_process_id(case):
+    if case.stuck_type == PARENT_WAKEUP_LOST:
+        return (case.evidence or {}).get("child_process_id")
+    return (case.related_objects or {}).get("process_id")
+
+
+def still_holds(case):
+    """用案例里的触发进程重新判定；形态、进程、节点、版本都一致才算仍然卡着。"""
+    process_id = _trigger_process_id(case)
+    processes = list(Process.objects.defer("pipeline_stack").filter(id=process_id)) if process_id else []
+    if not processes:
+        return False
+    identity = (
+        case.stuck_type,
+        (case.related_objects or {}).get("process_id"),
+        case.node_id,
+        (case.evidence or {}).get("state_version", ""),
+    )
+    hits = evaluate(processes, build_context(processes), slow=True)
+    return any(hit_identity(hit) == identity for _process, hit in hits)
+
+
+def close_resolved_signature_cases(stuck_types, holds=still_holds, now=None, batch=None):
+    """按 updated_at 轮转复核一批未关闭的形态案例：不再成立的关闭，仍成立的刷新 updated_at 排到队尾。返回关闭数。"""
+    now = now or timezone.now()
+    batch = conf.signature_close_batch() if batch is None else batch
+    cases = list(
+        DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN, stuck_type__in=list(stuck_types)).order_by(
+            "updated_at", "id"
+        )[:batch]
+    )
+    closed = 0
+    for case in cases:
+        if holds(case):
+            DiagnosticCase.objects.filter(id=case.id).update(updated_at=now)
+        else:
+            resolve_case(case, now=now)
+            closed += 1
+    return closed
