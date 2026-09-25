@@ -25,14 +25,19 @@ SIGNATURE_TIERS = {"fast": TIER_FAST, "slow": TIER_SLOW}
 
 
 class Command(BaseCommand):
-    help = "手动运行三期检测扫描器；--dry-run 只读预演（不立案、不推进水位、不关闭案例），生产环境预览必须带上"
+    help = "手动运行三期检测扫描器；--dry-run 只读预演、不写任何表，生产环境预览必须带上"
 
     def add_arguments(self, parser):
         parser.add_argument("--scanner", choices=["window", "signature", "callback"], required=True)
         parser.add_argument("--dry-run", action="store_true", dest="dry_run")
         parser.add_argument("--max-rows", type=int, dest="max_rows")
-        parser.add_argument("--tier", dest="tier", help="window：阈值秒数，默认全部档位；signature：fast 或 slow")
-        parser.add_argument("--start-seconds", type=int, dest="start_seconds", help="忽略水位，从 now 往前这么多秒开始扫")
+        parser.add_argument("--tier", dest="tier", help="window：已配置的阈值秒数，默认全部档位；signature：fast 或 slow；callback 不用")
+        parser.add_argument(
+            "--start-seconds",
+            type=int,
+            dest="start_seconds",
+            help="window/signature：从 now 往前这么多秒开始扫，不读也不写水位；callback 不用",
+        )
         parser.add_argument("--from-callback-id", type=int, dest="from_callback_id", help="callback：回扫起点 id")
         parser.add_argument("--to-callback-id", type=int, dest="to_callback_id", help="callback：回扫终点 id（含）")
         parser.add_argument("--confirm", type=int, dest="confirm", help="二次确认等待秒数，默认用配置值")
@@ -41,13 +46,23 @@ class Command(BaseCommand):
         scanner = options.get("scanner")
         dry_run = bool(options.get("dry_run"))
         now = timezone.now()
+        for key in ("max_rows", "start_seconds"):
+            if options.get(key) is not None and options[key] < 1:
+                raise CommandError("--{} 必须大于 0".format(key.replace("_", "-")))
+        if options.get("confirm") is not None and options["confirm"] < 0:
+            raise CommandError("--confirm 不能为负数")
         start_seconds = options.get("start_seconds")
-        start_override = now - timedelta(seconds=start_seconds) if start_seconds else None
+        start_override = now - timedelta(seconds=start_seconds) if start_seconds is not None else None
         max_rows = options.get("max_rows")
         tier = options.get("tier")
 
         if scanner == "window":
-            tiers = [int(tier)] if tier else list(conf.window_tiers_seconds())
+            configured = conf.window_tiers_seconds()
+            if tier and tier not in [str(threshold) for threshold in configured]:
+                raise CommandError(
+                    "window 的 --tier 只能是已配置的档位：{}".format(",".join(str(threshold) for threshold in configured))
+                )
+            tiers = [int(tier)] if tier else list(configured)
             reports = [
                 scan_silence_window(
                     threshold,

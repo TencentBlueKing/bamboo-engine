@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
+import math
 from collections import defaultdict
 from datetime import timedelta
 
@@ -26,7 +27,8 @@ from pipeline.eri.models import Node, Process, Schedule, State
 
 
 def _percentile(values, percent):
-    return int(values[min(len(values) - 1, int(len(values) * percent / 100))])
+    """最近秩百分位，values 须已升序。"""
+    return int(values[max(0, int(math.ceil(len(values) * percent / 100.0)) - 1)])
 
 
 class Command(BaseCommand):
@@ -39,15 +41,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         now = timezone.now()
+        max_rows = options.get("max_rows") or 20000
         since = now - timedelta(days=options.get("days") or 7)
-        processes = Process.objects.filter(dead=False, asleep=True, last_heartbeat__gte=since).only(
-            "id", "current_node_id", "last_heartbeat"
+        processes = list(
+            Process.objects.filter(dead=False, asleep=True, last_heartbeat__gte=since).only(
+                "id", "current_node_id", "last_heartbeat"
+            )
+            # 截断时丢心跳最新的、留静默最久的，据此定的阈值只会偏宽
+            .order_by("last_heartbeat")[:max_rows]
         )
-        by_node = {
-            process.current_node_id: process
-            for process in processes.order_by("-last_heartbeat")[: options.get("max_rows") or 20000]
-            if process.current_node_id
-        }
+        by_node = {process.current_node_id: process for process in processes if process.current_node_id}
 
         state_map, code_map, schedule_map = {}, {}, {}
         for chunk in chunks(by_node):
@@ -69,14 +72,19 @@ class Command(BaseCommand):
             silent = (now - process.last_heartbeat).total_seconds()
             interval = None
             if state.started_time is not None:
-                interval = (now - state.started_time).total_seconds() / schedule.schedule_times
+                # 每次轮询都刷新心跳，按上次心跳计算，当前这段静默不摊进间隔
+                interval = (process.last_heartbeat - state.started_time).total_seconds() / schedule.schedule_times
             profile[code_map.get(node_id, "")].append((silent, interval))
 
-        self.stdout.write("code count silent_p50 silent_p90 silent_max avg_interval")
+        capped = len(processes) >= max_rows
+        self.stdout.write("rows={} capped={}".format(len(processes), capped))
+        if capped:
+            self.stderr.write("已读满 --max-rows，缺的是心跳最新的进程；调大 --max-rows 或缩小 --days 后再看")
+        self.stdout.write("code count silent_p50 silent_p90 silent_max interval_p50")
         ranked = sorted(profile.items(), key=lambda item: -len(item[1]))[: options.get("limit") or 50]
         for code, samples in ranked:
             silents = sorted(silent for silent, _interval in samples)
-            intervals = [interval for _silent, interval in samples if interval is not None]
+            intervals = sorted(interval for _silent, interval in samples if interval is not None)
             self.stdout.write(
                 "{} {} {} {} {} {}".format(
                     code or "-",
@@ -84,6 +92,6 @@ class Command(BaseCommand):
                     _percentile(silents, 50),
                     _percentile(silents, 90),
                     int(silents[-1]),
-                    int(sum(intervals) / len(intervals)) if intervals else "-",
+                    _percentile(intervals, 50) if intervals else "-",
                 )
             )

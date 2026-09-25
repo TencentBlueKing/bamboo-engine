@@ -91,7 +91,8 @@ def _scan_tier(name, threshold_seconds, slow, now, dry_run, max_rows, confirm_se
         lag = int((cutoff - last.last_heartbeat).total_seconds())
     else:
         position, position_id, lag = cutoff, EXHAUSTED_ID, 0
-    if not dry_run:
+    if not dry_run and start_override is None:
+        # 指定起点是人工补扫，写水位会让原水位与指定起点之间的行永远扫不到
         save_cursor(name, position=position, position_id=position_id)
     return ScanReport(name, rows, len(found), hits, cases, lag, capped, dry_run, {})
 

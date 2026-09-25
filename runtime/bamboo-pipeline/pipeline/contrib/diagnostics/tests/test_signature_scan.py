@@ -76,6 +76,13 @@ class SignatureScanTest(DiagnosticsTestCase):
         self.assertFalse(DiagnosticCase.objects.exists())
         self.assertFalse(DiagnosticScanCursor.objects.exists())
 
+    def test_start_override_opens_case_without_moving_cursor(self):
+        s1_shape()
+        fast, _slow = scan_signatures(confirm_seconds=0, start_override=timezone.now() - timedelta(days=1))
+        self.assertEqual(len(fast.hits), 1)
+        self.assertTrue(DiagnosticCase.objects.filter(stuck_type=EXECUTE_DISPATCH_LOST).exists())
+        self.assertFalse(DiagnosticScanCursor.objects.exists())
+
     def test_tier_filter(self):
         s1_shape()
         reports = scan_signatures(confirm_seconds=0, dry_run=True, tiers=[TIER_SLOW])

@@ -65,6 +65,13 @@ class SilenceWindowScanTest(DiagnosticsTestCase):
         self.assertEqual(DiagnosticCase.objects.count(), 0)
         self.assertIsNone(load_cursor(cursor_name(3600)))
 
+    def test_start_override_opens_case_without_moving_cursor(self):
+        make_process(root="stuck", beat=ago(4000))
+        report = scan_silence_window(3600, confirm_seconds=0, start_override=ago(86400))
+        self.assertEqual(_roots(report), {"stuck"})
+        self.assertTrue(DiagnosticCase.objects.filter(root_pipeline_id="stuck").exists())
+        self.assertIsNone(load_cursor(cursor_name(3600)))
+
     def test_disabled_by_default(self):
         make_process(root="stuck", beat=ago(4000))
         self.assertEqual(scan_silence_windows(), [])
