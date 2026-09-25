@@ -13,10 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from datetime import timedelta
 
-from django.db.models import Max
+from django.db.models import Count, Max, Q
 from django.utils import timezone
 
-from pipeline.eri.models import Process
+from pipeline.eri.models import Process, State
 
 
 def stall_cutoff(threshold_seconds, now=None):
@@ -54,3 +54,23 @@ def root_last_progress(root_pipeline_id):
         .aggregate(latest=Max("last_heartbeat"))
         .get("latest")
     )
+
+
+def root_last_activity(root_pipeline_ids):
+    """{root: (所有进程的最新心跳, 存活进程数)}。
+
+    与 root_last_progress 不同，这里把已结束的子进程也算进去：并行分支全部结束而父进程没被唤醒时，
+    最新的心跳来自最后结束的子进程，只看存活进程会让这类 root 以更早的时间点提前进入窗口。
+    """
+    rows = (
+        Process.objects.filter(root_pipeline_id__in=list(root_pipeline_ids))
+        .values("root_pipeline_id")
+        .annotate(latest=Max("last_heartbeat"), live=Count("id", filter=Q(dead=False)))
+        .order_by()
+    )
+    return {row["root_pipeline_id"]: (row["latest"], row["live"]) for row in rows}
+
+
+def root_states(root_pipeline_ids):
+    """{root: 根流程状态名}。撤销只改根流程状态、不结束进程，判定前必须先看它。"""
+    return dict(State.objects.filter(node_id__in=list(root_pipeline_ids)).values_list("node_id", "name"))
