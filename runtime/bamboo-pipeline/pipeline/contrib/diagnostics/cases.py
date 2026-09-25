@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from pipeline.contrib.diagnostics import conf
+from pipeline.contrib.diagnostics.case_types import SIGNATURE_CASE_TYPES
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 
 
@@ -133,10 +134,18 @@ def close_stale_cases(threshold_seconds, now=None):
     cutoff = stall_cutoff(threshold_seconds, now=now)
     now_dt = now or timezone.now()
     to_close = []
-    for case in DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN).iterator():
+    for case in (
+        DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN)
+        .exclude(stuck_type__in=SIGNATURE_CASE_TYPES)
+        .iterator()
+    ):
         latest = root_last_progress(case.root_pipeline_id)
         if latest is None or latest >= cutoff:
             to_close.append(case)
     for case in to_close:
         _resolve_one(case, now_dt)
     return len(to_close)
+
+
+def resolve_case(case, now=None):
+    _resolve_one(case, now or timezone.now())
