@@ -54,6 +54,7 @@ class SilenceWindowScanTest(DiagnosticsTestCase):
         full = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="cb"), stall_seconds=4000)
         self.assertIn("callback_lock_conflict", {hit.type for hit in full})
         report = scan_silence_window(3600, confirm_seconds=0)
+        self.assertEqual(report.outcomes["confirmed"], 1)
         self.assertNotIn("callback_lock_conflict", {hit.type for _root, _node, hit in report.hits})
 
     def test_cursor_advances_and_rows_are_not_rescanned(self):
@@ -70,13 +71,13 @@ class SilenceWindowScanTest(DiagnosticsTestCase):
         self.assertTrue(first.capped)
         self.assertEqual(scan_silence_window(3600, confirm_seconds=0, max_rows=2).rows, 1)
 
-    @override_settings(PIPELINE_DIAGNOSTICS_WINDOW_MAX_ROOTS=2, PIPELINE_DIAGNOSTICS_SCAN_PAGE_SIZE=2)
+    @override_settings(PIPELINE_DIAGNOSTICS_WINDOW_MAX_ROOTS=2, PIPELINE_DIAGNOSTICS_SCAN_PAGE_SIZE=3)
     def test_root_cap_stops_at_page_end_and_resumes(self):
-        for index in range(3):
+        for index in range(4):
             make_process(root="stuck-%d" % index, beat=ago(4000 + index))
         first = scan_silence_window(3600, confirm_seconds=0)
         self.assertTrue(first.capped)
-        self.assertEqual(_roots(first), {"stuck-1", "stuck-2"})
+        self.assertEqual(_roots(first), {"stuck-1", "stuck-2", "stuck-3"})
         second = scan_silence_window(3600, confirm_seconds=0)
         self.assertFalse(second.capped)
         self.assertEqual(_roots(second), {"stuck-0"})
