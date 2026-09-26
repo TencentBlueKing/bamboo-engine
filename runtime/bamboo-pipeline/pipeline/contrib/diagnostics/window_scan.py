@@ -20,35 +20,39 @@ from pipeline.contrib.diagnostics.cases import close_stale_cases, upsert_case
 from pipeline.contrib.diagnostics.collector import collect_runtime_snapshot
 from pipeline.contrib.diagnostics.cursor import EXHAUSTED_ID, chunks, process_window_pages, save_cursor, window_start
 from pipeline.contrib.diagnostics.metrics import observe_hit, record_scan_report
-from pipeline.contrib.diagnostics.progress import root_last_activity, root_states, stall_cutoff
+from pipeline.contrib.diagnostics.progress import inactive_roots, root_last_activity, stall_cutoff
 from pipeline.contrib.diagnostics.rules import diagnose_snapshot
 from pipeline.contrib.diagnostics.scanner import _node_id_for_hit
 from pipeline.contrib.diagnostics.types import ScanReport
-from pipeline.engine import states
 from pipeline.eri.models import Process
-
-INACTIVE_ROOT_STATES = frozenset([states.FINISHED, states.REVOKED])
 
 
 def cursor_name(threshold_seconds):
     return "silence_window_{}".format(threshold_seconds)
 
 
-def _crossed_roots(start, start_id, cutoff, max_rows):
-    """心跳在本轮跨过 cutoff 的进程所属的 root；已结束的进程也参与，原因见 root_last_activity。"""
-    roots, rows, last = set(), 0, None
+def _silent_crossings(start, start_id, cutoff, max_rows, max_roots):
+    """按页读心跳跨过 cutoff 的进程，随读随判静默；已结束的进程也参与，原因见 root_last_activity。
+
+    静默 root 攒够 max_roots 就停在当前页末尾并按截断处理，水位停在已读的最后一行，剩下的行留给下一轮。
+    """
+    roots, silent, rows, last = set(), {}, 0, None
     queryset = Process.objects.only("id", "root_pipeline_id", "last_heartbeat")
     for page in process_window_pages(queryset, start, start_id, cutoff, conf.scan_page_size(), max_rows):
         rows += len(page)
-        roots.update(process.root_pipeline_id for process in page)
         last = page[-1]
-    return roots, rows, last
+        new_roots = {process.root_pipeline_id for process in page} - roots
+        roots.update(new_roots)
+        silent.update(_silent_roots(new_roots, cutoff))
+        if len(silent) >= max_roots:
+            return roots, silent, rows, last, True
+    return roots, silent, rows, last, rows >= max_rows
 
 
 def _silent_roots(roots, cutoff):
     silent = {}
     for chunk in chunks(roots):
-        inactive = {root for root, name in root_states(chunk).items() if name in INACTIVE_ROOT_STATES}
+        inactive = inactive_roots(chunk)
         for root_id, (latest, live) in root_last_activity(chunk).items():
             if root_id not in inactive and live and latest is not None and latest <= cutoff:
                 silent[root_id] = latest
@@ -70,7 +74,7 @@ def _confirm(silent, confirm_seconds):
 def scan_silence_window(
     threshold_seconds, now=None, confirm_seconds=None, max_rows=None, dry_run=False, start_override=None
 ):
-    """只看心跳在上一轮水位到本轮 cutoff 之间跨线的 root，不做全表分组，也不受 batch 截断。"""
+    """只看心跳在上一轮水位到本轮 cutoff 之间跨线的 root，不做全表分组；每轮处理的静默 root 数有上限，超出的留给下一轮。"""
     now = now or timezone.now()
     confirm_seconds = conf.second_confirm_seconds() if confirm_seconds is None else confirm_seconds
     max_rows = conf.scan_max_rows() if max_rows is None else max_rows
@@ -78,15 +82,13 @@ def scan_silence_window(
     cutoff = stall_cutoff(threshold_seconds, now=now)
     start, start_id = window_start(name, cutoff, conf.scan_initial_lookback_seconds(), start_override)
 
-    roots, rows, last = _crossed_roots(start, start_id, cutoff, max_rows)
-    capped = rows >= max_rows
-    silent = _silent_roots(roots, cutoff)
+    roots, silent, rows, last, capped = _silent_crossings(start, start_id, cutoff, max_rows, conf.window_max_roots())
     confirmed = _confirm(silent, confirm_seconds)
 
     hits, cases = [], 0
     for root_id, latest in confirmed.items():
         stall_seconds = int((now - latest).total_seconds())
-        snapshot = collect_runtime_snapshot(root_pipeline_id=root_id)
+        snapshot = collect_runtime_snapshot(root_pipeline_id=root_id, include_callback_data=False)
         for hit in diagnose_snapshot(snapshot, stall_seconds=stall_seconds):
             node_id = _node_id_for_hit(hit, snapshot.node_id)
             hits.append((root_id, node_id, hit))

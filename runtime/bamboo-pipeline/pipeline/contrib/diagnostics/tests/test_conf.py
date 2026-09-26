@@ -40,6 +40,7 @@ class Phase3ConfTest(TestCase):
         self.assertEqual(conf.callback_max_rows(), 5000)
         self.assertEqual(conf.scan_page_size(), 500)
         self.assertEqual(conf.scan_max_rows(), 20000)
+        self.assertEqual(conf.window_max_roots(), 1000)
         self.assertEqual(conf.scan_initial_lookback_seconds(), 3600)
 
     @override_settings(

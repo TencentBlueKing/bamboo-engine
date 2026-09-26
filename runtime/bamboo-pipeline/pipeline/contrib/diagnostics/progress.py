@@ -16,7 +16,11 @@ from datetime import timedelta
 from django.db.models import Count, Max, Q
 from django.utils import timezone
 
+from pipeline.contrib.diagnostics.cursor import chunks
+from pipeline.engine import states
 from pipeline.eri.models import Process, State
+
+INACTIVE_ROOT_STATES = frozenset([states.FINISHED, states.REVOKED])
 
 
 def stall_cutoff(threshold_seconds, now=None):
@@ -74,3 +78,11 @@ def root_last_activity(root_pipeline_ids):
 def root_states(root_pipeline_ids):
     """{root: 根流程状态名}。撤销只改根流程状态、不结束进程，判定前必须先看它。"""
     return dict(State.objects.filter(node_id__in=list(root_pipeline_ids)).values_list("node_id", "name"))
+
+
+def inactive_roots(root_pipeline_ids):
+    """根流程已结束或已撤销的 root。"""
+    inactive = set()
+    for chunk in chunks(root_pipeline_ids):
+        inactive.update(root for root, name in root_states(chunk).items() if name in INACTIVE_ROOT_STATES)
+    return inactive

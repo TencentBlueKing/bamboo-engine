@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from pipeline.contrib.diagnostics import conf
-from pipeline.contrib.diagnostics.case_types import SIGNATURE_CASE_TYPES
+from pipeline.contrib.diagnostics.case_types import ROOT_RULE_CASE_TYPES
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 
 
@@ -128,17 +128,21 @@ def _resolve_one(case, now_dt):
 
 
 def close_stale_cases(threshold_seconds, now=None):
-    """Resolve open cases whose root recovered (progressed within threshold) or has no live process."""
-    from pipeline.contrib.diagnostics.progress import root_last_progress, stall_cutoff
+    """Resolve open rule cases whose root progressed within threshold, has no live process, or was finished/revoked."""
+    from pipeline.contrib.diagnostics.progress import inactive_roots, root_last_progress, stall_cutoff
 
     cutoff = stall_cutoff(threshold_seconds, now=now)
     now_dt = now or timezone.now()
+    open_cases = list(
+        DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN, stuck_type__in=ROOT_RULE_CASE_TYPES)
+    )
+    # 撤销只改根流程状态、不结束进程，只看存活进程的心跳会让这类案例永远关不掉
+    inactive = inactive_roots({case.root_pipeline_id for case in open_cases})
     to_close = []
-    for case in (
-        DiagnosticCase.objects.filter(status=DiagnosticCase.STATUS_OPEN)
-        .exclude(stuck_type__in=SIGNATURE_CASE_TYPES)
-        .iterator()
-    ):
+    for case in open_cases:
+        if case.root_pipeline_id in inactive:
+            to_close.append(case)
+            continue
         latest = root_last_progress(case.root_pipeline_id)
         if latest is None or latest >= cutoff:
             to_close.append(case)

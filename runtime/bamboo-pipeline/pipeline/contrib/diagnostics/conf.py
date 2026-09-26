@@ -136,6 +136,11 @@ def scan_max_rows():
     return _get_setting("SCAN_MAX_ROWS", 20000)
 
 
+def window_max_roots():
+    """静默窗口扫描每档每轮最多处理的静默 root 数；攒够就停在当前页末尾，剩下的行留给下一轮。"""
+    return _get_setting("WINDOW_MAX_ROOTS", 1000)
+
+
 def scan_initial_lookback_seconds():
     """水位表里还没有记录时，首轮只回看这么久；更早的存量用预演命令单独看。"""
     return _get_setting("SCAN_INITIAL_LOOKBACK_SECONDS", 3600)

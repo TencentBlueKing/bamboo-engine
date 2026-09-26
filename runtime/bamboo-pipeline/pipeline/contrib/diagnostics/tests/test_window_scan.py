@@ -5,10 +5,12 @@ from datetime import timedelta
 from django.test import override_settings
 from django.utils import timezone
 
+from pipeline.contrib.diagnostics.collector import collect_runtime_snapshot
 from pipeline.contrib.diagnostics.cursor import load_cursor
 from pipeline.contrib.diagnostics.models import DiagnosticCase
+from pipeline.contrib.diagnostics.rules import diagnose_snapshot
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
-from pipeline.contrib.diagnostics.tests.factories import ago, make_process, make_state
+from pipeline.contrib.diagnostics.tests.factories import ago, make_callback, make_process, make_schedule, make_state
 from pipeline.contrib.diagnostics.window_scan import cursor_name, scan_silence_window, scan_silence_windows
 
 
@@ -44,6 +46,16 @@ class SilenceWindowScanTest(DiagnosticsTestCase):
         make_state("revoked", name="REVOKED", version="rv", root="revoked")
         self.assertEqual(scan_silence_window(3600, confirm_seconds=0).hits, [])
 
+    def test_window_snapshot_skips_callback_data(self):
+        process = make_process(root="cb", node="cb-node", beat=ago(4000))
+        make_state("cb-node", name="RUNNING", version="v1", root="cb", started=ago(4000))
+        make_schedule(process, "cb-node", version="v1")
+        make_callback("cb-node", version="v1")
+        full = diagnose_snapshot(collect_runtime_snapshot(root_pipeline_id="cb"), stall_seconds=4000)
+        self.assertIn("callback_lock_conflict", {hit.type for hit in full})
+        report = scan_silence_window(3600, confirm_seconds=0)
+        self.assertNotIn("callback_lock_conflict", {hit.type for _root, _node, hit in report.hits})
+
     def test_cursor_advances_and_rows_are_not_rescanned(self):
         make_process(root="stuck", beat=ago(4000))
         now = timezone.now()
@@ -57,6 +69,17 @@ class SilenceWindowScanTest(DiagnosticsTestCase):
         first = scan_silence_window(3600, confirm_seconds=0, max_rows=2)
         self.assertTrue(first.capped)
         self.assertEqual(scan_silence_window(3600, confirm_seconds=0, max_rows=2).rows, 1)
+
+    @override_settings(PIPELINE_DIAGNOSTICS_WINDOW_MAX_ROOTS=2, PIPELINE_DIAGNOSTICS_SCAN_PAGE_SIZE=2)
+    def test_root_cap_stops_at_page_end_and_resumes(self):
+        for index in range(3):
+            make_process(root="stuck-%d" % index, beat=ago(4000 + index))
+        first = scan_silence_window(3600, confirm_seconds=0)
+        self.assertTrue(first.capped)
+        self.assertEqual(_roots(first), {"stuck-1", "stuck-2"})
+        second = scan_silence_window(3600, confirm_seconds=0)
+        self.assertFalse(second.capped)
+        self.assertEqual(_roots(second), {"stuck-0"})
 
     def test_dry_run_writes_nothing(self):
         make_process(root="stuck", beat=ago(4000))
