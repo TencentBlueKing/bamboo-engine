@@ -13,11 +13,37 @@ specific language governing permissions and limitations under the License.
 
 import copy
 import datetime
+import io
+from unittest import mock
 
 from django.test import TestCase
 
-from pipeline.core.data import expression, sandbox
-from pipeline.core.data.expression import deformat_constant_key, format_constant_key
+from pipeline.core.data import expression, mako_safety, sandbox
+from pipeline.core.data.expression import format_constant_key, deformat_constant_key
+from pipeline.utils.mako_utils.checker import check_mako_template_safety
+from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
+
+
+_COMMAND_PATCHES = []
+_COMMAND_SINKS = []
+
+
+def setUpModule():
+    for name, result in (("os.system", 0), ("os.popen", io.StringIO("INERT")), ("subprocess.Popen", "INERT")):
+        patcher = mock.patch(name, return_value=result)
+        _COMMAND_SINKS.append(patcher.start())
+        _COMMAND_PATCHES.append(patcher)
+
+
+def tearDownModule():
+    for patcher in reversed(_COMMAND_PATCHES):
+        patcher.stop()
+    try:
+        for sink in _COMMAND_SINKS:
+            sink.assert_not_called()
+    finally:
+        _COMMAND_PATCHES.clear()
+        _COMMAND_SINKS.clear()
 
 
 class TestConstantTemplate(TestCase):
@@ -57,10 +83,16 @@ class TestConstantTemplate(TestCase):
 
     def test_resolve_template_with_curly_braces(self):
         cons_tmpl = expression.ConstantTemplate("")
-        one_template = '${"test_{}".format(a)}'
-        self.assertEqual(cons_tmpl.resolve_string(one_template, {"a": "1"}), "test_1")
-        ano_template = '${f"test_{a}"}'
-        self.assertEqual(cons_tmpl.resolve_template(ano_template, {"a": "2"}), "test_2")
+        # ``.format(...)`` / ``.format_map(...)`` 在 mako 模板里被显式禁用以阻断
+        # ``${"{0.__class__}".format("")}`` 这一类 dunder lookup 绕过；走 ``resolve_string``
+        # 时模板会被原样回显。
+        format_attr_template = '${"test_{}".format(a)}'
+        self.assertEqual(cons_tmpl.resolve_string(format_attr_template, {"a": "1"}), format_attr_template)
+        # 合法的等价写法：% 格式化与 f-string 仍正常渲染。
+        percent_template = '${"test_%s" % a}'
+        self.assertEqual(cons_tmpl.resolve_string(percent_template, {"a": "1"}), "test_1")
+        fstring_template = '${f"test_{a}"}'
+        self.assertEqual(cons_tmpl.resolve_template(fstring_template, {"a": "2"}), "test_2")
 
     def test_resolve_string(self):
         cons_tmpl = expression.ConstantTemplate("")
@@ -162,6 +194,7 @@ class TestConstantTemplate(TestCase):
         sandbox_copy = copy.deepcopy(sandbox.SANDBOX)
         shield_words = [
             "ascii",
+            "breakpoint",
             "bytearray",
             "bytes",
             "callable",
@@ -174,6 +207,7 @@ class TestConstantTemplate(TestCase):
             "exec",
             "eval",
             "filter",
+            "format",
             "frozenset",
             "getattr",
             "globals",
@@ -213,3 +247,396 @@ class TestConstantTemplate(TestCase):
             self.assertEqual(expression.ConstantTemplate(at).resolve_data({}), at)
 
         sandbox.SANDBOX = sandbox_copy
+
+
+class TestMakoNameWhitelist(TestCase):
+    def setUp(self):
+        from bamboo_engine.config import Settings as BambooSettings
+
+        self._BambooSettings = BambooSettings
+        self._original_mode = BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE
+        self._original_extra = BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST
+
+    def tearDown(self):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = self._original_mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = self._original_extra
+
+    def _set_mode(self, mode, extra=()):
+        self._BambooSettings.MAKO_TEMPLATE_NAME_WHITELIST_MODE = mode
+        self._BambooSettings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset(extra)
+
+    def test_existing_format_expressions_only_blocked_in_enforce(self):
+        from types import SimpleNamespace
+
+        cases = [
+            (
+                '${"gamedb.{}.xzj.db".format(set_info.bk_set_name[_loop-1])}',
+                {"set_info": SimpleNamespace(bk_set_name=["zone1"]), "_loop": 1},
+                "gamedb.zone1.xzj.db",
+            ),
+            ('${",".join(["haha{}".format(g) for g in groups])}', {"groups": ["a", "b"]}, "hahaa,hahab"),
+        ]
+        for mode in ("off", "warn", "enforce"):
+            self._set_mode(mode)
+            for template, context, expected in cases:
+                with self.subTest(mode=mode, template=template):
+                    self.assertEqual(
+                        expression.ConstantTemplate(template).resolve_data(context),
+                        template if mode == "enforce" else expected,
+                    )
+
+    def test_off_mode_also_blocks_self_module(self):
+        # 保留命名空间属性链下沉 always-on 后，off 模式也 inert
+        # （此前 off 会解析出真实 os 模块执行命令，这里回归为拦截）。
+        self._set_mode("off")
+        payload = '${self.module.cache.util.os.popen("echo OFF").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_default_mode_blocks_self_module(self):
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_enforce_blocks_self_module(self):
+        self._set_mode("enforce")
+        payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
+        rendered = expression.ConstantTemplate(payload).resolve_data({})
+        self.assertEqual(rendered, payload)
+
+    def test_dangerous_attr_chain_blocked(self):
+        self._set_mode("enforce")
+        original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
+            "datetime": "datetime",
+            "re": "re",
+            "os.path": "os.path",
+        }
+        try:
+            payloads = [
+                '${os.path.os.popen("echo PWNED").read()}',
+                '${os.path.genericpath.os.popen("echo PWNED").read()}',
+                '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+                '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+            ]
+            for p in payloads:
+                with self.subTest(payload=p):
+                    rendered = expression.ConstantTemplate(p).resolve_data({})
+                    self.assertEqual(rendered, p)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+    def test_reserved_namespace_attributes_blocked(self):
+        self._set_mode("enforce")
+        for p in [
+            "${context._kwargs}",
+            "${context._with_template}",
+        ]:
+            with self.subTest(payload=p):
+                rendered = expression.ConstantTemplate(p).resolve_data({})
+                self.assertEqual(rendered, p)
+
+    def test_user_single_underscore_attr_allowed(self):
+        self._set_mode("enforce")
+
+        class Bag(object):
+            def __init__(self):
+                self._module = [{"gamesvr": "1.1.1.1"}]
+
+        rendered = expression.ConstantTemplate("${obj._module[0]['gamesvr']}").resolve_data({"obj": Bag()})
+        self.assertEqual(rendered, "1.1.1.1")
+
+    def test_bare_caller_allowed(self):
+        self._set_mode("enforce")
+        # ConstantTemplate 对光杆 ``${caller}`` 会按 context 键短路，AST 走不到 visitor。
+        self.assertEqual(
+            expression.ConstantTemplate("${parent + ''}").resolve_data({"parent": "alice"}),
+            "alice",
+        )
+
+    def test_import_deep_chain_blocked(self):
+        self._set_mode("enforce")
+        original = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {"json": "json"}
+        try:
+            payload = "${json.codecs.builtins.exec('1')}"
+            self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original
+
+    def test_business_patterns_still_render(self):
+        self._set_mode("enforce")
+        cases = [
+            ("${name.upper()}", {"name": "abc"}, "ABC"),
+            ("${[x * 2 for x in items]}", {"items": [1, 2, 3]}, "[2, 4, 6]"),
+            ("${(lambda y: y + 1)(seed)}", {"seed": 4}, "5"),
+            ("${len(items)}", {"items": [1, 2]}, "2"),
+        ]
+        for tpl, ctx, expected in cases:
+            with self.subTest(tpl=tpl):
+                self.assertEqual(expression.ConstantTemplate(tpl).resolve_data(ctx), expected)
+
+    def test_extra_whitelist_names(self):
+        self._set_mode("enforce", extra=("_loop", "_system"))
+        self.assertEqual(expression.ConstantTemplate("${_loop}").resolve_data({"_loop": 3}), 3)
+        self.assertEqual(expression.ConstantTemplate("${_loop + 1}").resolve_data({"_loop": 4}), "5")
+
+    def test_unknown_root_name_blocked(self):
+        self._set_mode("enforce")
+        payload = "${secret_var}"
+        self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+
+    def test_generator_frame_gadget_blocked_all_modes(self):
+        payload = "${(i for i in [1]).gi_frame.f_builtins['eval']" "(\"__import__('os').popen('echo PWNED').read()\")}"
+        for mode in ("off", "warn", "enforce"):
+            with self.subTest(mode=mode):
+                self._set_mode(mode)
+                self.assertEqual(expression.ConstantTemplate(payload).resolve_data({}), payload)
+
+    def test_dangerous_attr_chain_blocked_all_modes(self):
+        # 危险属性名下沉 always-on 后，模块反向 pivot 在 off / warn / enforce 三档都 inert。
+        original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
+        self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
+            "datetime": "datetime",
+            "re": "re",
+            "os.path": "os.path",
+            "json": "json",
+        }
+        payloads = [
+            '${os.path.os.system("echo PWNED")}',
+            '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+            '${json.codecs.builtins.exec("import os")}',
+        ]
+        try:
+            for mode in ("off", "warn", "enforce"):
+                for p in payloads:
+                    with self.subTest(mode=mode, payload=p):
+                        self._set_mode(mode)
+                        self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+        finally:
+            self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
+
+    def test_reserved_namespace_chain_blocked_all_modes(self):
+        for mode in ("off", "warn", "enforce"):
+            for p in ("${context.lookup}", "${local.something}", "${parent.foo}"):
+                with self.subTest(mode=mode, payload=p):
+                    self._set_mode(mode)
+                    self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+
+
+class TestMakoSafetyHardening(TestCase):
+    """
+    与 ``tests/template/test_template.py`` 平行的 bamboo-pipeline runtime 侧回归。
+
+    PR #265 把 filter callable / tag-level filter 校验加进了 ``bamboo_engine.utils.mako_safety``，
+    bamboo-pipeline runtime 这一路（``pipeline.core.data.mako_safety``）是独立的一份代码，
+    本测试类确保这边的实现具备同样的拦截能力。
+    """
+
+    def _assert_forbidden(self, payload):
+        with self.assertRaises(ForbiddenMakoTemplateException):
+            check_mako_template_safety(
+                payload,
+                mako_safety.SingleLineNodeVisitor(),
+                mako_safety.SingleLinCodeExtractor(),
+            )
+
+    def _assert_allowed(self, payload):
+        check_mako_template_safety(
+            payload,
+            mako_safety.SingleLineNodeVisitor(),
+            mako_safety.SingleLinCodeExtractor(),
+        )
+
+    def test_filter_callable_with_side_effect_is_blocked(self):
+        self._assert_forbidden("${'x'|((side_effect() or str))}")
+
+    def test_filter_with_dunder_chain_is_blocked(self):
+        self._assert_forbidden("${'x'|().__class__.__bases__[0].__subclasses__}")
+
+    def test_filter_list_with_malicious_item_is_blocked(self):
+        self._assert_forbidden("${'x'|h, (side_effect() or str)}")
+
+    def test_decode_filter_with_dunder_is_blocked(self):
+        self._assert_forbidden("${'x'|decode.__class__}")
+
+    def test_tag_level_expression_filter_is_blocked(self):
+        self._assert_forbidden('<%page expression_filter="(side_effect() or str)"/>${name}')
+
+    def test_tag_level_def_filter_is_blocked(self):
+        payload = '<%def name="r(x)" filter="(side_effect() or str)">${x}</%def>${r("x")}'
+        self._assert_forbidden(payload)
+
+    def test_tag_level_block_filter_is_blocked(self):
+        self._assert_forbidden('<%block filter="(side_effect() or str)">x</%block>')
+
+    def test_tag_level_text_filter_is_blocked(self):
+        self._assert_forbidden('<%text filter="(side_effect() or str)">x</%text>')
+
+    def test_format_attribute_call_is_blocked_in_enforce(self):
+        with self.assertRaises(ForbiddenMakoTemplateException):
+            check_mako_template_safety(
+                '${"{0.__class__}".format("")}',
+                mako_safety.WhitelistNameVisitor(set(), mode="enforce"),
+                mako_safety.SingleLinCodeExtractor(),
+            )
+
+    def test_format_map_attribute_call_is_blocked(self):
+        self._assert_forbidden('${"{value.__class__}".format_map({"value": ""})}')
+
+    def test_subscript_dunder_key_is_blocked(self):
+        self._assert_forbidden("${a['__class__']}")
+
+    def test_builtin_filters_remain_allowed(self):
+        for payload in [
+            "${' x ' | h}",
+            "${' x ' | trim}",
+            "${' x ' | h, trim}",
+            "${'x' | n}",
+            "${b'abc' | decode.utf8}",
+        ]:
+            with self.subTest(payload=payload):
+                self._assert_allowed(payload)
+
+    def test_latent_bypass_is_inert_under_complete_shield(self):
+        """以下 payload 能过 AST 检查（动态拼字符串 / Name 调用 / 内建调用），
+        必须依靠完整 shield 在渲染期保持 inert。
+        """
+        sandbox_copy = copy.deepcopy(sandbox.SANDBOX)
+        try:
+            sandbox._shield_words(
+                sandbox.SANDBOX,
+                [
+                    "getattr",
+                    "type",
+                    "vars",
+                    "format",
+                    "breakpoint",
+                    "dir",
+                    "object",
+                ],
+            )
+            payloads = [
+                "${getattr('', '__cl' + 'ass__')}",
+                ("${getattr(getattr(getattr('', '__cl' + 'ass__'), '__ba' + 'se__')," " '__sub' + 'classes__')()}"),
+                "${getattr('', dir(0)[0][0] + dir(0)[0][0] + 'class' + dir(0)[0][0] + dir(0)[0][0])}",
+                "${type('').mro()}",
+                "${vars()}",
+                "${format('', '')}",
+                "${breakpoint()}",
+            ]
+            for p in payloads:
+                with self.subTest(payload=p):
+                    self.assertEqual(expression.ConstantTemplate(p).resolve_data({}), p)
+        finally:
+            sandbox.SANDBOX = sandbox_copy
+
+    def test_frame_introspection_attrs_are_blocked(self):
+        for attr in [
+            "gi_frame",
+            "gi_code",
+            "cr_frame",
+            "ag_frame",
+            "f_back",
+            "f_builtins",
+            "f_globals",
+            "f_locals",
+            "f_code",
+            "tb_frame",
+            "tb_next",
+            "func_globals",
+        ]:
+            with self.subTest(attr=attr):
+                self._assert_forbidden("${obj.%s}" % attr)
+
+    def test_restricted_builtins_strips_execution_primitives(self):
+        from bamboo_engine.template import sandbox as engine_sandbox
+
+        rb = engine_sandbox.restricted_builtins()
+        for name in ("eval", "exec", "compile", "open", "input", "breakpoint"):
+            self.assertNotIn(name, rb)
+        for name in ("len", "str", "range", "int", "__import__"):
+            self.assertIn(name, rb)
+
+    def test_dangerous_attr_names_are_blocked_always_on(self):
+        for attr in ("os", "sys", "subprocess", "builtins", "modules", "system", "popen", "kill"):
+            with self.subTest(attr=attr):
+                self._assert_forbidden("${obj.%s}" % attr)
+
+    def test_reserved_namespace_chain_is_blocked_always_on(self):
+        for payload in (
+            "${self.module.cache.util}",
+            "${context.lookup}",
+            "${local.x}",
+            "${parent.foo}",
+            "${caller.body()}",
+            "${pageargs.x}",
+        ):
+            with self.subTest(payload=payload):
+                self._assert_forbidden(payload)
+
+    def test_filter_import_modules_rejects_dangerous_keeps_safe(self):
+        from bamboo_engine.template import sandbox as engine_sandbox
+
+        src = {
+            "os": "os",
+            "subprocess": "subprocess",
+            "operator": "operator",
+            "pickle": "pickle",
+            "os.path": "os.path",
+            "json": "json",
+        }
+        self.assertEqual(set(engine_sandbox.filter_import_modules(src)), {"os.path", "json"})
+
+
+class TestRenderBackendSeam(TestCase):
+    """校验 ``ConstantTemplate.resolve_template`` 已下沉到可插拔 render backend，且默认行为不变。"""
+
+    def setUp(self):
+        from bamboo_engine.template import render_backend
+
+        render_backend.reset_render_backend()
+
+    def tearDown(self):
+        from bamboo_engine.template import render_backend
+
+        render_backend.reset_render_backend()
+
+    def test_default_backend_preserves_inprocess_render(self):
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${a}", {"a": "1"}), "1")
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${a+int(b)}", {"a": 2, "b": "3"}), "5")
+
+    def test_compile_and_render_errors_stay_inert(self):
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${", {}), "${")
+        self.assertEqual(expression.ConstantTemplate.resolve_template("${nope}", {}), "${nope}")
+
+    def test_resolve_template_rejects_non_string(self):
+        with self.assertRaises(expression.exceptions.ConstantTypeException):
+            expression.ConstantTemplate.resolve_template(123, {})
+
+    def test_resolve_template_routes_through_configured_backend(self):
+        from bamboo_engine.template import render_backend
+
+        calls = []
+
+        class _StubBackend(render_backend.RenderBackend):
+            def render(self, template, context, sandbox_builder):
+                calls.append((template, context, sandbox_builder))
+                return "STUB::" + template
+
+        render_backend.set_render_backend(_StubBackend())
+        out = expression.ConstantTemplate.resolve_template("${a}", {"a": 1})
+        self.assertEqual(out, "STUB::${a}")
+        self.assertEqual(len(calls), 1)
+        template_arg, context_arg, sandbox_builder = calls[0]
+        self.assertEqual(template_arg, "${a}")
+        self.assertEqual(context_arg, {"a": 1})
+        # the seam must pass the sandbox *builder* callable (for subprocess-local rebuild), not a dict
+        self.assertTrue(callable(sandbox_builder))
+        self.assertIsInstance(sandbox_builder(), dict)
+
+    def test_render_sandbox_builder_reads_expression_sandbox_at_call_time(self):
+        # The builder must resolve expression.SANDBOX at call time (matching the historical
+        # ``data.update(SANDBOX)``), so rebinding pipeline.core.data.sandbox.SANDBOX elsewhere
+        # never diverges the render source from what callers mutate via expression.SANDBOX.
+        self.assertIs(expression._mako_render_sandbox(), expression.SANDBOX)

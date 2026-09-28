@@ -18,6 +18,7 @@ from bamboo_engine import metrics, states
 from bamboo_engine.config import Settings
 from bamboo_engine.context import Context
 from bamboo_engine.eri import ExecuteInterruptPoint, NodeType, ProcessInfo
+from bamboo_engine.exceptions import RenderInfrastructureError
 from bamboo_engine.handler import ExecuteResult, NodeHandler, register_handler
 from bamboo_engine.template.template import Template
 
@@ -48,8 +49,8 @@ class EmptyEndEventHandler(NodeHandler):
             metrics.ENGINE_NODE_EXECUTE_PRE_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
             root_pipeline_id = process_info.root_pipeline_id
-            pipeline_id = process_info.pipeline_stack.pop()
-            root_pipeline_finished = len(process_info.pipeline_stack) == 0
+            pipeline_id = process_info.pipeline_stack[-1]
+            root_pipeline_finished = len(process_info.pipeline_stack) == 1
 
             root_pipeline_inputs = self._get_plain_inputs(process_info.root_pipeline_id)
             if not root_pipeline_finished:
@@ -94,6 +95,9 @@ class EmptyEndEventHandler(NodeHandler):
             context = Context(self.runtime, context_values, root_pipeline_inputs)
             try:
                 hydrated_context = context.hydrate(deformat=False)
+            except RenderInfrastructureError:
+                # Preserve the pipeline stack and let the engine record the actual failure.
+                raise
             except Exception:
                 logger.exception(
                     "root_pipeline[%s] node(%s) context hydrate error",
@@ -134,6 +138,7 @@ class EmptyEndEventHandler(NodeHandler):
         with metrics.observe(
             metrics.ENGINE_NODE_EXECUTE_POST_PROCESS_DURATION, type=self.node.type.value, hostname=self._hostname
         ):
+            process_info.pipeline_stack.pop()
             self.runtime.set_execution_data_outputs(node_id=pipeline_id, outputs=outputs)
 
             self.runtime.set_state(

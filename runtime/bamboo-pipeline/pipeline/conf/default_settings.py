@@ -94,7 +94,53 @@ EXPIRED_TASK_CLEAN_NUM_LIMIT = getattr(settings, "EXPIRED_TASK_CLEAN_NUM_LIMIT",
 TASK_EXPIRED_MONTH = getattr(settings, "TASK_EXPIRED_MONTH", 6)
 
 # MAKO sandbox config
-MAKO_SANDBOX_SHIELD_WORDS = getattr(settings, "MAKO_SANDBOX_SHIELD_WORDS", [])
+# 默认屏蔽所有可被用于 SSTI 链路的内建可调用名字（getattr/eval/exec/open/type/__import__ 等）。
+# 这是一份与 ``bamboo_engine.config.Settings.MAKO_SANDBOX_SHIELD_WORDS`` 保持同步的安全兜底，
+# 任何未显式设置 ``MAKO_SANDBOX_SHIELD_WORDS`` 的 Django 宿主也能开箱即得到屏蔽。
+DEFAULT_MAKO_SANDBOX_SHIELD_WORDS = [
+    "ascii",
+    "breakpoint",
+    "bytearray",
+    "bytes",
+    "callable",
+    "chr",
+    "classmethod",
+    "compile",
+    "delattr",
+    "dir",
+    "divmod",
+    "exec",
+    "eval",
+    "filter",
+    "format",
+    "frozenset",
+    "getattr",
+    "globals",
+    "hasattr",
+    "hash",
+    "help",
+    "id",
+    "input",
+    "isinstance",
+    "issubclass",
+    "iter",
+    "locals",
+    "map",
+    "memoryview",
+    "next",
+    "object",
+    "open",
+    "print",
+    "property",
+    "repr",
+    "setattr",
+    "staticmethod",
+    "super",
+    "type",
+    "vars",
+    "__import__",
+]
+MAKO_SANDBOX_SHIELD_WORDS = getattr(settings, "MAKO_SANDBOX_SHIELD_WORDS", DEFAULT_MAKO_SANDBOX_SHIELD_WORDS)
 MAKO_SANDBOX_IMPORT_MODULES = getattr(settings, "MAKO_SANDBOX_IMPORT_MODULES", {})
 MAKO_SAFETY_CHECK = getattr(settings, "MAKO_SAFETY_CHECK", True)
 

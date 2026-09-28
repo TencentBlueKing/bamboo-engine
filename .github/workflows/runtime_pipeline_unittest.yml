@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python-version: [3.12.10]
-        django-version: [4.2]
+        django-version: ["4.2", "5.2"]
 
     steps:
 
@@ -42,17 +42,33 @@ jobs:
       run: |
         cd runtime/bamboo-pipeline/
         poetry install
-        poetry run pip install "Django>${{ matrix.django-version }}"
+        poetry run pip install "Django~=${{ matrix.django-version }}.0"
 
     - name: Run Tests
+      if: matrix.django-version == '4.2'
       run: |
         cp -r bamboo_engine runtime/bamboo-pipeline/test
         cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
         cd runtime/bamboo-pipeline/test
         poetry run coverage run --source="." manage.py test pipeline.tests
         poetry run coverage report -m
+        # These functions are not collected by Django's unittest runner.
+        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run pytest pipeline/tests/core/data/test_sandbox_builder.py -q
+        # Verify rendering/failure handling without MySQL, Redis or a broker.
+        poetry run python manage.py test --settings=pipeline_sdk_use.security_test_settings pipeline.tests.core pipeline.tests.engine.core
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
         PIPELINE_TEST_DB_USER: root
         PIPELINE_TEST_DB_PWD: root
+
+    # Existing index_together models and timezone-field constraints exclude Django 5.
+    # Exercise the render/data boundary there without changing application dependencies.
+    - name: Django 5 render compatibility
+      if: matrix.django-version == '5.2'
+      run: |
+        cp -r bamboo_engine runtime/bamboo-pipeline/test
+        cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
+        cd runtime/bamboo-pipeline/test
+        poetry run python manage.py test --settings=pipeline_sdk_use.security_render_settings pipeline.tests.core.data.test_expression pipeline.tests.core.data.test_sandbox pipeline.tests.core.data.test_render_infrastructure pipeline.tests.core.data.test_cnvd_frame_render
+        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run pytest pipeline/tests/core/data/test_sandbox_builder.py -q
