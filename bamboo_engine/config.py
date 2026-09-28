@@ -78,3 +78,9 @@ class Settings:
     MAKO_TEMPLATE_NAME_EXTRA_WHITELIST = frozenset()
 
     RERUN_INDEX_OFFSET = 0
+
+    # 引擎门禁（令牌见 fence.py）：
+    #   FENCE_EMIT_ENABLED - 正常派发点给 execute/schedule 消息附带令牌；所有 worker 都升级到识别令牌的版本后才能打开
+    #   FENCE_ENFORCE      - 令牌不符时丢弃消息；关闭时只记"本应丢弃"的日志和指标，照常执行
+    FENCE_EMIT_ENABLED = False
+    FENCE_ENFORCE = False
