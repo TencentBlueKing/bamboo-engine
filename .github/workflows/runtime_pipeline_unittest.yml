@@ -11,6 +11,7 @@ jobs:
       DB_DATABASE: pipeline_test
       DB_USER: root
       DB_PASSWORD: root
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/runtime/bamboo-pipeline:${{ github.workspace }}/runtime/bamboo-pipeline/test
     strategy:
       matrix:
         python-version: [3.12.10]
@@ -53,7 +54,7 @@ jobs:
         poetry run coverage run --source="." manage.py test pipeline.tests
         poetry run coverage report -m
         # These functions are not collected by Django's unittest runner.
-        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run pytest pipeline/tests/core/data/test_sandbox_builder.py -q
+        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run python -m pytest pipeline/tests/core/data/test_sandbox_builder.py -q
         # Verify rendering/failure handling without MySQL, Redis or a broker.
         poetry run python manage.py test --settings=pipeline_sdk_use.security_test_settings pipeline.tests.core pipeline.tests.engine.core
       env:
@@ -71,4 +72,4 @@ jobs:
         cp -r runtime/bamboo-pipeline/pipeline runtime/bamboo-pipeline/test
         cd runtime/bamboo-pipeline/test
         poetry run python manage.py test --settings=pipeline_sdk_use.security_render_settings pipeline.tests.core.data.test_expression pipeline.tests.core.data.test_sandbox pipeline.tests.core.data.test_render_infrastructure pipeline.tests.core.data.test_cnvd_frame_render
-        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run pytest pipeline/tests/core/data/test_sandbox_builder.py -q
+        env -u DJANGO_SETTINGS_MODULE PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 poetry run python -m pytest pipeline/tests/core/data/test_sandbox_builder.py -q
