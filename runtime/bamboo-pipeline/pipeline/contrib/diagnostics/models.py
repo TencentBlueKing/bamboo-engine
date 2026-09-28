@@ -171,3 +171,20 @@ class DiagnosticOperationAudit(models.Model):
 
     def __unicode__(self):
         return "{}_{}_{}".format(self.case_id or "", self.operation_type, self.mode)
+
+
+class DiagnosticScanCursor(models.Model):
+    id = models.BigAutoField(_("ID"), primary_key=True)
+    name = models.CharField(_("扫描器"), max_length=64, unique=True)
+    position = models.DateTimeField(_("时间水位"), null=True, blank=True)
+    position_id = models.BigIntegerField(_("ID 水位"), default=0)
+    extra = JSONTextField(_("扫描状态"), default=dict)
+    updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
+
+    class Meta:
+        app_label = "pipeline_diagnostics"
+        verbose_name = _("Pipeline诊断扫描水位")
+        verbose_name_plural = _("Pipeline诊断扫描水位")
+
+    def __unicode__(self):
+        return self.name
