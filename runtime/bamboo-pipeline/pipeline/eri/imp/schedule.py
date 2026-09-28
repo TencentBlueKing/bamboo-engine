@@ -112,6 +112,20 @@ class ScheduleMixin:
         """
         return DBSchedule.objects.filter(id=schedule_id, scheduling=False).update(scheduling=True) == 1
 
+    def apply_schedule_lock_with_times(self, schedule_id: str, times: int) -> bool:
+        """
+        仅当调度次数为 times 时获取 Schedule 对象的调度锁，返回是否成功获取锁
+
+        :param schedule_id: 调度实例 ID
+        :type schedule_id: str
+        :param times: 期望的调度次数
+        :type times: int
+        :return: 是否成功获取锁
+        :rtype: bool
+        """
+        qs = DBSchedule.objects.filter(id=schedule_id, scheduling=False, schedule_times=times)
+        return qs.update(scheduling=True) == 1
+
     def release_schedule_lock(self, schedule_id: int):
         """
         释放指定 Schedule 的调度锁

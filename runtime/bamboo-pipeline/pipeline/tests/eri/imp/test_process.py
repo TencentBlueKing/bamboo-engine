@@ -313,3 +313,30 @@ class ProcessMixinTestCase(TransactionTestCase):
 
         p = self.mixin.get_process_info_with_root_pipeline("not_exist")
         self.assertEqual(0, len(p))
+
+    def test_wake_up_if_sleeping_at(self):
+        self.process.current_node_id = "n1"
+        self.process.save()
+
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n2"))
+        self.assertTrue(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+        self.process.refresh_from_db()
+        self.assertFalse(self.process.asleep)
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+
+    def test_wake_up_if_sleeping_at_skips_dead_process(self):
+        self.process.current_node_id = "n1"
+        self.process.dead = True
+        self.process.save()
+
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+        self.process.refresh_from_db()
+        self.assertTrue(self.process.asleep)
+
+    def test_get_current_node_id(self):
+        self.assertIsNone(self.mixin.get_current_node_id(self.process.id))
+        self.process.current_node_id = "n1"
+        self.process.save()
+
+        self.assertEqual(self.mixin.get_current_node_id(self.process.id), "n1")
+        self.assertIsNone(self.mixin.get_current_node_id(self.process.id + 1))
