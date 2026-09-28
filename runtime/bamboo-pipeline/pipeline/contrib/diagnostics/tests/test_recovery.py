@@ -391,3 +391,36 @@ class SettleTest(RecoveryTestCase):
             self.assertEqual(settle_recoveries(), {"error": 1, "preview_holds": 1})
         self.assertEqual(self.settled(recovery), ("dispatched", None, False))
         self.assertEqual(self.settled(preview), ("previewed", True, True))
+
+    def test_deleted_case_settles_as_obsolete(self):
+        case = open_case(s1_shape())
+        recovery = self.dispatch(case)
+        DiagnosticCase.objects.filter(id=case.id).delete()
+        self.assertEqual(settle_recoveries(), {"obsolete": 1})
+        self.assertEqual(self.settled(recovery), ("obsolete", None, True))
+        self.assertNotIn("settled_holds", recovery.detail)
+
+    def test_preview_of_deleted_case_is_not_counted(self):
+        case = open_case(s1_shape())
+        preview = DiagnosticRecovery.objects.create(
+            case=case,
+            root_pipeline_id=ROOT,
+            node_id="a",
+            stuck_type=EXECUTE_DISPATCH_LOST,
+            fingerprint="f",
+            trigger="auto",
+            mode="preview",
+            status="previewed",
+        )
+        DiagnosticRecovery.objects.filter(id=preview.id).update(created_at=ago(200))
+        DiagnosticCase.objects.filter(id=case.id).delete()
+        self.assertEqual(settle_recoveries(), {"preview_gone": 1})
+        self.assertEqual(self.settled(preview), ("previewed", None, True))
+        self.assertNotIn("settled_holds", preview.detail)
+
+    def test_callback_still_scheduling_is_ineffective(self):
+        case, schedule, _callback = open_callback_case()
+        recovery = self.dispatch(case)
+        Schedule.objects.filter(id=schedule.id).update(scheduling=True)
+        settle_recoveries()
+        self.assertEqual(self.settled(recovery), ("ineffective", True, True))

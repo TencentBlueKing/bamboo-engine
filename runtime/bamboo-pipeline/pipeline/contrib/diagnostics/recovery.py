@@ -21,7 +21,7 @@ from bamboo_engine import fence
 from bamboo_engine.fence import ExecuteFence, ScheduleFence
 
 from pipeline.contrib.diagnostics import conf
-from pipeline.contrib.diagnostics.callback_scan import OUTCOME_PENDING, OUTCOME_SCHEDULING, case_callback
+from pipeline.contrib.diagnostics.callback_scan import OUTCOME_PENDING, OUTCOME_SCHEDULING, WATCHED, case_callback
 from pipeline.contrib.diagnostics.case_types import (
     CALLBACK_DISPATCH_LOST,
     CHILD_START_LOST,
@@ -275,9 +275,9 @@ def replay_case(case_id, operator, mode=MODE_DRY_RUN, confirm_risk=False):
 def _still_stuck(recovery):
     case = recovery.case
     if case is None:
-        return False
+        return None
     if recovery.stuck_type == CALLBACK_DISPATCH_LOST:
-        return case_callback(case)[0] == OUTCOME_PENDING
+        return case_callback(case)[0] in WATCHED
     hit = matching_hit(case)
     if hit is None:
         return False
@@ -302,9 +302,14 @@ def settle_recoveries(now=None, batch=None):
     for row in rows:
         try:
             holds = _still_stuck(row)
-            fields = {"detail": dict(row.detail or {}, settled_holds=holds), "settled_at": now}
+            detail = dict(row.detail or {})
+            if holds is not None:
+                detail["settled_holds"] = holds
+            fields = {"detail": detail, "settled_at": now}
             if row.status == DiagnosticRecovery.STATUS_DISPATCHED:
-                if holds:
+                if holds is None:
+                    status = DiagnosticRecovery.STATUS_OBSOLETE
+                elif holds:
                     status = DiagnosticRecovery.STATUS_INEFFECTIVE
                 elif roots.get(row.root_pipeline_id) == states.RUNNING:
                     status = DiagnosticRecovery.STATUS_APPLIED
@@ -316,7 +321,10 @@ def settle_recoveries(now=None, batch=None):
                 outcomes[status] += 1
             else:
                 DiagnosticRecovery.objects.filter(id=row.id).update(**fields)
-                outcomes["preview_holds" if holds else "preview_healed"] += 1
+                if holds is None:
+                    outcomes["preview_gone"] += 1
+                else:
+                    outcomes["preview_holds" if holds else "preview_healed"] += 1
         except Exception:
             logger.exception("[pipeline_diagnostics_recovery] settle failed: recovery=%s", row.id)
             outcomes["error"] += 1
