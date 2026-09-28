@@ -13,7 +13,7 @@ specific language governing permissions and limitations under the License.
 
 from django.contrib import admin
 
-from .models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit
+from .models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit, DiagnosticRecovery
 
 
 @admin.register(DiagnosticEvent)
@@ -56,3 +56,10 @@ class DiagnosticOperationAuditAdmin(admin.ModelAdmin):
     list_display = ("id", "case", "operation_type", "operator", "mode", "risk_level", "created_at")
     search_fields = ("operator", "case__root_pipeline_id", "case__node_id")
     list_filter = ("operation_type", "mode", "risk_level")
+
+
+@admin.register(DiagnosticRecovery)
+class DiagnosticRecoveryAdmin(admin.ModelAdmin):
+    list_display = ("id", "case", "stuck_type", "trigger", "mode", "status", "operator", "created_at", "settled_at")
+    search_fields = ("root_pipeline_id", "node_id", "fingerprint")
+    list_filter = ("stuck_type", "trigger", "mode", "status")
