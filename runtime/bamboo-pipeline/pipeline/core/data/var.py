@@ -21,6 +21,8 @@ from pipeline.core.data.context import OutputRef
 from pipeline.core.data.expression import ConstantTemplate, format_constant_key
 from pipeline.core.signals import pre_variable_register
 
+from bamboo_engine.exceptions import RenderInfrastructureError
+
 logger = logging.getLogger("root")
 
 
@@ -63,6 +65,8 @@ class SpliceVariable(Variable):
         if not self._value:
             try:
                 self._resolve()
+            except RenderInfrastructureError:
+                raise
             except settings.VARIABLE_SPECIFIC_EXCEPTIONS as e:
                 logger.error("get value[{}] of Variable[{}] error[{}]".format(self.value, self.name, e))
                 return "Error: {}".format(e)
@@ -136,6 +140,8 @@ class LazyVariable(SpliceVariable, metaclass=RegisterVariableMeta):
         self.value = super(LazyVariable, self).get()
         try:
             return self.get_value()
+        except RenderInfrastructureError:
+            raise
         except settings.VARIABLE_SPECIFIC_EXCEPTIONS as e:
             logger.error("get value[{}] of Variable[{}] error[{}]".format(self.value, self.name, e))
             return "Error: {}".format(e)
