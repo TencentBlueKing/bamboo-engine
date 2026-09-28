@@ -165,13 +165,18 @@ def _emit(lost, dry_run):
     return hits, cases
 
 
-def _still_pending(case):
+def case_callback(case):
+    """案例记录的回调当前的处境，返回 (outcome, callback, schedule)；回调已被清理时三者都是 None。"""
     callback_id = (case.evidence or {}).get("callback_data_id")
     callbacks = _load([callback_id]) if callback_id else []
     if not callbacks:
-        return False
-    outcome, _state, _schedule = _judge(callbacks)[callbacks[0].id]
-    return outcome in WATCHED
+        return None, None, None
+    outcome, _state, schedule = _judge(callbacks)[callbacks[0].id]
+    return outcome, callbacks[0], schedule
+
+
+def _still_pending(case):
+    return case_callback(case)[0] in WATCHED
 
 
 def scan_callbacks(now=None, dry_run=False, max_rows=None, force=False):

@@ -55,3 +55,10 @@ class Phase3ConfTest(TestCase):
     def test_sequence_settings_are_accepted(self):
         self.assertEqual(conf.poll_exclude_codes(), frozenset(["sleep_timer"]))
         self.assertEqual(conf.window_tiers_seconds(), (600,))
+
+
+class RecoveryConfTest(TestCase):
+    def test_defaults(self):
+        self.assertFalse(conf.recovery_enabled())
+        self.assertEqual(conf.recovery_settle_seconds(), 180)
+        self.assertEqual(conf.recovery_batch(), 200)

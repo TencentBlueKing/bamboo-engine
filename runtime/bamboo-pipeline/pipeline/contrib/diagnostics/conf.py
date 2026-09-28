@@ -144,3 +144,17 @@ def window_max_roots():
 def scan_initial_lookback_seconds():
     """水位表里还没有记录时，首轮只回看这么久；更早的存量用预演命令单独看。"""
     return _get_setting("SCAN_INITIAL_LOOKBACK_SECONDS", 3600)
+
+
+def recovery_enabled():
+    return _get_setting("RECOVERY_ENABLED", False)
+
+
+def recovery_settle_seconds():
+    """重放派发后等多久再复核形态；要长于执行、调度消息正常排队和处理的时长。"""
+    return _get_setting("RECOVERY_SETTLE_SECONDS", 180)
+
+
+def recovery_batch():
+    """恢复任务每轮最多检查的案例数和复核的记录数。"""
+    return _get_setting("RECOVERY_BATCH", 200)
