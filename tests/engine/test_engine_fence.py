@@ -13,15 +13,23 @@ specific language governing permissions and limitations under the License.
 
 import mock
 import pytest
-from mock import MagicMock
+from mock import MagicMock, call
 from prometheus_client import REGISTRY
 
 from bamboo_engine import states
 from bamboo_engine.config import Settings
 from bamboo_engine.engine import Engine
-from bamboo_engine.eri import NodeType, ProcessInfo, Schedule, ScheduleType, ServiceActivity, State
+from bamboo_engine.eri import (
+    DispatchProcess,
+    NodeType,
+    ProcessInfo,
+    Schedule,
+    ScheduleType,
+    ServiceActivity,
+    State,
+)
 from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
-from bamboo_engine.handler import ScheduleResult
+from bamboo_engine.handler import ExecuteResult, ScheduleResult
 from bamboo_engine.interrupt import (
     ExecuteInterrupter,
     ExecuteInterruptPoint,
@@ -317,3 +325,180 @@ def test_schedule_recovery_skips_fence(enforce, pi, node):
     runtime.apply_schedule_lock_with_times.assert_not_called()
     runtime.apply_schedule_lock.assert_not_called()
     handler.schedule.assert_called_once()
+
+
+# 派发点附带令牌
+
+SCHEDULE_DONE = ScheduleResult(has_next_schedule=False, schedule_after=-1, schedule_done=True, next_node_id="nid2")
+
+
+@pytest.fixture
+def emit(monkeypatch):
+    monkeypatch.setattr(Settings, "FENCE_EMIT_ENABLED", True)
+
+
+def test_schedule_done_dispatches_execute_fence(emit, pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3))
+
+    run_schedule(runtime, pi, {"k": "v", "fence": {"schedule_times": 3}}, SCHEDULE_DONE)
+
+    runtime.execute.assert_called_once_with(
+        process_id=1,
+        node_id="nid2",
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        headers={"k": "v", "fence": {"from_node": "nid", "from_version": "v"}},
+    )
+
+
+def test_poll_continuation_dispatches_reread_times(emit, pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3))
+    runtime.get_schedule = MagicMock(side_effect=[make_schedule(times=3), make_schedule(times=4)])
+
+    run_schedule(runtime, pi, {"k": "v", "fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    runtime.set_next_schedule.assert_called_once_with(
+        process_id=1,
+        node_id="nid",
+        schedule_id=2,
+        schedule_after=5,
+        headers={"k": "v", "fence": {"schedule_times": 4}},
+    )
+
+
+def test_schedule_dispatch_strips_fence_when_emit_disabled(pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3))
+
+    run_schedule(runtime, pi, {"k": "v", "fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    runtime.set_next_schedule.assert_called_once_with(
+        process_id=1, node_id="nid", schedule_id=2, schedule_after=5, headers={"k": "v"}
+    )
+    runtime.get_schedule.assert_called_once_with(2)
+
+
+def test_parent_wake_dispatches_parent_fence(emit, pi):
+    runtime = arrived_runtime(pi)
+    runtime.child_process_finish = MagicMock(return_value=True)
+    runtime.get_current_node_id = MagicMock(return_value="pg")
+    runtime.get_state_or_none = MagicMock(side_effect=lambda node_id: make_state(node_id, node_id + "_v"))
+
+    run_execute(runtime, pi, {"k": "v", "fence": {"from_node": "n0", "from_version": "n0_v"}})
+
+    runtime.get_current_node_id.assert_called_once_with(9)
+    runtime.execute.assert_called_once_with(
+        process_id=9,
+        node_id="nid",
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        headers={"k": "v", "fence": {"from_node": "pg", "from_version": "pg_v"}},
+    )
+
+
+def test_parent_wake_strips_fence_when_emit_disabled(pi):
+    runtime = arrived_runtime(pi)
+    runtime.child_process_finish = MagicMock(return_value=True)
+
+    run_execute(runtime, pi, {"k": "v", "fence": FENCE})
+
+    runtime.get_current_node_id.assert_not_called()
+    runtime.execute.assert_called_once_with(
+        process_id=9, node_id="nid", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}
+    )
+
+
+def fenced_state_only(node_id):
+    return make_state("n0", "v0") if node_id == "n0" else None
+
+
+def loop_runtime(pi, node):
+    """进程带着令牌抢占成功，然后执行 node"""
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.batch_get_state_name = MagicMock(return_value={"root": states.RUNNING})
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state_or_none = MagicMock(side_effect=fenced_state_only)
+    runtime.wake_up_if_sleeping_at = MagicMock(return_value=True)
+    runtime.set_state = MagicMock(return_value="v")
+    runtime.set_schedule = MagicMock(return_value=make_schedule(times=0))
+    return runtime
+
+
+def run_node(runtime, pi, headers, execute_result):
+    handler = MagicMock()
+    handler.execute = MagicMock(return_value=execute_result)
+    with mock.patch("bamboo_engine.engine.HandlerFactory.get_handler", MagicMock(return_value=handler)):
+        run_execute(runtime, pi, headers)
+
+
+def test_first_poll_dispatches_schedule_fence(emit, pi, node):
+    runtime = loop_runtime(pi, node)
+    result = ExecuteResult(
+        should_sleep=True,
+        schedule_ready=True,
+        schedule_type=ScheduleType.POLL,
+        schedule_after=5,
+        dispatch_processes=[],
+        next_node_id=None,
+        should_die=False,
+    )
+
+    run_node(runtime, pi, {"k": "v", "fence": FENCE}, result)
+
+    runtime.wake_up.assert_not_called()
+    runtime.schedule.assert_called_once_with(
+        process_id=1, node_id="nid", schedule_id=2, headers={"k": "v", "fence": {"schedule_times": 0}}
+    )
+
+
+def fork_result():
+    return ExecuteResult(
+        should_sleep=True,
+        schedule_ready=False,
+        schedule_type=None,
+        schedule_after=-1,
+        dispatch_processes=[DispatchProcess(process_id=3, node_id="n3"), DispatchProcess(process_id=4, node_id="n4")],
+        next_node_id=None,
+        should_die=False,
+    )
+
+
+def test_fork_dispatches_children_fences(emit, pi, node):
+    runtime = loop_runtime(pi, node)
+    runtime.batch_get_state_version = MagicMock(return_value={"n3": "v3"})
+
+    run_node(runtime, pi, {"k": "v", "fence": FENCE}, fork_result())
+
+    runtime.batch_get_state_version.assert_called_once_with(["n3", "n4"])
+    runtime.execute.assert_has_calls(
+        [
+            call(
+                process_id=3,
+                node_id="n3",
+                root_pipeline_id="root",
+                parent_pipeline_id="root",
+                headers={"k": "v", "fence": {"from_node": "n3", "from_version": "v3"}},
+            ),
+            call(
+                process_id=4,
+                node_id="n4",
+                root_pipeline_id="root",
+                parent_pipeline_id="root",
+                headers={"k": "v", "fence": {"from_node": "n4", "from_version": None}},
+            ),
+        ]
+    )
+
+
+def test_fork_strips_fence_when_emit_disabled(pi, node):
+    runtime = loop_runtime(pi, node)
+
+    run_node(runtime, pi, {"k": "v", "fence": FENCE}, fork_result())
+
+    runtime.batch_get_state_version.assert_not_called()
+    runtime.execute.assert_has_calls(
+        [
+            call(process_id=3, node_id="n3", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}),
+            call(process_id=4, node_id="n4", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}),
+        ]
+    )

@@ -31,6 +31,7 @@ from .eri import (
     ExecuteResult,
 )
 from .exceptions import InvalidOperationError, NotFoundError, RenderInfrastructureError
+from .fence import ExecuteFence, ScheduleFence
 from .handler import HandlerFactory
 from .interrupt import (
     ExecuteInterrupter,
@@ -693,7 +694,7 @@ class Engine:
                             node_id=process_info.destination_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
-                            headers=headers,
+                            headers=fence.dispatch_headers(headers, self._process_fence(process_info.parent_id)),
                         )
 
                     logger.info(
@@ -928,7 +929,10 @@ class Engine:
                         not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
                     ):
                         self.runtime.schedule(
-                            process_id=process_id, node_id=current_node_id, schedule_id=schedule_id, headers=headers
+                            process_id=process_id,
+                            node_id=current_node_id,
+                            schedule_id=schedule_id,
+                            headers=fence.dispatch_headers(headers, ScheduleFence(schedule.times)),
                         )
 
                     interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, set_schedule_done=True)
@@ -946,13 +950,14 @@ class Engine:
 
                     self.runtime.join(process_id, children)
 
+                    children_fences = self._children_fences(execute_result.dispatch_processes)
                     for d in execute_result.dispatch_processes:
                         self.runtime.execute(
                             process_id=d.process_id,
                             node_id=d.node_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
-                            headers=headers,
+                            headers=fence.dispatch_headers(headers, children_fences.get(d.process_id)),
                         )
 
                 if execute_result.should_die:
@@ -1232,7 +1237,7 @@ class Engine:
                     node_id=node_id,
                     schedule_id=schedule_id,
                     schedule_after=schedule_result.schedule_after,
-                    headers=headers,
+                    headers=fence.dispatch_headers(headers, self._next_schedule_fence(schedule_id)),
                 )
 
             if schedule_result.schedule_done:
@@ -1242,7 +1247,7 @@ class Engine:
                     node_id=schedule_result.next_node_id,
                     root_pipeline_id=process_info.root_pipeline_id,
                     parent_pipeline_id=process_info.top_pipeline_id,
-                    headers=headers,
+                    headers=fence.dispatch_headers(headers, ExecuteFence(node_id, state.version)),
                 )
 
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
@@ -1303,6 +1308,29 @@ class Engine:
         if enforced:
             return None
         return self.runtime.apply_schedule_lock(schedule_id)
+
+    def _process_fence(self, process_id: int) -> Optional[ExecuteFence]:
+        """按进程当前所在节点及其状态版本生成令牌，用于唤醒睡在并行网关上的父进程"""
+        if not fence.emit_enabled():
+            return None
+        node_id = self.runtime.get_current_node_id(process_id)
+        if not node_id:
+            return None
+        state = self.runtime.get_state_or_none(node_id)
+        return ExecuteFence(node_id, state.version if state else None)
+
+    def _children_fences(self, dispatch_processes: list) -> dict:
+        """按子进程起始节点在派发时的状态版本生成令牌；循环流程里起始节点可能留有上一轮的状态"""
+        if not fence.emit_enabled():
+            return {}
+        versions = self.runtime.batch_get_state_version([d.node_id for d in dispatch_processes])
+        return {d.process_id: ExecuteFence(d.node_id, versions.get(d.node_id)) for d in dispatch_processes}
+
+    def _next_schedule_fence(self, schedule_id) -> Optional[ScheduleFence]:
+        """续派令牌取 add_schedule_times 之后的库内次数；断点恢复时内存里的 schedule.times 与库内不一致，必须重读"""
+        if not fence.emit_enabled():
+            return None
+        return ScheduleFence(self.runtime.get_schedule(schedule_id).times)
 
     def _add_history(
         self,
