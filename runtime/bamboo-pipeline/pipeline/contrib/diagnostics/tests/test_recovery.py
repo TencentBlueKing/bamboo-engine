@@ -372,3 +372,22 @@ class SettleTest(RecoveryTestCase):
         DiagnosticRecovery.objects.filter(id=preview.id).update(created_at=ago(200))
         self.assertEqual(settle_recoveries(), {"preview_holds": 1})
         self.assertEqual(self.settled(preview), ("previewed", True, True))
+
+    def test_failed_row_does_not_block_the_rest(self):
+        case = open_case(s1_shape())
+        recovery = self.dispatch(case)
+        preview = DiagnosticRecovery.objects.create(
+            case=case,
+            root_pipeline_id=ROOT,
+            node_id="a",
+            stuck_type=EXECUTE_DISPATCH_LOST,
+            fingerprint="f",
+            trigger="auto",
+            mode="preview",
+            status="previewed",
+        )
+        DiagnosticRecovery.objects.filter(id=preview.id).update(created_at=ago(200))
+        with mock.patch("pipeline.contrib.diagnostics.recovery._still_stuck", side_effect=[RuntimeError("boom"), True]):
+            self.assertEqual(settle_recoveries(), {"error": 1, "preview_holds": 1})
+        self.assertEqual(self.settled(recovery), ("dispatched", None, False))
+        self.assertEqual(self.settled(preview), ("previewed", True, True))

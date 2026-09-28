@@ -300,19 +300,24 @@ def settle_recoveries(now=None, batch=None):
     roots = root_states({row.root_pipeline_id for row in rows})
     outcomes = Counter()
     for row in rows:
-        holds = _still_stuck(row)
-        fields = {"detail": dict(row.detail or {}, settled_holds=holds), "settled_at": now}
-        if row.status == DiagnosticRecovery.STATUS_DISPATCHED:
-            if holds:
-                status = DiagnosticRecovery.STATUS_INEFFECTIVE
-            elif roots.get(row.root_pipeline_id) == states.RUNNING:
-                status = DiagnosticRecovery.STATUS_APPLIED
+        try:
+            holds = _still_stuck(row)
+            fields = {"detail": dict(row.detail or {}, settled_holds=holds), "settled_at": now}
+            if row.status == DiagnosticRecovery.STATUS_DISPATCHED:
+                if holds:
+                    status = DiagnosticRecovery.STATUS_INEFFECTIVE
+                elif roots.get(row.root_pipeline_id) == states.RUNNING:
+                    status = DiagnosticRecovery.STATUS_APPLIED
+                else:
+                    status = DiagnosticRecovery.STATUS_OBSOLETE
+                fields["status"] = status
+                DiagnosticRecovery.objects.filter(id=row.id).update(**fields)
+                record_recovery(row.stuck_type, row.trigger, status)
+                outcomes[status] += 1
             else:
-                status = DiagnosticRecovery.STATUS_OBSOLETE
-            fields["status"] = status
-            record_recovery(row.stuck_type, row.trigger, status)
-            outcomes[status] += 1
-        else:
-            outcomes["preview_holds" if holds else "preview_healed"] += 1
-        DiagnosticRecovery.objects.filter(id=row.id).update(**fields)
+                DiagnosticRecovery.objects.filter(id=row.id).update(**fields)
+                outcomes["preview_holds" if holds else "preview_healed"] += 1
+        except Exception:
+            logger.exception("[pipeline_diagnostics_recovery] settle failed: recovery=%s", row.id)
+            outcomes["error"] += 1
     return outcomes
