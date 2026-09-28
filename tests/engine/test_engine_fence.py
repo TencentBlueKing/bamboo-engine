@@ -11,6 +11,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import logging
+
 import mock
 import pytest
 from mock import MagicMock, call
@@ -116,6 +118,16 @@ def test_execute_without_fence_wakes_up_unconditionally(pi):
     runtime.get_state_or_none.assert_not_called()
 
 
+def test_execute_with_malformed_fence_wakes_up_unconditionally(enforce, pi):
+    runtime = arrived_runtime(pi, claimed=False)
+
+    run_execute(runtime, pi, {"fence": "n0"})
+
+    runtime.wake_up.assert_called_once_with(1)
+    runtime.wake_up_if_sleeping_at.assert_not_called()
+    runtime.get_state_or_none.assert_not_called()
+
+
 def test_execute_claims_with_fence(pi):
     runtime = arrived_runtime(pi)
 
@@ -210,6 +222,15 @@ def node():
     )
 
 
+@pytest.fixture
+def no_diagnostics():
+    """锁被占用时引擎会从 site-packages 懒加载 pipeline.contrib.diagnostics 上报事件"""
+    with mock.patch("bamboo_engine.engine.emit_diagnostic_event"), mock.patch(
+        "bamboo_engine.engine.emit_diagnostic_alert"
+    ):
+        yield
+
+
 POLL_AGAIN = ScheduleResult(has_next_schedule=True, schedule_after=5, schedule_done=False, next_node_id=None)
 
 
@@ -275,12 +296,24 @@ def test_schedule_locks_with_times(pi, node):
     handler.schedule.assert_called_once()
 
 
-def test_schedule_lock_busy_keeps_existing_handling(enforce, pi, node):
+@pytest.mark.parametrize("token", [FENCE, {"schedule_times": True}, {"schedule_times": -1}])
+def test_schedule_with_malformed_fence_uses_plain_lock(enforce, pi, node, token):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3), locked=False)
+
+    handler = run_schedule(runtime, pi, {"fence": token}, POLL_AGAIN)
+
+    runtime.apply_schedule_lock.assert_called_once_with(2)
+    runtime.apply_schedule_lock_with_times.assert_not_called()
+    handler.schedule.assert_called_once()
+
+
+def test_schedule_lock_busy_keeps_existing_handling(enforce, no_diagnostics, pi, node):
     runtime = schedule_runtime(pi, node, make_schedule(times=3), locked=False)
     before = drop_count("schedule", "schedule_times_mismatch", "true")
 
     handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN)
 
+    runtime.apply_schedule_lock_with_times.assert_called_once_with(2, 3)
     assert drop_count("schedule", "schedule_times_mismatch", "true") == before
     handler.schedule.assert_not_called()
     runtime.set_next_schedule.assert_not_called()
@@ -288,7 +321,7 @@ def test_schedule_lock_busy_keeps_existing_handling(enforce, pi, node):
 
 
 @mock.patch("bamboo_engine.engine.random.randint", return_value=5)
-def test_schedule_lock_busy_retry_keeps_fence(randint, pi, node):
+def test_schedule_lock_busy_retry_keeps_fence(randint, no_diagnostics, pi, node):
     schedule = make_schedule(times=3, schedule_type=ScheduleType.MULTIPLE_CALLBACK)
     runtime = schedule_runtime(pi, node, schedule, locked=False)
 
@@ -315,6 +348,10 @@ def test_schedule_drops_times_mismatch_when_enforced(enforce, pi, node):
     runtime.beat.assert_not_called()
     runtime.set_next_schedule.assert_not_called()
     handler.schedule.assert_not_called()
+    runtime.expire_schedule.assert_not_called()
+    runtime.release_schedule_lock.assert_not_called()
+    runtime.finish_schedule.assert_not_called()
+    runtime.execute.assert_not_called()
 
 
 def test_schedule_only_records_times_mismatch_when_not_enforced(pi, node):
@@ -360,6 +397,16 @@ def test_schedule_done_dispatches_execute_fence(emit, pi, node):
         root_pipeline_id="root",
         parent_pipeline_id="root",
         headers={"k": "v", "fence": {"from_node": "nid", "from_version": "v"}},
+    )
+
+
+def test_schedule_done_strips_fence_when_emit_disabled(pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3))
+
+    run_schedule(runtime, pi, {"k": "v", "fence": {"schedule_times": 3}}, SCHEDULE_DONE)
+
+    runtime.execute.assert_called_once_with(
+        process_id=1, node_id="nid2", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}
     )
 
 
@@ -419,18 +466,20 @@ def test_parent_wake_strips_fence_when_emit_disabled(pi):
     )
 
 
-def test_parent_wake_dispatches_without_fence_when_read_fails(emit, pi):
+def test_parent_wake_dispatches_without_fence_when_read_fails(emit, pi, caplog):
     runtime = arrived_runtime(pi)
     runtime.child_process_finish = MagicMock(return_value=True)
     runtime.get_current_node_id = MagicMock(side_effect=RuntimeError("db error"))
 
-    run_execute(runtime, pi, {"k": "v", "fence": FENCE})
+    with caplog.at_level(logging.ERROR, logger="bamboo_engine"):
+        run_execute(runtime, pi, {"k": "v", "fence": FENCE})
 
     runtime.get_current_node_id.assert_called_once_with(9)
     runtime.get_state_or_none.assert_called_once_with("n0")
     runtime.execute.assert_called_once_with(
         process_id=9, node_id="nid", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}
     )
+    assert "[fence] build fence for process(9) failed, dispatch without fence" in caplog.text
 
 
 def fenced_state_only(node_id):
@@ -457,9 +506,8 @@ def run_node(runtime, pi, headers, execute_result):
         run_execute(runtime, pi, headers)
 
 
-def test_first_poll_dispatches_schedule_fence(emit, pi, node):
-    runtime = loop_runtime(pi, node)
-    result = ExecuteResult(
+def poll_result():
+    return ExecuteResult(
         should_sleep=True,
         schedule_ready=True,
         schedule_type=ScheduleType.POLL,
@@ -469,12 +517,25 @@ def test_first_poll_dispatches_schedule_fence(emit, pi, node):
         should_die=False,
     )
 
-    run_node(runtime, pi, {"k": "v", "fence": FENCE}, result)
+
+def test_first_poll_dispatches_schedule_fence(emit, pi, node):
+    runtime = loop_runtime(pi, node)
+    runtime.set_schedule = MagicMock(return_value=make_schedule(times=2))
+
+    run_node(runtime, pi, {"k": "v", "fence": FENCE}, poll_result())
 
     runtime.wake_up.assert_not_called()
     runtime.schedule.assert_called_once_with(
-        process_id=1, node_id="nid", schedule_id=2, headers={"k": "v", "fence": {"schedule_times": 0}}
+        process_id=1, node_id="nid", schedule_id=2, headers={"k": "v", "fence": {"schedule_times": 2}}
     )
+
+
+def test_first_poll_strips_fence_when_emit_disabled(pi, node):
+    runtime = loop_runtime(pi, node)
+
+    run_node(runtime, pi, {"k": "v", "fence": FENCE}, poll_result())
+
+    runtime.schedule.assert_called_once_with(process_id=1, node_id="nid", schedule_id=2, headers={"k": "v"})
 
 
 def fork_result():
@@ -514,6 +575,7 @@ def test_fork_dispatches_children_fences(emit, pi, node):
             ),
         ]
     )
+    assert runtime.execute.call_count == 2
 
 
 def test_fork_strips_fence_when_emit_disabled(pi, node):
@@ -528,6 +590,7 @@ def test_fork_strips_fence_when_emit_disabled(pi, node):
             call(process_id=4, node_id="n4", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}),
         ]
     )
+    assert runtime.execute.call_count == 2
 
 
 # 人工操作

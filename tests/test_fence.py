@@ -147,9 +147,11 @@ def test_record_drop(caplog):
     assert "[fence] execute message would be dropped, reason=process_moved, node_id=n1, process_id=1" in caplog.text
 
     before = drop_count("schedule", "schedule_times_mismatch", "true")
-    fence.record_drop(kind="schedule", reason="schedule_times_mismatch", enforced=True, schedule_id=2)
+    with caplog.at_level(logging.WARNING, logger="bamboo_engine"):
+        fence.record_drop(kind="schedule", reason="schedule_times_mismatch", enforced=True, schedule_id=2)
 
     assert drop_count("schedule", "schedule_times_mismatch", "true") == before + 1
+    assert "[fence] schedule message dropped, reason=schedule_times_mismatch, schedule_id=2" in caplog.text
 
 
 def test_claim_execute_success():
