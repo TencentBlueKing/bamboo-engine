@@ -407,6 +407,20 @@ def test_parent_wake_strips_fence_when_emit_disabled(pi):
     )
 
 
+def test_parent_wake_dispatches_without_fence_when_read_fails(emit, pi):
+    runtime = arrived_runtime(pi)
+    runtime.child_process_finish = MagicMock(return_value=True)
+    runtime.get_current_node_id = MagicMock(side_effect=RuntimeError("db error"))
+
+    run_execute(runtime, pi, {"k": "v", "fence": FENCE})
+
+    runtime.get_current_node_id.assert_called_once_with(9)
+    runtime.get_state_or_none.assert_called_once_with("n0")
+    runtime.execute.assert_called_once_with(
+        process_id=9, node_id="nid", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}
+    )
+
+
 def fenced_state_only(node_id):
     return make_state("n0", "v0") if node_id == "n0" else None
 

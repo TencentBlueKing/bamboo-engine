@@ -1310,13 +1310,21 @@ class Engine:
         return self.runtime.apply_schedule_lock(schedule_id)
 
     def _process_fence(self, process_id: int) -> Optional[ExecuteFence]:
-        """按进程当前所在节点及其状态版本生成令牌，用于唤醒睡在并行网关上的父进程"""
+        """按进程当前所在节点及其状态版本生成令牌，用于唤醒睡在并行网关上的父进程
+
+        调用时子进程已提交 dead=True，读库报错若交给断点恢复，重投的子进程消息会因 child_process_finish
+        返回 False 而不再唤醒父进程，所以读库失败时不带令牌，退回无条件唤醒
+        """
         if not fence.emit_enabled():
             return None
-        node_id = self.runtime.get_current_node_id(process_id)
-        if not node_id:
+        try:
+            node_id = self.runtime.get_current_node_id(process_id)
+            if not node_id:
+                return None
+            state = self.runtime.get_state_or_none(node_id)
+        except Exception:
+            logger.exception("[fence] build fence for process(%s) failed, dispatch without fence", process_id)
             return None
-        state = self.runtime.get_state_or_none(node_id)
         return ExecuteFence(node_id, state.version if state else None)
 
     def _children_fences(self, dispatch_processes: list) -> dict:
