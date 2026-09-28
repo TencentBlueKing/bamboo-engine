@@ -40,6 +40,12 @@ jobs:
         poetry install
         poetry run pip install "Django>${{ matrix.django-version }}"
 
+    - name: Run isolated rendering security tests from this checkout
+      run: |
+        export PYTHONPATH="$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/runtime/bamboo-pipeline:$GITHUB_WORKSPACE/runtime/bamboo-pipeline/test"
+        cd runtime/bamboo-pipeline/
+        poetry run python test/manage.py test pipeline.tests.core pipeline.tests.engine.core --settings=pipeline_sdk_use.security_settings --noinput
+
     - name: Run Tests
       run: |
         cp -r bamboo_engine runtime/bamboo-pipeline/test
