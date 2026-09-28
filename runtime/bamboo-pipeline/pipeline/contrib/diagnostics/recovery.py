@@ -12,7 +12,7 @@ specific language governing permissions and limitations under the License.
 """
 
 import logging
-from collections import namedtuple
+from collections import Counter, namedtuple
 from datetime import timedelta
 
 from django.utils import timezone
@@ -31,8 +31,10 @@ from pipeline.contrib.diagnostics.case_types import (
 )
 from pipeline.contrib.diagnostics.metrics import record_recovery
 from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticOperationAudit, DiagnosticRecovery
+from pipeline.contrib.diagnostics.progress import root_states
 from pipeline.contrib.diagnostics.signatures import matching_hit
 from pipeline.contrib.diagnostics.types import OperationResult
+from pipeline.engine import states
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,12 @@ BLOCKER_RISK = "fence emit is off, confirm the risk to replay"
 BLOCKER_IN_FLIGHT = "a replay is waiting to settle"
 BLOCKER_APPLY_DISABLED = "apply disabled"
 BLOCKER_DISPATCH_FAILED = "dispatch failed"
+
+SETTLE_STATUSES = (
+    DiagnosticRecovery.STATUS_DISPATCHED,
+    DiagnosticRecovery.STATUS_PREVIEWED,
+    DiagnosticRecovery.STATUS_BLOCKED,
+)
 
 ReplayPlan = namedtuple("ReplayPlan", ["case", "fingerprint", "message", "blockers"])
 
@@ -262,3 +270,49 @@ def replay_case(case_id, operator, mode=MODE_DRY_RUN, confirm_risk=False):
             result = OperationResult(True, "replay dispatched", data, [])
     _audit(case, operator, mode, plan, blockers, result, confirm_risk)
     return result
+
+
+def _still_stuck(recovery):
+    case = recovery.case
+    if case is None:
+        return False
+    if recovery.stuck_type == CALLBACK_DISPATCH_LOST:
+        return case_callback(case)[0] == OUTCOME_PENDING
+    hit = matching_hit(case)
+    if hit is None:
+        return False
+    message = recovery.message or {}
+    if message.get("kind") == KIND_POLL:
+        return hit.evidence.get("schedule_times") == (message.get("fence") or {}).get("schedule_times")
+    return True
+
+
+def settle_recoveries(now=None, batch=None):
+    """复核超过收敛窗口的记录：已派发的定出结果，预演和阻断的只记形态是否仍成立。返回结果计数。"""
+    now = now or timezone.now()
+    batch = conf.recovery_batch() if batch is None else batch
+    cutoff = now - timedelta(seconds=conf.recovery_settle_seconds())
+    rows = list(
+        DiagnosticRecovery.objects.select_related("case")
+        .filter(status__in=SETTLE_STATUSES, settled_at__isnull=True, created_at__lte=cutoff)
+        .order_by("id")[:batch]
+    )
+    roots = root_states({row.root_pipeline_id for row in rows})
+    outcomes = Counter()
+    for row in rows:
+        holds = _still_stuck(row)
+        fields = {"detail": dict(row.detail or {}, settled_holds=holds), "settled_at": now}
+        if row.status == DiagnosticRecovery.STATUS_DISPATCHED:
+            if holds:
+                status = DiagnosticRecovery.STATUS_INEFFECTIVE
+            elif roots.get(row.root_pipeline_id) == states.RUNNING:
+                status = DiagnosticRecovery.STATUS_APPLIED
+            else:
+                status = DiagnosticRecovery.STATUS_OBSOLETE
+            fields["status"] = status
+            record_recovery(row.stuck_type, row.trigger, status)
+            outcomes[status] += 1
+        else:
+            outcomes["preview_holds" if holds else "preview_healed"] += 1
+        DiagnosticRecovery.objects.filter(id=row.id).update(**fields)
+    return outcomes

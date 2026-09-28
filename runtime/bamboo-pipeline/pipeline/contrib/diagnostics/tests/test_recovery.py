@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from django.test import override_settings
+from django.utils import timezone
 
 from bamboo_engine.config import Settings
 
@@ -28,6 +29,7 @@ from pipeline.contrib.diagnostics.recovery import (
     apply_plan,
     plan_replay,
     replay_case,
+    settle_recoveries,
 )
 from pipeline.contrib.diagnostics.signatures import build_context, evaluate
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
@@ -43,7 +45,7 @@ from pipeline.contrib.diagnostics.tests.factories import (
     running_root,
     s1_shape,
 )
-from pipeline.eri.models import Process, Schedule
+from pipeline.eri.models import Process, Schedule, State
 
 
 def open_case(process):
@@ -302,3 +304,71 @@ class ReplayCaseTest(RecoveryTestCase):
     def test_missing_case(self):
         self.assertFalse(replay_case(999999, "admin").result)
         self.assertFalse(DiagnosticOperationAudit.objects.exists())
+
+
+class SettleTest(RecoveryTestCase):
+    def dispatch(self, case):
+        recovery, _error = apply_plan(plan_replay(case), DiagnosticRecovery.TRIGGER_MANUAL, "admin")
+        DiagnosticRecovery.objects.filter(id=recovery.id).update(created_at=ago(200))
+        return recovery
+
+    def settled(self, recovery):
+        recovery.refresh_from_db()
+        return recovery.status, recovery.detail.get("settled_holds"), recovery.settled_at is not None
+
+    def test_applied_when_shape_gone(self):
+        process = s1_shape()
+        recovery = self.dispatch(open_case(process))
+        Process.objects.filter(id=process.id).update(
+            current_node_id="a-next", asleep=False, last_heartbeat=timezone.now()
+        )
+        before = recovery_count(EXECUTE_DISPATCH_LOST, "manual", "applied")
+        self.assertEqual(settle_recoveries(), {"applied": 1})
+        self.assertEqual(self.settled(recovery), ("applied", False, True))
+        self.assertEqual(recovery_count(EXECUTE_DISPATCH_LOST, "manual", "applied") - before, 1)
+
+    def test_ineffective_when_shape_holds(self):
+        recovery = self.dispatch(open_case(s1_shape()))
+        settle_recoveries()
+        self.assertEqual(self.settled(recovery), ("ineffective", True, True))
+
+    def test_obsolete_when_root_stopped(self):
+        recovery = self.dispatch(open_case(s1_shape()))
+        State.objects.filter(node_id=ROOT).update(name="REVOKED")
+        settle_recoveries()
+        self.assertEqual(self.settled(recovery), ("obsolete", False, True))
+
+    def test_recent_dispatch_waits_for_window(self):
+        case = open_case(s1_shape())
+        recovery, _error = apply_plan(plan_replay(case), DiagnosticRecovery.TRIGGER_MANUAL, "admin")
+        self.assertEqual(settle_recoveries(), {})
+        self.assertEqual(self.settled(recovery), ("dispatched", None, False))
+
+    def test_poll_counts_as_applied_once_schedule_times_move(self):
+        recovery = self.dispatch(open_case(poll_shape(beat=2000, times=3)))
+        Schedule.objects.filter(node_id="p").update(schedule_times=4)
+        settle_recoveries()
+        self.assertEqual(self.settled(recovery), ("applied", False, True))
+
+    def test_callback_applied_after_schedule_finished(self):
+        case, schedule, _callback = open_callback_case()
+        recovery = self.dispatch(case)
+        Schedule.objects.filter(id=schedule.id).update(finished=True)
+        settle_recoveries()
+        self.assertEqual(self.settled(recovery)[0], "applied")
+
+    def test_preview_rows_only_record_holds(self):
+        case = open_case(s1_shape())
+        preview = DiagnosticRecovery.objects.create(
+            case=case,
+            root_pipeline_id=ROOT,
+            node_id="a",
+            stuck_type=EXECUTE_DISPATCH_LOST,
+            fingerprint="f",
+            trigger="auto",
+            mode="preview",
+            status="previewed",
+        )
+        DiagnosticRecovery.objects.filter(id=preview.id).update(created_at=ago(200))
+        self.assertEqual(settle_recoveries(), {"preview_holds": 1})
+        self.assertEqual(self.settled(preview), ("previewed", True, True))
