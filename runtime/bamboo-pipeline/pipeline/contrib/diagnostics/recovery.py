@@ -35,6 +35,7 @@ from pipeline.contrib.diagnostics.progress import root_states
 from pipeline.contrib.diagnostics.signatures import matching_hit
 from pipeline.contrib.diagnostics.types import OperationResult
 from pipeline.engine import states
+from pipeline.eri.models import Process, State
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +57,12 @@ BLOCKER_MULTIPLE_CALLBACKS = "more than one callback was lost on this node"
 BLOCKER_ENFORCE_OFF = "fence enforce is off"
 BLOCKER_EMIT_OFF = "fence emit is off"
 BLOCKER_RISK = "fence emit is off, confirm the risk to replay"
+BLOCKER_SKIP_ORIGIN = "message came from a skip and carries no fence token"
+BLOCKER_SKIP_RISK = "message came from a skip and carries no fence token, confirm the risk to replay"
 BLOCKER_IN_FLIGHT = "a replay is waiting to settle"
 BLOCKER_APPLY_DISABLED = "apply disabled"
 BLOCKER_DISPATCH_FAILED = "dispatch failed"
+RISK_BLOCKERS = (BLOCKER_RISK, BLOCKER_SKIP_RISK)
 
 SETTLE_STATUSES = (
     DiagnosticRecovery.STATUS_DISPATCHED,
@@ -148,6 +152,18 @@ def _safety_blockers(message, trigger, confirm_risk):
     return [BLOCKER_RISK if manual else BLOCKER_EMIT_OFF]
 
 
+def _skip_origin(case):
+    """跳过节点、跳过条件并行网关派发的消息不带令牌，原消息晚到时会绕过门禁再执行一次。"""
+    if case.stuck_type == EXECUTE_DISPATCH_LOST:
+        version = (case.evidence or {}).get("state_version", "")
+        return State.objects.filter(node_id=case.node_id, version=version, skip=True).exists()
+    if case.stuck_type == CHILD_START_LOST:
+        parent_id = (case.related_objects or {}).get("parent_process_id")
+        gateway_id = Process.objects.filter(id=parent_id).values_list("current_node_id", flat=True).first()
+        return bool(gateway_id) and State.objects.filter(node_id=gateway_id, skip=True).exists()
+    return False
+
+
 def _in_flight(case, fingerprint, now):
     return DiagnosticRecovery.objects.filter(
         case=case,
@@ -167,6 +183,11 @@ def plan_replay(case, trigger=DiagnosticRecovery.TRIGGER_MANUAL, confirm_risk=Fa
     fingerprint, message, blockers = build(case)
     if message is not None:
         blockers = _safety_blockers(message, trigger, confirm_risk)
+        if _skip_origin(case):
+            if trigger != DiagnosticRecovery.TRIGGER_MANUAL:
+                blockers.append(BLOCKER_SKIP_ORIGIN)
+            elif not confirm_risk:
+                blockers.append(BLOCKER_SKIP_RISK)
         if _in_flight(case, fingerprint, now or timezone.now()):
             blockers.append(BLOCKER_IN_FLIGHT)
     return ReplayPlan(case, fingerprint, message, blockers)
@@ -254,7 +275,7 @@ def replay_case(case_id, operator, mode=MODE_DRY_RUN, confirm_risk=False):
         "case_id": case.id,
         "fingerprint": plan.fingerprint,
         "message": plan.message,
-        "requires_risk_confirm": BLOCKER_RISK in blockers,
+        "requires_risk_confirm": any(blocker in blockers for blocker in RISK_BLOCKERS),
     }
     if blockers:
         result = OperationResult(False, "; ".join(blockers), data, blockers)

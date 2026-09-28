@@ -25,6 +25,8 @@ from pipeline.contrib.diagnostics.recovery import (
     BLOCKER_NOT_REPLAYABLE,
     BLOCKER_RISK,
     BLOCKER_SHAPE_GONE,
+    BLOCKER_SKIP_ORIGIN,
+    BLOCKER_SKIP_RISK,
     BLOCKER_SUCCESSOR,
     apply_plan,
     plan_replay,
@@ -210,6 +212,26 @@ class ReplaySafetyTest(RecoveryTestCase):
             auto = plan_replay(case, trigger=DiagnosticRecovery.TRIGGER_AUTO, confirm_risk=True)
             self.assertEqual(auto.blockers, [BLOCKER_EMIT_OFF])
 
+    def test_skipped_node_blocks_auto_replay(self):
+        case = open_case(s1_shape())
+        State.objects.filter(node_id="a").update(skip=True)
+        plan = plan_replay(case, trigger=DiagnosticRecovery.TRIGGER_AUTO)
+        self.assertEqual(plan.blockers, [BLOCKER_SKIP_ORIGIN])
+        self.assertEqual(plan.message["node_id"], "a-next")
+
+    def test_skipped_node_requires_risk_confirm(self):
+        case = open_case(s1_shape())
+        State.objects.filter(node_id="a").update(skip=True)
+        self.assertEqual(plan_replay(case).blockers, [BLOCKER_SKIP_RISK])
+        self.assertEqual(plan_replay(case, confirm_risk=True).blockers, [])
+
+    def test_skipped_gateway_blocks_child_start_replay(self):
+        case = open_case(new_child(fork_parent(need_ack=2)))
+        State.objects.filter(node_id="pg").update(skip=True)
+        plan = plan_replay(case, trigger=DiagnosticRecovery.TRIGGER_AUTO)
+        self.assertEqual(plan.blockers, [BLOCKER_SKIP_ORIGIN])
+        self.assertEqual(plan.message["node_id"], "b1")
+
     def test_unsettled_dispatch_blocks_another(self):
         case = open_case(s1_shape())
         apply_plan(plan_replay(case), DiagnosticRecovery.TRIGGER_MANUAL, "admin")
@@ -300,6 +322,16 @@ class ReplayCaseTest(RecoveryTestCase):
         with mock.patch.object(Settings, "FENCE_EMIT_ENABLED", False):
             result = replay_case(case.id, "admin")
         self.assertEqual((result.result, result.data["requires_risk_confirm"]), (False, True))
+
+    @override_settings(PIPELINE_DIAGNOSTICS_APPLY_ENABLED=True)
+    def test_replay_case_flags_skip_risk(self):
+        case = open_case(s1_shape())
+        State.objects.filter(node_id="a").update(skip=True)
+        result = replay_case(case.id, "admin", mode="apply")
+        self.assertEqual((result.result, result.blockers), (False, [BLOCKER_SKIP_RISK]))
+        self.assertIs(result.data["requires_risk_confirm"], True)
+        self.runtime.execute.assert_not_called()
+        self.assertFalse(DiagnosticRecovery.objects.exists())
 
     def test_missing_case(self):
         self.assertFalse(replay_case(999999, "admin").result)
