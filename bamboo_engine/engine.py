@@ -515,14 +515,8 @@ class Engine:
         )
         children = [d.process_id for d in dispatch_processes]
         self.runtime.join(process_id, children)
-        for d in dispatch_processes:
-            self.runtime.execute(
-                process_id=d.process_id,
-                node_id=d.node_id,
-                root_pipeline_id=process_info.root_pipeline_id,
-                parent_pipeline_id=process_info.top_pipeline_id,
-            )
 
+        # 必须先刷新网关版本再派发：子进程结束时按网关当前版本生成唤醒父进程的令牌，先派发会取到旧版本
         self._add_history(node_id, state)
 
         self.runtime.set_state(
@@ -532,6 +526,14 @@ class Engine:
             refresh_version=True,
             set_archive_time=True,
         )
+
+        for d in dispatch_processes:
+            self.runtime.execute(
+                process_id=d.process_id,
+                node_id=d.node_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                parent_pipeline_id=process_info.top_pipeline_id,
+            )
 
         self.runtime.post_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
 

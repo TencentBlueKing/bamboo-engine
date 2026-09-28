@@ -516,3 +516,28 @@ def test_fork_strips_fence_when_emit_disabled(pi, node):
             call(process_id=4, node_id="n4", root_pipeline_id="root", parent_pipeline_id="root", headers={"k": "v"}),
         ]
     )
+
+
+# 人工操作
+
+
+def test_skip_conditional_parallel_gateway_refreshes_version_before_dispatch(pi):
+    node = MagicMock()
+    node.type = NodeType.ConditionalParallelGateway
+    node.targets = {"f1": "n3"}
+    state = MagicMock()
+    state.node_id = "cpg"
+    state.name = states.FAILED
+    runtime = MagicMock()
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.get_state = MagicMock(return_value=state)
+    runtime.get_sleep_process_info_with_current_node_id = MagicMock(return_value=pi)
+    runtime.fork = MagicMock(return_value=[DispatchProcess(process_id=3, node_id="n3")])
+
+    Engine(runtime=runtime).skip_conditional_parallel_gateway("cpg", ["f1"], "cg")
+
+    names = [name for name, _, _ in runtime.method_calls]
+    assert names.index("set_state") < names.index("execute")
+    runtime.execute.assert_called_once_with(
+        process_id=3, node_id="n3", root_pipeline_id="root", parent_pipeline_id="root"
+    )
