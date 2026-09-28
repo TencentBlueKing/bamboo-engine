@@ -16,7 +16,13 @@ from pipeline.contrib.diagnostics import metrics
 from pipeline.contrib.diagnostics.case_types import EXECUTE_DISPATCH_LOST, POLL_DISPATCH_LOST
 from pipeline.contrib.diagnostics.management.commands.diagnostics_recovery_report import Command
 from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticRecovery
-from pipeline.contrib.diagnostics.recovery import BLOCKER_EMIT_OFF, BLOCKER_ENFORCE_OFF, apply_plan, plan_replay
+from pipeline.contrib.diagnostics.recovery import (
+    BLOCKER_EMIT_OFF,
+    BLOCKER_ENFORCE_OFF,
+    BLOCKER_SKIP_ORIGIN,
+    apply_plan,
+    plan_replay,
+)
 from pipeline.contrib.diagnostics.recovery_runner import recovery_report, run_recovery
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 from pipeline.contrib.diagnostics.tests.factories import ROOT, ago, poll_shape, running_root, s1_shape
@@ -26,7 +32,7 @@ from pipeline.contrib.diagnostics.tests.test_recovery import (
     open_case,
     recovery_count,
 )
-from pipeline.eri.models import Process, Schedule
+from pipeline.eri.models import Process, Schedule, State
 
 
 class RunRecoveryTest(DiagnosticsTestCase):
@@ -245,6 +251,17 @@ class AutoReplayTest(RecoveryTestCase):
         self.assertEqual((recovery.mode, recovery.detail), ("preview", {"blockers": [BLOCKER_EMIT_OFF]}))
         self.runtime.execute.assert_not_called()
 
+    def test_skipped_node_is_blocked_not_replayed(self):
+        open_case(s1_shape())
+        State.objects.filter(node_id="a").update(skip=True)
+        self.assertEqual(run_recovery().outcomes, {"blocked": 1})
+        recovery = DiagnosticRecovery.objects.get()
+        self.assertEqual(
+            (recovery.mode, recovery.status, recovery.detail),
+            ("preview", "blocked", {"blockers": [BLOCKER_SKIP_ORIGIN]}),
+        )
+        self.runtime.execute.assert_not_called()
+
     def test_callback_replays_without_fence(self):
         _case, schedule, callback = open_callback_case()
         with mock.patch.multiple(Settings, FENCE_EMIT_ENABLED=False, FENCE_ENFORCE=False):
@@ -293,6 +310,33 @@ class AutoReplayTest(RecoveryTestCase):
         DiagnosticRecovery.objects.update(created_at=ago(200))
         self.assertEqual(run_recovery().outcomes["auto_dispatched"], 1)
         self.assertEqual(self.runtime.execute.call_count, 2)
+
+    def test_third_failed_dispatch_requires_manual_next_round(self):
+        open_case(s1_shape())
+        self.runtime.execute.side_effect = Exception("mq down")
+        rounds = [run_recovery().outcomes]
+        for _ in range(2):
+            DiagnosticRecovery.objects.update(created_at=ago(200))
+            rounds.append(run_recovery().outcomes)
+        rounds.append(run_recovery().outcomes)
+        self.assertEqual(
+            rounds,
+            [
+                {"auto_failed": 1},
+                {"preview_holds": 1, "auto_failed": 1},
+                {"preview_holds": 1, "auto_failed": 1},
+                {"manual_required": 1},
+            ],
+        )
+        self.assertEqual(self.runtime.execute.call_count, 3)
+
+    def test_manual_replays_do_not_count_as_attempts(self):
+        case = open_case(s1_shape())
+        for _ in range(3):
+            apply_plan(plan_replay(case), DiagnosticRecovery.TRIGGER_MANUAL, "admin")
+            DiagnosticRecovery.objects.update(created_at=ago(200))
+        self.assertEqual(run_recovery().outcomes, {"ineffective": 3, "auto_dispatched": 1})
+        self.assertEqual(self.runtime.execute.call_count, 4)
 
     def test_round_cap_defers_the_rest(self):
         open_case(s1_shape(node="a"))
