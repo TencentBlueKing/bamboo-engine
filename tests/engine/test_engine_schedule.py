@@ -33,6 +33,57 @@ from bamboo_engine.handler import ScheduleResult
 from bamboo_engine.interrupt import ScheduleInterrupter, ScheduleKeyPoint
 
 
+@pytest.mark.parametrize("schedule_type", [ScheduleType.POLL, ScheduleType.CALLBACK, ScheduleType.MULTIPLE_CALLBACK])
+def test_render_failure_during_schedule_cannot_be_ignored(
+    node_id, pi, state, schedule, node, interrupter, monkeypatch, schedule_type
+):
+    from bamboo_engine.eri import ExecutionData
+    from bamboo_engine.handlers.service_activity import ServiceActivityHandler  # noqa
+    from bamboo_engine.template import Template, template
+    from tests.template.test_render_backend_failures import pool
+
+    node.id = node_id
+    node.error_ignorable = True
+    schedule.type = schedule_type
+    runtime = MagicMock()
+    runtime.get_process_info.return_value = pi
+    runtime.get_state.return_value = state
+    runtime.get_schedule.return_value = schedule
+    runtime.get_node.return_value = node
+    runtime.apply_schedule_lock.return_value = True
+    runtime.get_data_inputs.return_value = {}
+    runtime.get_data_outputs.return_value = {}
+    runtime.get_execution_data.return_value = ExecutionData(inputs={}, outputs={})
+    runtime.get_execution_data_outputs.return_value = {}
+    runtime.serialize_execution_data.return_value = ("{}", "json")
+    service = runtime.get_service.return_value
+    service.schedule_type.return_value = schedule_type
+    service.schedule.side_effect = lambda **kwargs: Template("${x + 1}").render({"x": 2})
+    interrupter.runtime.interrupt_errors.return_value = ()
+    backend = pool(fallback_inprocess=True)
+
+    def fail_start():
+        raise OSError("synthetic process quota")
+
+    monkeypatch.setattr(backend, "_spawn_worker", fail_start)
+    monkeypatch.setattr(template, "get_render_backend", lambda: backend)
+    try:
+        Engine(runtime).schedule(pi.process_id, node_id, schedule.id, interrupter, {})
+    finally:
+        backend.close()
+
+    assert runtime.set_state.call_args.kwargs["to_state"] == states.FAILED
+    assert runtime.set_state.call_args.kwargs["version"] == state.version
+    outputs = runtime.set_execution_data.call_args.kwargs["data"].outputs
+    assert outputs["_result"] is False
+    assert "isolated render failed" in outputs["ex_data"]
+    runtime.release_schedule_lock.assert_called_once_with(schedule.id)
+    runtime.execute.assert_not_called()
+    runtime.finish_schedule.assert_not_called()
+    runtime.set_next_schedule.assert_not_called()
+    assert ScheduleInterruptPoint.from_json(interrupter.check_point.to_json()).handler_data.render_infrastructure_failed
+
+
 @pytest.fixture
 def node_id():
     return "nid"

@@ -7,6 +7,8 @@ jobs:
   tests:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-22.04
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
 
     strategy:
       matrix:
@@ -23,9 +25,9 @@ jobs:
           python -VV
           python -m site
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install --upgrade coverage[toml] virtualenv tox tox-gh-actions
-          python -m pip install poetry==2.0.0
-          python -m pip install urllib3==2.3.0
+          # Resolve the CI tools together: Poetry 2.0 requires virtualenv <21.
+          python -m pip install "coverage[toml]" "tox==4.24.1" "virtualenv==20.39.1" "tox-gh-actions==3.3.0" "poetry==2.0.0" "urllib3==2.3.0"
+          python -m pip check
 
       - name: Run tox targets for ${{ matrix.python-version }}
         run: python -m tox
