@@ -231,6 +231,12 @@ class AutoReplayTest(RecoveryTestCase):
                 self.assertEqual(run_recovery().outcomes, {"previewed": 1}, path)
         self.runtime.execute.assert_not_called()
 
+    def test_scope_setup_error_only_previews(self):
+        open_case(s1_shape())
+        with mock.patch("pipeline.contrib.diagnostics.recovery_runner.import_string", side_effect=RuntimeError("boom")):
+            self.assertEqual(run_recovery().outcomes, {"previewed": 1})
+        self.runtime.execute.assert_not_called()
+
     def test_emit_off_blocks_execute_replay(self):
         open_case(s1_shape())
         with mock.patch.object(Settings, "FENCE_EMIT_ENABLED", False):

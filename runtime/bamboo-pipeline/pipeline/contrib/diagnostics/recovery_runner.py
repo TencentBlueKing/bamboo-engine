@@ -165,7 +165,11 @@ def run_recovery(now=None, force=False):
         return None
     now = now or timezone.now()
     outcomes = Counter(settle_recoveries(now=now))
-    auto = _auto_replay(now, outcomes)
+    try:
+        auto = _auto_replay(now, outcomes)
+    except Exception:
+        logger.exception("[pipeline_diagnostics_recovery] auto replay skipped: scope setup failed")
+        auto = None
     cases = list(
         DiagnosticCase.objects.filter(
             status=DiagnosticCase.STATUS_OPEN, stuck_type__in=list(REPLAYABLE_CASE_TYPES)
