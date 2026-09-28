@@ -12,11 +12,10 @@ specific language governing permissions and limitations under the License.
 """
 
 import json
-
 from typing import List, Optional
 
-from .runtime import DispatchProcess
 from .handler import ExecuteResult, ScheduleResult
+from .runtime import DispatchProcess
 
 
 class InterruptPoint:
@@ -41,6 +40,7 @@ class HandlerExecuteData:
         execute_serialize_outputs: str = "{}",
         execute_outputs_serializer: str = "",
         pipeline_stack_setted: bool = False,
+        render_infrastructure_failed: bool = False,
     ):
         self.dispatch_processes = dispatch_processes or []
         self.end_event_executed = end_event_executed
@@ -51,9 +51,10 @@ class HandlerExecuteData:
         self.execute_serialize_outputs = execute_serialize_outputs
         self.execute_outputs_serializer = execute_outputs_serializer
         self.pipeline_stack_setted = pipeline_stack_setted
+        self.render_infrastructure_failed = render_infrastructure_failed
 
     def to_dict(self) -> dict:
-        return {
+        obj = {
             "dispatch_processes": [dp.to_dict() for dp in self.dispatch_processes],
             "end_event_executed": self.end_event_executed,
             "end_event_execute_fail": self.end_event_execute_fail,
@@ -64,6 +65,9 @@ class HandlerExecuteData:
             "execute_outputs_serializer": self.execute_outputs_serializer,
             "pipeline_stack_setted": self.pipeline_stack_setted,
         }
+        if getattr(self, "render_infrastructure_failed", False):
+            obj["render_infrastructure_failed"] = True
+        return obj
 
     @classmethod
     def from_dict(cls, obj: dict):
@@ -77,6 +81,7 @@ class HandlerExecuteData:
             execute_serialize_outputs=obj["execute_serialize_outputs"],
             execute_outputs_serializer=obj["execute_outputs_serializer"],
             pipeline_stack_setted=obj["pipeline_stack_setted"],
+            render_infrastructure_failed=obj.get("render_infrastructure_failed", False),
         )
 
 
@@ -141,6 +146,7 @@ class HandlerScheduleData:
         schedule_times_added: bool = False,
         schedule_serialize_outputs: str = "{}",
         schedule_outputs_serializer: str = "",
+        render_infrastructure_failed: bool = False,
     ) -> None:
         self.service_scheduled = service_scheduled
         self.service_schedule_fail = service_schedule_fail
@@ -148,9 +154,10 @@ class HandlerScheduleData:
         self.schedule_times_added = schedule_times_added
         self.schedule_serialize_outputs = schedule_serialize_outputs
         self.schedule_outputs_serializer = schedule_outputs_serializer
+        self.render_infrastructure_failed = render_infrastructure_failed
 
     def to_dict(self) -> dict:
-        return {
+        obj = {
             "service_scheduled": self.service_scheduled,
             "service_schedule_fail": self.service_schedule_fail,
             "is_schedule_done": self.is_schedule_done,
@@ -158,6 +165,9 @@ class HandlerScheduleData:
             "schedule_serialize_outputs": self.schedule_serialize_outputs,
             "schedule_outputs_serializer": self.schedule_outputs_serializer,
         }
+        if getattr(self, "render_infrastructure_failed", False):
+            obj["render_infrastructure_failed"] = True
+        return obj
 
     @classmethod
     def from_dict(cls, obj: dict):
@@ -168,6 +178,7 @@ class HandlerScheduleData:
             schedule_times_added=obj["schedule_times_added"],
             schedule_serialize_outputs=obj["schedule_serialize_outputs"],
             schedule_outputs_serializer=obj["schedule_outputs_serializer"],
+            render_infrastructure_failed=obj.get("render_infrastructure_failed", False),
         )
 
 

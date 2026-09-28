@@ -6,23 +6,28 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
       DB_DATABASE: pipeline_test
       DB_USER: root
       DB_PASSWORD: root
+      PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
     strategy:
       matrix:
-        python-version: [3.6, 3.7]
+        python-version: [3.6.12, 3.7.16]
         django-version: [2.2, 3.0]
 
     steps:
 
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
+    - uses: actions/checkout@v6
+    # Keep Poetry's dependencies isolated and compatible with the Python 3.6 target.
+    - name: Set up compatible Poetry
+      run: |
+        python3 -m venv "$RUNNER_TEMP/poetry"
+        "$RUNNER_TEMP/poetry/bin/python" -m pip install "poetry==1.2.2" "packaging==21.3" "virtualenv==20.17.1"
+
+    - name: Set up Python ${{ matrix.python-version }} with pyenv
+      run: .github/scripts/setup_pyenv_python.sh ${{ matrix.python-version }}
 
     - name: Set up MySQL
       run: |
@@ -39,32 +44,30 @@ jobs:
       with:
         rabbitmq version: 3
 
-    - name: Set up Poetry
-      uses: abatilo/actions-poetry@v2.0.0
-      with:
-        poetry-version: 1.1.9
-
-    - name: Install urllib3
-      run: |
-        python -m pip install urllib3==1.26.9
-
     - name: Install dependency
       run: |
         cd runtime/bamboo-pipeline/test
-        poetry install
-        poetry run pip install "Django>${{ matrix.django-version }}"
+        "$RUNNER_TEMP/poetry/bin/poetry" env use "$PYENV_ROOT/versions/${{ matrix.python-version }}/bin/python"
+        # Avoid intermittent PyPI metadata/candidate failures for these legacy sdists.
+        # Versions and SHA-256 values are unchanged from poetry.lock.
+        "$RUNNER_TEMP/poetry/bin/poetry" run python -m pip install --no-deps --no-index \
+          --find-links "https://files.pythonhosted.org/packages/9f/79/d265d783dd022541b744d002745d9e55d84c04a41930e35d8795934f6526/click-didyoumean-0.0.3.tar.gz#sha256=112229485c9704ff51362fe34b2d4f0b12fc71cc20f6d2b3afabed4b8bfa6aeb" \
+          --find-links "https://files.pythonhosted.org/packages/3c/df/59cd2fa5e48d0804d213bdcb1acb4d08c403b61c7ff7ed4dd4a6a2deb3f7/mysqlclient-2.0.3.tar.gz#sha256=f6ebea7c008f155baeefe16c56cd3ee6239f7a5a9ae42396c2f1860f08a7c432" \
+          "click-didyoumean==0.0.3" "mysqlclient==2.0.3"
+        "$RUNNER_TEMP/poetry/bin/poetry" install
+        "$RUNNER_TEMP/poetry/bin/poetry" run pip install "Django>${{ matrix.django-version }}"
 
     - name: Run test
       run: |
         cd runtime/bamboo-pipeline/test
         cp -r ../../../bamboo_engine/ .
         cp -r ../pipeline .
-        poetry run python manage.py migrate
-        poetry run python manage.py celery worker &
-        while ! poetry run celery inspect ping; do
+        "$RUNNER_TEMP/poetry/bin/poetry" run python manage.py migrate
+        "$RUNNER_TEMP/poetry/bin/poetry" run python manage.py celery worker &
+        while ! "$RUNNER_TEMP/poetry/bin/poetry" run celery inspect ping; do
             sleep 1
         done
-        poetry run pytest pipeline_test_use/tests
+        "$RUNNER_TEMP/poetry/bin/poetry" run pytest pipeline_test_use/tests
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test

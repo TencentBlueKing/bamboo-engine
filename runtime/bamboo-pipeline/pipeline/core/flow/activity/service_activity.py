@@ -17,13 +17,10 @@ from copy import deepcopy
 from django.utils.translation import ugettext_lazy as _
 from pipeline.conf import settings
 from pipeline.core.flow.activity.base import Activity
-from pipeline.core.flow.io import (
-    BooleanItemSchema,
-    InputItem,
-    IntItemSchema,
-    OutputItem,
-)
+from pipeline.core.flow.io import BooleanItemSchema, InputItem, IntItemSchema, OutputItem
 from pipeline.utils.utils import convert_bytes_to_str
+
+from bamboo_engine.exceptions import RenderInfrastructureError
 
 
 class Service(object, metaclass=ABCMeta):
@@ -239,7 +236,6 @@ class ServiceActivity(Activity):
             self._prepared_outputs = self.data.outputs_copy()
 
     def __setstate__(self, state):
-
         for attr, obj in list(state.items()):
             # py2 pickle dumps data compatible
             if isinstance(attr, bytes):
@@ -269,6 +265,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.execute(self.data, parent_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False
@@ -307,6 +305,8 @@ class ServiceActivity(Activity):
         self.setup_logger()
         try:
             result = self.service.schedule(self.data, parent_data, callback_data)
+        except RenderInfrastructureError:
+            raise
         except settings.PLUGIN_SPECIFIC_EXCEPTIONS as e:
             self.data.set_outputs("ex_data", e)
             result = False
@@ -364,13 +364,13 @@ class AbstractIntervalGenerator(object, metaclass=ABCMeta):
 class DefaultIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(DefaultIntervalGenerator, self).next()
-        return self.count**2
+        return self.count ** 2
 
 
 class SquareIntervalGenerator(AbstractIntervalGenerator):
     def next(self):
         super(SquareIntervalGenerator, self).next()
-        return self.count**2
+        return self.count ** 2
 
 
 class NullIntervalGenerator(AbstractIntervalGenerator):
