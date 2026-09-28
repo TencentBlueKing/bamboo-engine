@@ -53,6 +53,7 @@ class Migration(migrations.Migration):
                     "case",
                     models.ForeignKey(
                         blank=True,
+                        db_constraint=False,
                         null=True,
                         on_delete=django.db.models.deletion.SET_NULL,
                         related_name="recoveries",
@@ -65,7 +66,7 @@ class Migration(migrations.Migration):
                 "verbose_name": "Pipeline诊断恢复记录",
                 "verbose_name_plural": "Pipeline诊断恢复记录",
                 "ordering": ["-id"],
-                "index_together": {("case", "fingerprint"), ("status", "created_at")},
+                "index_together": {("case", "fingerprint"), ("status", "settled_at", "created_at")},
             },
         ),
     ]

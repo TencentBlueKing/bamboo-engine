@@ -231,6 +231,7 @@ class DiagnosticRecovery(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        db_constraint=False,
     )
     root_pipeline_id = models.CharField(_("根 Pipeline ID"), max_length=64, db_index=True)
     node_id = models.CharField(_("节点ID"), max_length=64)
@@ -251,7 +252,7 @@ class DiagnosticRecovery(models.Model):
         verbose_name = _("Pipeline诊断恢复记录")
         verbose_name_plural = _("Pipeline诊断恢复记录")
         ordering = ["-id"]
-        index_together = (("case", "fingerprint"), ("status", "created_at"))
+        index_together = (("case", "fingerprint"), ("status", "settled_at", "created_at"))
 
     def __unicode__(self):
         return "{}_{}_{}".format(self.case_id or "", self.fingerprint, self.status)
