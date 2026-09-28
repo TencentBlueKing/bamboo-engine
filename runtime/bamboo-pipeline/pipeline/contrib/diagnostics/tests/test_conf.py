@@ -62,3 +62,16 @@ class RecoveryConfTest(TestCase):
         self.assertFalse(conf.recovery_enabled())
         self.assertEqual(conf.recovery_settle_seconds(), 180)
         self.assertEqual(conf.recovery_batch(), 200)
+
+    def test_auto_replay_defaults(self):
+        self.assertEqual(conf.recovery_mode(), "preview")
+        self.assertEqual(conf.auto_replay_types(), frozenset())
+        self.assertEqual(conf.recovery_scope_resolver(), "")
+        self.assertEqual(conf.recovery_max_attempts(), 3)
+        self.assertEqual(conf.recovery_max_per_round(), 20)
+        self.assertEqual(conf.recovery_breaker_window_seconds(), 300)
+        self.assertEqual(conf.recovery_breaker_threshold(), 50)
+
+    @override_settings(PIPELINE_DIAGNOSTICS_AUTO_REPLAY_TYPES="execute_dispatch_lost, callback_dispatch_lost")
+    def test_auto_replay_types_accept_string(self):
+        self.assertEqual(conf.auto_replay_types(), frozenset(["execute_dispatch_lost", "callback_dispatch_lost"]))

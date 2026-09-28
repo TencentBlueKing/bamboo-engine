@@ -70,3 +70,14 @@ class RecordRecoveryTest(SimpleTestCase):
     def test_metric_errors_are_swallowed(self):
         with mock.patch.object(metrics.DIAGNOSTICS_RECOVERY, "labels", side_effect=RuntimeError("boom")):
             metrics.record_recovery("t_recovery", "auto", "applied")
+
+
+class RecordBreakerOpenTest(SimpleTestCase):
+    def test_counts_breaker_open(self):
+        before = _value(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN)
+        metrics.record_breaker_open()
+        self.assertEqual(_value(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN) - before, 1)
+
+    def test_metric_errors_are_swallowed(self):
+        with mock.patch.object(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN, "labels", side_effect=RuntimeError("boom")):
+            metrics.record_breaker_open()
