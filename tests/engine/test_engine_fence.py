@@ -11,6 +11,7 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
+import mock
 import pytest
 from mock import MagicMock
 from prometheus_client import REGISTRY
@@ -18,8 +19,16 @@ from prometheus_client import REGISTRY
 from bamboo_engine import states
 from bamboo_engine.config import Settings
 from bamboo_engine.engine import Engine
-from bamboo_engine.eri import ProcessInfo, State
-from bamboo_engine.interrupt import ExecuteInterrupter, ExecuteInterruptPoint, ExecuteKeyPoint
+from bamboo_engine.eri import NodeType, ProcessInfo, Schedule, ScheduleType, ServiceActivity, State
+from bamboo_engine.eri.models.interrupt import ScheduleInterruptPoint
+from bamboo_engine.handler import ScheduleResult
+from bamboo_engine.interrupt import (
+    ExecuteInterrupter,
+    ExecuteInterruptPoint,
+    ExecuteKeyPoint,
+    ScheduleInterrupter,
+    ScheduleKeyPoint,
+)
 from bamboo_engine.utils.host import get_hostname
 
 FENCE = {"from_node": "n0", "from_version": "v0"}
@@ -160,3 +169,151 @@ def test_execute_recovery_at_entry_still_checks_fence(enforce, pi):
     runtime.wake_up_if_sleeping_at.assert_called_once_with(1, "n0")
     runtime.wake_up.assert_not_called()
     runtime.beat.assert_not_called()
+
+
+# 调度入口
+
+
+@pytest.fixture
+def node():
+    return ServiceActivity(
+        id="nid",
+        type=NodeType.ServiceActivity,
+        target_flows=["f1"],
+        target_nodes=["t1"],
+        targets={"f1": "t1"},
+        root_pipeline_id="root",
+        parent_pipeline_id="root",
+        code="",
+        version="",
+        error_ignorable=False,
+    )
+
+
+POLL_AGAIN = ScheduleResult(has_next_schedule=True, schedule_after=5, schedule_done=False, next_node_id=None)
+
+
+def make_schedule(times=0, schedule_type=ScheduleType.POLL):
+    return Schedule(
+        id=2,
+        type=schedule_type,
+        process_id=1,
+        node_id="nid",
+        finished=False,
+        expired=False,
+        version="v",
+        times=times,
+    )
+
+
+def schedule_runtime(pi, node, schedule, locked=True):
+    runtime = MagicMock()
+    runtime.get_process_info = MagicMock(return_value=pi)
+    runtime.get_state = MagicMock(return_value=make_state("nid", "v"))
+    runtime.get_schedule = MagicMock(return_value=schedule)
+    runtime.get_node = MagicMock(return_value=node)
+    runtime.apply_schedule_lock = MagicMock(return_value=True)
+    runtime.apply_schedule_lock_with_times = MagicMock(return_value=locked)
+    return runtime
+
+
+def run_schedule(runtime, pi, headers, schedule_result, recover_point=None):
+    interrupter = ScheduleInterrupter(
+        runtime=MagicMock(),
+        process_id=pi.process_id,
+        current_node_id="nid",
+        schedule_id=2,
+        callback_data_id=None,
+        check_point=ScheduleInterruptPoint(name=ScheduleKeyPoint.ENTRY),
+        recover_point=recover_point,
+        headers=headers,
+    )
+    handler = MagicMock()
+    handler.schedule = MagicMock(return_value=schedule_result)
+    with mock.patch("bamboo_engine.engine.HandlerFactory.get_handler", MagicMock(return_value=handler)):
+        Engine(runtime=runtime).schedule(pi.process_id, "nid", 2, interrupter, headers)
+    return handler
+
+
+def test_schedule_without_fence_uses_plain_lock(pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule())
+
+    handler = run_schedule(runtime, pi, {"k": "v"}, POLL_AGAIN)
+
+    runtime.apply_schedule_lock.assert_called_once_with(2)
+    runtime.apply_schedule_lock_with_times.assert_not_called()
+    handler.schedule.assert_called_once()
+
+
+def test_schedule_locks_with_times(pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3))
+
+    handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    runtime.apply_schedule_lock_with_times.assert_called_once_with(2, 3)
+    runtime.apply_schedule_lock.assert_not_called()
+    handler.schedule.assert_called_once()
+
+
+def test_schedule_lock_busy_keeps_existing_handling(enforce, pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=3), locked=False)
+    before = drop_count("schedule", "schedule_times_mismatch", "true")
+
+    handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    assert drop_count("schedule", "schedule_times_mismatch", "true") == before
+    handler.schedule.assert_not_called()
+    runtime.set_next_schedule.assert_not_called()
+    runtime.apply_schedule_lock.assert_not_called()
+
+
+@mock.patch("bamboo_engine.engine.random.randint", return_value=5)
+def test_schedule_lock_busy_retry_keeps_fence(randint, pi, node):
+    schedule = make_schedule(times=3, schedule_type=ScheduleType.MULTIPLE_CALLBACK)
+    runtime = schedule_runtime(pi, node, schedule, locked=False)
+
+    run_schedule(runtime, pi, {"k": "v", "fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    runtime.set_next_schedule.assert_called_once_with(
+        process_id=1,
+        node_id="nid",
+        schedule_id=2,
+        callback_data_id=None,
+        schedule_after=5,
+        headers={"k": "v", "fence": {"schedule_times": 3}},
+    )
+
+
+def test_schedule_drops_times_mismatch_when_enforced(enforce, pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=4), locked=False)
+    before = drop_count("schedule", "schedule_times_mismatch", "true")
+
+    handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    assert drop_count("schedule", "schedule_times_mismatch", "true") == before + 1
+    runtime.apply_schedule_lock.assert_not_called()
+    runtime.beat.assert_not_called()
+    runtime.set_next_schedule.assert_not_called()
+    handler.schedule.assert_not_called()
+
+
+def test_schedule_only_records_times_mismatch_when_not_enforced(pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=4), locked=False)
+    before = drop_count("schedule", "schedule_times_mismatch", "false")
+
+    handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN)
+
+    assert drop_count("schedule", "schedule_times_mismatch", "false") == before + 1
+    runtime.apply_schedule_lock.assert_called_once_with(2)
+    handler.schedule.assert_called_once()
+
+
+def test_schedule_recovery_skips_fence(enforce, pi, node):
+    runtime = schedule_runtime(pi, node, make_schedule(times=4), locked=False)
+    recover_point = ScheduleInterruptPoint(name=ScheduleKeyPoint.APPLY_LOCK_DONE, version=1, lock_get=True)
+
+    handler = run_schedule(runtime, pi, {"fence": {"schedule_times": 3}}, POLL_AGAIN, recover_point=recover_point)
+
+    runtime.apply_schedule_lock_with_times.assert_not_called()
+    runtime.apply_schedule_lock.assert_not_called()
+    handler.schedule.assert_called_once()

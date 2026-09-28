@@ -1069,7 +1069,9 @@ class Engine:
             if interrupter.recover_point and interrupter.recover_point.lock_get is not None:
                 lock_get = interrupter.recover_point.lock_get
             else:
-                lock_get = self.runtime.apply_schedule_lock(schedule_id)
+                lock_get = self._apply_schedule_lock(schedule_id, node_id, root_pipeline_id, headers)
+                if lock_get is None:
+                    return
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
@@ -1277,6 +1279,30 @@ class Engine:
             return False
         self.runtime.wake_up(process_id)
         return True
+
+    def _apply_schedule_lock(self, schedule_id, node_id: str, root_pipeline_id: str, headers: dict) -> Optional[bool]:
+        """获取调度锁；消息带令牌时同时校验调度次数，返回 None 表示消息应被丢弃"""
+        token = fence.read_schedule_fence(headers)
+        if token is None:
+            return self.runtime.apply_schedule_lock(schedule_id)
+
+        lock_get = fence.apply_schedule_lock(self.runtime, schedule_id, token)
+        if lock_get is not None:
+            return lock_get
+
+        enforced = fence.enforce_enabled()
+        fence.record_drop(
+            kind=fence.KIND_SCHEDULE,
+            reason=fence.REASON_SCHEDULE_TIMES_MISMATCH,
+            enforced=enforced,
+            root_pipeline_id=root_pipeline_id,
+            schedule_id=schedule_id,
+            node_id=node_id,
+            token=token.to_dict(),
+        )
+        if enforced:
+            return None
+        return self.runtime.apply_schedule_lock(schedule_id)
 
     def _add_history(
         self,
