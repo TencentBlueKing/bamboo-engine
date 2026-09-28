@@ -1,16 +1,18 @@
-# master Mako 安全同步验证（2026-09-28）
+# 3.29 LTS Mako 安全同步验证（2026-09-28）
 
 ## 基线与范围
 
-- 目标：`ai/sync-mako-security-master-20260928`，基线 `ddff308f155ac8089c8e57eb0b491e670b184912`。
+- 目标：`ai/sync-mako-security-3.29-lts-20260928`，基线 `upstream/bamboo_pipeline_3.29_lts` 的 `cd9f7b8`。包版本保持 engine `2.11.3`、pipeline `3.29.9`。
+- 安全实现与 master 同步分支 `ai/sync-mako-security-master-20260928` 的 `bamboo_engine/utils/mako_safety.py` 相同，并保留 Python 3.6/3.7 的 `ast.Index` 下标解包。下文全量数字来自该 master 端口在 Python 3.6/3.7 上的记录；本分支的定向复验写在版本说明中。
 - 权威源：4.0 LTS `8a9f6ea6f0f1b6b216d68c1586c5531df6dbb7b1`、3.24 LTS `6979feba98d01ec2cd4594206ddbdf0ee99f045f`。
 - 复用安全补丁 `519b063`、`5fbe338`、`4868979`、`1a5dcda` 及 `4de95c7` 文档；最终按源分支内容核对，不以祖先关系代替验证。
 - 覆盖既有 filter callable、动态字符串、subscript、默认 shield、根白名单，以及 frame 属性、restricted builtins、危险属性/保留命名空间、导入过滤、合法 `_module`/caller/alias、仅 enforce 禁止 format。
 - 同步可选 subprocess、受限协议、超时/大小边界、primitive-only reply、可信 parent 决定兼容回退、设施故障显式停止及恢复类别、执行/调度/完成钩子的故障处理。
 - 安全模块 13 文件与 4.0 源的 AST 相同（比较时仅归一化本分支必需的 `ast.Index` 解包）。3.24 的同源 backend/稳定性测试差异仅为导入排版。
-- master 的 `Engine` 只改 `hook_dispatch`、`execute`、`schedule` 并增加 `_fail_rendering`；保留 SubCanvas、循环作用域、重试/跳过与输出聚合。普通业务失败保留 `error_ignorable`/`loop_fail_skip`，设施故障均停止。
+- 本分支 `Engine` 只改 `hook_dispatch`、`execute`、`schedule` 并增加 `_fail_rendering`；保留 SubCanvas、循环作用域、重试/跳过与输出聚合。普通业务失败保留 `error_ignorable`/`loop_fail_skip`，设施故障均停止。
 - engine 和 legacy 的 `_get_subscript_key` 均保留 Python 3.6/3.7 `ast.Index` 解包，新增 `__class__`、`__builtins__`、`__globals__` 的 AST 和真实渲染回归。
-- 未同步卡住治理、callback 诊断、SubCanvas 新功能或发布变更。应用默认配置、依赖声明/锁文件和版本不变：engine `2.11.4`、pipeline `3.29.10`；新 backend 默认 `inprocess`。
+- 未同步卡住治理、callback 诊断、SubCanvas 新功能或发布变更。应用默认配置、依赖声明/锁文件和版本不变：engine `2.11.3`、pipeline `3.29.9`；新 backend 默认 `inprocess`。
+- 本分支在 Python 3.7.16 上复验 `tests/template` 的帧反射、属性策略、format 模式、导入过滤和模板回归，152 passed。
 
 ## 实测结果
 
