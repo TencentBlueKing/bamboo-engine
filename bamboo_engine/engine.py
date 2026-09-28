@@ -19,7 +19,7 @@ import time
 from functools import wraps
 from typing import Optional
 
-from . import states, validator
+from . import fence, states, validator
 from .eri import (
     DataInput,
     EngineRuntimeInterface,
@@ -663,7 +663,8 @@ class Engine:
         current_node_id = node_id
         with interrupter():
             process_info = self.runtime.get_process_info(process_id)
-            self.runtime.wake_up(process_id)
+            if not self._wake_up(process_id, node_id, root_pipeline_id, interrupter, headers):
+                return
 
             # 推进循环
             while True:
@@ -1245,6 +1246,37 @@ class Engine:
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                 time.time() - engine_post_schedule_start_at
             )
+
+    def _wake_up(
+        self, process_id: int, node_id: str, root_pipeline_id: str, interrupter: ExecuteInterrupter, headers: dict
+    ) -> bool:
+        """唤醒进程；消息带令牌时按令牌抢占，返回 False 表示消息应被丢弃"""
+        token = fence.read_execute_fence(headers)
+        # 断点恢复是同一条消息的重试；停在 ENTRY 的恢复还没抢占过进程，仍要校验
+        recover_point = interrupter.recover_point
+        recovering = recover_point is not None and recover_point.name != ExecuteKeyPoint.ENTRY
+        if token is None or recovering:
+            self.runtime.wake_up(process_id)
+            return True
+
+        reason = fence.claim_execute(self.runtime, process_id, token)
+        if reason is None:
+            return True
+
+        enforced = fence.enforce_enabled()
+        fence.record_drop(
+            kind=fence.KIND_EXECUTE,
+            reason=reason,
+            enforced=enforced,
+            root_pipeline_id=root_pipeline_id,
+            process_id=process_id,
+            node_id=node_id,
+            token=token.to_dict(),
+        )
+        if enforced:
+            return False
+        self.runtime.wake_up(process_id)
+        return True
 
     def _add_history(
         self,
