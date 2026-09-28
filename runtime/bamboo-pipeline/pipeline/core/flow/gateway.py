@@ -14,12 +14,13 @@ import logging
 from abc import ABCMeta
 
 import ujson as json
-
 from pipeline.core.constants import ESCAPED_CHARS
 from pipeline.core.data.expression import ConstantTemplate, deformat_constant_key
 from pipeline.core.flow.base import FlowNode
 from pipeline.exceptions import ConditionExhaustedException, EvaluationException, InvalidOperationException
 from pipeline.utils.boolrule import BoolRule
+
+from bamboo_engine.exceptions import RenderInfrastructureError
 
 logger = logging.getLogger("pipeline_engine")
 
@@ -87,6 +88,8 @@ class ExclusiveGateway(Gateway):
                 logger.info("[{}] test {} with data {}".format(self.id, resolved_evaluate, data))
                 result = BoolRule(resolved_evaluate).test(data)
                 logger.info("[{}] {} test result: {}".format(self.id, resolved_evaluate, result))
+            except RenderInfrastructureError:
+                raise
             except Exception as e:
                 raise EvaluationException(
                     "evaluate[%s] fail with data[%s] message: %s"
@@ -120,7 +123,6 @@ class ConditionalParallelGateway(Gateway):
         self.conditions.append(condition)
 
     def targets_meet_condition(self, data):
-
         targets = []
 
         logger.info("[{}] ready to resolve conditions: {}".format(self.id, [c.evaluate for c in self.conditions]))
@@ -132,6 +134,8 @@ class ConditionalParallelGateway(Gateway):
                 logger.info("[{}] test {} with data {}".format(self.id, resolved_evaluate, data))
                 result = BoolRule(resolved_evaluate).test(data)
                 logger.info("[{}] {} test result: {}".format(self.id, resolved_evaluate, result))
+            except RenderInfrastructureError:
+                raise
             except Exception as e:
                 raise EvaluationException(
                     "evaluate[%s] fail with data[%s] message: %s"

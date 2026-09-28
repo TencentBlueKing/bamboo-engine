@@ -19,6 +19,17 @@ class EngineException(Exception):
     pass
 
 
+class RenderInfrastructureError(EngineException):
+    """The isolated renderer could not complete a request; never a rendered value."""
+
+    def __init__(self, reason):
+        super().__init__(reason)
+        self.reason = reason
+
+    def __str__(self):
+        return "isolated render failed ({})".format(self.reason)
+
+
 class InvalidOperationError(EngineException):
     pass
 
