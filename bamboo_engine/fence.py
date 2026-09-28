@@ -16,6 +16,7 @@ specific language governing permissions and limitations under the License.
 import logging
 from typing import Optional
 
+from . import states
 from .config import Settings
 from .metrics import ENGINE_FENCE_DROP
 from .utils.host import get_hostname
@@ -133,11 +134,26 @@ def claim_execute(runtime, process_id: int, token: ExecuteFence) -> Optional[str
     再用条件更新唤醒。成功返回 None；失败返回丢弃原因，且不改动任何数据。
     """
     state = runtime.get_state_or_none(token.from_node)
-    if (state.version if state else None) != token.from_version:
+    if not _version_matches(state, token.from_version):
         return REASON_VERSION_MISMATCH
     if not runtime.wake_up_if_sleeping_at(process_id, token.from_node):
         return REASON_PROCESS_MOVED
     return None
+
+
+def _version_matches(state, from_version: Optional[str]) -> bool:
+    """
+    令牌版本为空表示派发时节点还没有状态（子进程首次到达分支首节点）。抢占前用户预约暂停（及随后继续）会新建状态和版本，
+    但节点从未执行过，不能因此丢弃启动消息；执行过的节点有 started_time，重试会把 retry 加 1，都不在此列。
+    """
+    if (state.version if state else None) == from_version:
+        return True
+    return (
+        from_version is None
+        and state.name in (states.SUSPENDED, states.READY)
+        and state.retry == 0
+        and state.started_time is None
+    )
 
 
 def apply_schedule_lock(runtime, schedule_id, token: ScheduleFence) -> Optional[bool]:

@@ -47,12 +47,12 @@ def drop_count(kind, reason, enforced):
     return REGISTRY.get_sample_value("engine_fence_drop_total", labels) or 0.0
 
 
-def make_state(node_id, version):
+def make_state(node_id, version, name=states.RUNNING):
     return State(
         node_id=node_id,
         root_id="root",
         parent_id="root",
-        name=states.RUNNING,
+        name=name,
         version=version,
         loop=1,
         inner_loop=1,
@@ -177,6 +177,18 @@ def test_execute_recovery_at_entry_still_checks_fence(enforce, pi):
     runtime.wake_up_if_sleeping_at.assert_called_once_with(1, "n0")
     runtime.wake_up.assert_not_called()
     runtime.beat.assert_not_called()
+
+
+def test_execute_claims_child_after_first_node_appointed(enforce, pi):
+    runtime = arrived_runtime(pi)
+    runtime.get_state_or_none = MagicMock(return_value=make_state("n0", "v1", name=states.SUSPENDED))
+    before = drop_count("execute", "version_mismatch", "true")
+
+    run_execute(runtime, pi, {"fence": {"from_node": "n0", "from_version": None}})
+
+    assert drop_count("execute", "version_mismatch", "true") == before
+    runtime.wake_up_if_sleeping_at.assert_called_once_with(1, "n0")
+    runtime.beat.assert_called_once_with(1)
 
 
 # 调度入口

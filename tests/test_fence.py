@@ -17,7 +17,7 @@ import pytest
 from mock import MagicMock
 from prometheus_client import REGISTRY
 
-from bamboo_engine import fence
+from bamboo_engine import fence, states
 from bamboo_engine.config import Settings
 from bamboo_engine.eri import Schedule, ScheduleType
 from bamboo_engine.fence import ExecuteFence, ScheduleFence
@@ -32,6 +32,15 @@ def drop_count(kind, reason, enforced):
 def state_with_version(version):
     state = MagicMock()
     state.version = version
+    return state
+
+
+def appointed_state(name, retry=0, started_time=None):
+    state = MagicMock()
+    state.name = name
+    state.version = "v2"
+    state.retry = retry
+    state.started_time = started_time
     return state
 
 
@@ -177,6 +186,34 @@ def test_claim_execute_process_moved():
     runtime.wake_up_if_sleeping_at = MagicMock(return_value=False)
 
     assert fence.claim_execute(runtime, 1, ExecuteFence("n1", "v1")) == fence.REASON_PROCESS_MOVED
+
+
+@pytest.mark.parametrize("name", [states.SUSPENDED, states.READY])
+def test_claim_execute_allows_first_arrival_after_appoint(name):
+    runtime = MagicMock()
+    runtime.get_state_or_none = MagicMock(return_value=appointed_state(name))
+    runtime.wake_up_if_sleeping_at = MagicMock(return_value=True)
+
+    assert fence.claim_execute(runtime, 1, ExecuteFence("n1", None)) is None
+    runtime.wake_up_if_sleeping_at.assert_called_once_with(1, "n1")
+
+
+@pytest.mark.parametrize(
+    "state, from_version",
+    [
+        (appointed_state(states.READY, retry=1), None),
+        (appointed_state(states.SUSPENDED, started_time="t"), None),
+        (appointed_state(states.RUNNING), None),
+        (appointed_state(states.FINISHED), None),
+        (appointed_state(states.SUSPENDED), "v1"),
+    ],
+)
+def test_claim_execute_rejects_executed_or_retried_node(state, from_version):
+    runtime = MagicMock()
+    runtime.get_state_or_none = MagicMock(return_value=state)
+
+    assert fence.claim_execute(runtime, 1, ExecuteFence("n1", from_version)) == fence.REASON_VERSION_MISMATCH
+    runtime.wake_up_if_sleeping_at.assert_not_called()
 
 
 def test_apply_schedule_lock_success():

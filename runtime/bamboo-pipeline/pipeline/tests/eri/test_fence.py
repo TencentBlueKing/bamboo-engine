@@ -57,6 +57,30 @@ class FenceGateTestCase(TransactionTestCase):
         self.assertTrue(self.process.asleep)
         self.assertIsNone(fence.claim_execute(self.runtime, self.process.id, ExecuteFence(self.node_id, "v2")))
 
+    def test_claim_execute_allows_first_arrival_after_appoint(self):
+        self.runtime.set_state(node_id=self.node_id, to_state=states.SUSPENDED)
+
+        self.assertIsNone(fence.claim_execute(self.runtime, self.process.id, ExecuteFence(self.node_id, None)))
+
+    def test_claim_execute_allows_first_arrival_after_appoint_and_resume(self):
+        self.runtime.set_state(node_id=self.node_id, to_state=states.SUSPENDED)
+        self.runtime.set_state(node_id=self.node_id, to_state=states.READY)
+
+        self.assertIsNone(fence.claim_execute(self.runtime, self.process.id, ExecuteFence(self.node_id, None)))
+
+    def test_claim_execute_rejects_first_arrival_token_after_execution_or_retry(self):
+        token = ExecuteFence(self.node_id, None)
+        self.runtime.set_state(node_id=self.node_id, to_state=states.RUNNING, set_started_time=True)
+        self.runtime.set_state(node_id=self.node_id, to_state=states.SUSPENDED)
+
+        self.assertEqual(fence.claim_execute(self.runtime, self.process.id, token), fence.REASON_VERSION_MISMATCH)
+
+        State.objects.filter(node_id=self.node_id).update(name=states.READY, started_time=None, retry=1)
+
+        self.assertEqual(fence.claim_execute(self.runtime, self.process.id, token), fence.REASON_VERSION_MISMATCH)
+        self.process.refresh_from_db()
+        self.assertTrue(self.process.asleep)
+
     def test_apply_schedule_lock(self):
         schedule = Schedule.objects.create(
             process_id=self.process.id,
