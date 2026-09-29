@@ -11,4 +11,19 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-__version__ = "2.6.9"
+from bamboo_engine.eri import interfaces
+from bamboo_engine.eri.interfaces import ProcessMixin, ScheduleMixin, StateMixin
+
+
+def test_eri_version():
+    assert interfaces.__version__ == "7.2.0"
+
+
+def test_fence_interfaces_declared():
+    for mixin, name in (
+        (ProcessMixin, "wake_up_if_sleeping_at"),
+        (ProcessMixin, "get_current_node_id"),
+        (StateMixin, "batch_get_state_version"),
+        (ScheduleMixin, "apply_schedule_lock_with_times"),
+    ):
+        assert getattr(mixin, name).__isabstractmethod__ is True
