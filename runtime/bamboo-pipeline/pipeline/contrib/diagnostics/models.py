@@ -123,6 +123,7 @@ class DiagnosticOperationAudit(models.Model):
     OPERATION_TYPE_INSPECT_ACK_CONVERGE = "inspect_ack_converge"
     OPERATION_TYPE_INSPECT_NODE_RUNTIME_READINESS = "inspect_node_runtime_readiness"
     OPERATION_TYPE_IGNORE = "ignore"
+    OPERATION_TYPE_REPLAY_CASE = "replay_case"
 
     MODE_DRY_RUN = "dry_run"
     MODE_APPLY = "apply"
@@ -171,3 +172,87 @@ class DiagnosticOperationAudit(models.Model):
 
     def __unicode__(self):
         return "{}_{}_{}".format(self.case_id or "", self.operation_type, self.mode)
+
+
+class DiagnosticScanCursor(models.Model):
+    id = models.BigAutoField(_("ID"), primary_key=True)
+    name = models.CharField(_("扫描器"), max_length=64, unique=True)
+    position = models.DateTimeField(_("时间水位"), null=True, blank=True)
+    position_id = models.BigIntegerField(_("ID 水位"), default=0)
+    extra = JSONTextField(_("扫描状态"), default=dict)
+    updated_at = models.DateTimeField(_("更新时间"), auto_now=True)
+
+    class Meta:
+        app_label = "pipeline_diagnostics"
+        verbose_name = _("Pipeline诊断扫描水位")
+        verbose_name_plural = _("Pipeline诊断扫描水位")
+
+    def __unicode__(self):
+        return self.name
+
+
+class DiagnosticRecovery(models.Model):
+    TRIGGER_MANUAL = "manual"
+    TRIGGER_AUTO = "auto"
+    TRIGGER_CHOICES = (
+        (TRIGGER_MANUAL, _("人工")),
+        (TRIGGER_AUTO, _("自动")),
+    )
+
+    MODE_PREVIEW = "preview"
+    MODE_APPLY = "apply"
+    MODE_CHOICES = (
+        (MODE_PREVIEW, _("预演")),
+        (MODE_APPLY, _("执行")),
+    )
+
+    STATUS_PREVIEWED = "previewed"
+    STATUS_BLOCKED = "blocked"
+    STATUS_DISPATCHED = "dispatched"
+    STATUS_APPLIED = "applied"
+    STATUS_OBSOLETE = "obsolete"
+    STATUS_INEFFECTIVE = "ineffective"
+    STATUS_MANUAL_REQUIRED = "manual_required"
+    STATUS_CHOICES = (
+        (STATUS_PREVIEWED, _("已预演")),
+        (STATUS_BLOCKED, _("已阻断")),
+        (STATUS_DISPATCHED, _("已派发")),
+        (STATUS_APPLIED, _("已生效")),
+        (STATUS_OBSOLETE, _("已过期")),
+        (STATUS_INEFFECTIVE, _("无效")),
+        (STATUS_MANUAL_REQUIRED, _("转人工")),
+    )
+
+    id = models.BigAutoField(_("ID"), primary_key=True)
+    case = models.ForeignKey(
+        DiagnosticCase,
+        verbose_name=_("诊断案例"),
+        related_name="recoveries",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        db_constraint=False,
+    )
+    root_pipeline_id = models.CharField(_("根 Pipeline ID"), max_length=64, db_index=True)
+    node_id = models.CharField(_("节点ID"), max_length=64)
+    stuck_type = models.CharField(_("卡住类型"), max_length=64, db_index=True)
+    process_id = models.BigIntegerField(_("进程ID"), null=True, blank=True)
+    fingerprint = models.CharField(_("消息指纹"), max_length=255)
+    message = JSONTextField(_("重放消息"), default=dict)
+    trigger = models.CharField(_("触发方式"), max_length=16, choices=TRIGGER_CHOICES)
+    mode = models.CharField(_("模式"), max_length=16, choices=MODE_CHOICES)
+    status = models.CharField(_("状态"), max_length=32, choices=STATUS_CHOICES)
+    operator = models.CharField(_("操作人"), max_length=64, blank=True, default="")
+    detail = JSONTextField(_("详情"), default=dict)
+    created_at = models.DateTimeField(_("创建时间"), auto_now_add=True, db_index=True)
+    settled_at = models.DateTimeField(_("复核时间"), null=True, blank=True)
+
+    class Meta:
+        app_label = "pipeline_diagnostics"
+        verbose_name = _("Pipeline诊断恢复记录")
+        verbose_name_plural = _("Pipeline诊断恢复记录")
+        ordering = ["-id"]
+        index_together = (("case", "fingerprint"), ("status", "settled_at", "created_at"))
+
+    def __unicode__(self):
+        return "{}_{}_{}".format(self.case_id or "", self.fingerprint, self.status)

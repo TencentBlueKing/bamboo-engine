@@ -50,9 +50,11 @@ def _empty_snapshot(root_pipeline_id, node_id, process_id):
     )
 
 
-def collect_runtime_snapshot(root_pipeline_id="", node_id="", process_id=None):
+def collect_runtime_snapshot(root_pipeline_id="", node_id="", process_id=None, include_callback_data=True):
     """
     Collect a read-only runtime snapshot for diagnostics rules and commands.
+
+    include_callback_data=False 不查 CallbackData：它的 node_id 没有索引，批量扫描时每个快照都是一次全表扫。
     """
     root_pipeline_id = root_pipeline_id or ""
     node_id = node_id or ""
@@ -113,7 +115,7 @@ def collect_runtime_snapshot(root_pipeline_id="", node_id="", process_id=None):
         schedules = _sorted_by_id(schedule_queryset)
 
         callback_data = []
-        if candidate_node_ids:
+        if include_callback_data and candidate_node_ids:
             callback_data = _sorted_by_id(CallbackData.objects.filter(node_id__in=candidate_node_ids))
 
         return RuntimeSnapshot(

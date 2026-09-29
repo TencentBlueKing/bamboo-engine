@@ -31,3 +31,8 @@ RuntimeSnapshot = namedtuple(
         "callback_data",
     ],
 )
+
+ScanReport = namedtuple(
+    "ScanReport",
+    ["scanner", "rows", "candidates", "hits", "cases", "cursor_lag_seconds", "capped", "dry_run", "outcomes"],
+)
