@@ -43,6 +43,32 @@ class ProcessMixin:
         """
         Process.objects.filter(id=process_id).update(asleep=False)
 
+    def wake_up_if_sleeping_at(self, process_id: int, node_id: str) -> bool:
+        """
+        仅当进程存活、处于休眠且当前节点为 node_id 时将其唤醒，返回是否唤醒成功
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :param node_id: 期望进程当前所在的节点 ID
+        :type node_id: str
+        :return: 是否唤醒成功
+        :rtype: bool
+        """
+        qs = Process.objects.filter(id=process_id, asleep=True, dead=False, current_node_id=node_id)
+        return qs.update(asleep=False) == 1
+
+    def get_current_node_id(self, process_id: int) -> Optional[str]:
+        """
+        获取进程当前所在的节点 ID
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :return: 节点 ID，进程不存在或尚未设置当前节点时返回 None
+        :rtype: Optional[str]
+        """
+        node_id = Process.objects.filter(id=process_id).values_list("current_node_id", flat=True).first()
+        return node_id or None
+
     def sleep(self, process_id: int):
         """
         将当前进程标记为睡眠状态

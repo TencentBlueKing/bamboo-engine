@@ -7,12 +7,13 @@ from pipeline.contrib.diagnostics.models import (
     DiagnosticCase,
     DiagnosticEvent,
     DiagnosticOperationAudit,
+    DiagnosticRecovery,
     DiagnosticScanCursor,
 )
 
 
 class DiagnosticsTestCase(TransactionTestCase):
-    models = (DiagnosticEvent, DiagnosticCase, DiagnosticOperationAudit, DiagnosticScanCursor)
+    models = (DiagnosticEvent, DiagnosticCase, DiagnosticOperationAudit, DiagnosticScanCursor, DiagnosticRecovery)
 
     @classmethod
     def setUpClass(cls):

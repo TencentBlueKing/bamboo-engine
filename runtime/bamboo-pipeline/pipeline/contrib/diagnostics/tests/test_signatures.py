@@ -21,6 +21,7 @@ from pipeline.contrib.diagnostics.signatures import (
     detect_parent_wakeup_lost,
     detect_poll_dispatch_lost,
     evaluate,
+    matching_hit,
     still_holds,
 )
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
@@ -202,6 +203,15 @@ class SignatureCloseTest(SignatureTestCase):
         self.assertTrue(still_holds(case))
         Process.objects.filter(id=parent.id).update(current_node_id="cg", asleep=False)
         self.assertFalse(still_holds(case))
+
+    def test_matching_hit_reads_current_state(self):
+        process = poll_shape(beat=2000, times=3)
+        [(_process, hit)] = evaluate([process], build_context([process]), slow=True)
+        case = upsert_case(ROOT, hit.related_objects["node_id"], hit)
+        Schedule.objects.filter(node_id="p").update(schedule_times=5)
+        self.assertEqual(matching_hit(case).evidence["schedule_times"], 5)
+        State.objects.filter(node_id="p").update(version="v2")
+        self.assertIsNone(matching_hit(case))
 
     def test_holding_cases_rotate_by_updated_at(self):
         first = DiagnosticCase.objects.create(root_pipeline_id=ROOT, node_id="x1", stuck_type=EXECUTE_DISPATCH_LOST)

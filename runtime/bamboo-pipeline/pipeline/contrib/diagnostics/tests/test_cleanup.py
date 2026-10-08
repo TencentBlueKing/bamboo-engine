@@ -6,7 +6,12 @@ from io import StringIO
 from django.utils import timezone
 
 from pipeline.contrib.diagnostics.management.commands.cleanup_diagnostics import Command
-from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit
+from pipeline.contrib.diagnostics.models import (
+    DiagnosticCase,
+    DiagnosticEvent,
+    DiagnosticOperationAudit,
+    DiagnosticRecovery,
+)
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
 
 
@@ -81,3 +86,29 @@ class DiagnosticsCleanupTestCase(DiagnosticsTestCase):
         self.assertIn("DiagnosticEvent deleted: 1", stdout.getvalue())
         self.assertIn("DiagnosticCase deleted: 1", stdout.getvalue())
         self.assertIn("DiagnosticOperationAudit deleted: 1", stdout.getvalue())
+
+    def test_cleanup_expired_recoveries(self):
+        now = timezone.now()
+        old_case = DiagnosticCase.objects.create(
+            root_pipeline_id="root-pipeline-7",
+            node_id="node-7",
+            stuck_type="execute_dispatch_lost",
+            status=DiagnosticCase.STATUS_RESOLVED,
+        )
+        fields = {"root_pipeline_id": "root-pipeline-7", "node_id": "node-7", "stuck_type": "execute_dispatch_lost"}
+        old_recovery = DiagnosticRecovery.objects.create(
+            fingerprint="old", trigger="auto", mode="preview", status="previewed", **fields
+        )
+        recent_recovery = DiagnosticRecovery.objects.create(
+            case=old_case, fingerprint="recent", trigger="manual", mode="apply", status="applied", **fields
+        )
+        DiagnosticCase.objects.filter(id=old_case.id).update(updated_at=now - datetime.timedelta(days=366))
+        DiagnosticRecovery.objects.filter(id=old_recovery.id).update(created_at=now - datetime.timedelta(days=366))
+
+        stdout = StringIO()
+        Command(stdout=stdout).handle()
+
+        self.assertFalse(DiagnosticRecovery.objects.filter(id=old_recovery.id).exists())
+        self.assertIsNone(DiagnosticRecovery.objects.get(id=recent_recovery.id).case_id)
+        self.assertFalse(DiagnosticCase.objects.filter(id=old_case.id).exists())
+        self.assertIn("DiagnosticRecovery deleted: 1", stdout.getvalue())

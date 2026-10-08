@@ -292,12 +292,12 @@ def _trigger_process_id(case):
     return (case.related_objects or {}).get("process_id")
 
 
-def still_holds(case):
-    """用案例里的触发进程重新判定；形态、进程、节点、版本都一致才算仍然卡着。"""
+def matching_hit(case):
+    """用案例里的触发进程重新判定，返回形态、进程、节点、版本都一致的命中；不再成立时返回 None。"""
     process_id = _trigger_process_id(case)
     processes = list(Process.objects.defer("pipeline_stack").filter(id=process_id)) if process_id else []
     if not processes:
-        return False
+        return None
     identity = (
         case.stuck_type,
         (case.related_objects or {}).get("process_id"),
@@ -305,7 +305,12 @@ def still_holds(case):
         (case.evidence or {}).get("state_version", ""),
     )
     hits = evaluate(processes, build_context(processes), slow=True)
-    return any(hit_identity(hit) == identity for _process, hit in hits)
+    return next((hit for _process, hit in hits if hit_identity(hit) == identity), None)
+
+
+def still_holds(case):
+    """用案例里的触发进程重新判定；形态、进程、节点、版本都一致才算仍然卡着。"""
+    return matching_hit(case) is not None
 
 
 def close_resolved_signature_cases(stuck_types, holds=still_holds, now=None, batch=None):

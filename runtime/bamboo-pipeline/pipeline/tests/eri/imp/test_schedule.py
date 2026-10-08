@@ -190,3 +190,12 @@ class ScheduleMixinTestCase(TransactionTestCase):
         self.mixin.add_schedule_times(self.schedule.id)
         self.schedule.refresh_from_db()
         self.assertEqual(self.schedule.schedule_times, 3)
+
+    def test_apply_schedule_lock_with_times(self):
+        DBSchedule.objects.filter(id=self.schedule.id).update(schedule_times=2)
+
+        self.assertFalse(self.mixin.apply_schedule_lock_with_times(self.schedule.id, 1))
+        self.assertTrue(self.mixin.apply_schedule_lock_with_times(self.schedule.id, 2))
+        self.schedule.refresh_from_db()
+        self.assertTrue(self.schedule.scheduling)
+        self.assertFalse(self.mixin.apply_schedule_lock_with_times(self.schedule.id, 2))
