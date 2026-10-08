@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
 
+import inspect
+import re
 from datetime import timedelta
 
+from django.test import SimpleTestCase
 from django.utils import timezone
 
-from pipeline.contrib.diagnostics import cases
+from pipeline.contrib.diagnostics import cases, rules
+from pipeline.contrib.diagnostics.case_types import ROOT_RULE_CASE_TYPES
 from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.eri.models import Process
 from pipeline.contrib.diagnostics.tests.base import DiagnosticsTestCase
+from pipeline.contrib.diagnostics.tests.factories import make_state
 
 
 class CloseStaleCasesTest(DiagnosticsTestCase):
@@ -66,6 +71,30 @@ class CloseStaleCasesTest(DiagnosticsTestCase):
             DiagnosticCase.STATUS_OPEN,
         )
 
+    def test_external_case_types_are_left_to_their_owner(self):
+        DiagnosticCase.objects.create(
+            root_pipeline_id="root-ext",
+            node_id="n1",
+            stuck_type="running_task_without_live_process",
+            status=DiagnosticCase.STATUS_OPEN,
+        )
+        self.assertEqual(cases.close_stale_cases(threshold_seconds=1800), 0)
+        self.assertEqual(
+            DiagnosticCase.objects.get(root_pipeline_id="root-ext").status,
+            DiagnosticCase.STATUS_OPEN,
+        )
+
+    def test_resolve_when_root_revoked_or_finished_with_live_process(self):
+        for root, name in (("root-revoked", "REVOKED"), ("root-done", "FINISHED")):
+            self._proc(root, beat_delta=3600)
+            make_state(root, name=name, version="rv", root=root)
+            self._open_case(root)
+        self.assertEqual(cases.close_stale_cases(threshold_seconds=1800), 2)
+        self.assertEqual(
+            set(DiagnosticCase.objects.values_list("status", flat=True)),
+            {DiagnosticCase.STATUS_RESOLVED},
+        )
+
     def test_already_resolved_not_recounted(self):
         DiagnosticCase.objects.create(
             root_pipeline_id="root-x",
@@ -99,3 +128,10 @@ class CloseStaleCasesTest(DiagnosticsTestCase):
             DiagnosticCase.objects.filter(root_pipeline_id="root-recur", status=DiagnosticCase.STATUS_OPEN).count(),
             0,
         )
+
+
+class RootRuleCaseTypesTest(SimpleTestCase):
+    def test_matches_rule_hit_types(self):
+        # 规则新增类型却没登记时，它的案例永远不会被按 root 关闭
+        found = set(re.findall(r'_hit\(\s*"(\w+)"', inspect.getsource(rules)))
+        self.assertEqual(found, set(ROOT_RULE_CASE_TYPES))
