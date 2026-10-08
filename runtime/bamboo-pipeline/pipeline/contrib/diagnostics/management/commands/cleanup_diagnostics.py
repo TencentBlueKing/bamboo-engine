@@ -17,7 +17,12 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from pipeline.contrib.diagnostics import conf
-from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit
+from pipeline.contrib.diagnostics.models import (
+    DiagnosticCase,
+    DiagnosticEvent,
+    DiagnosticOperationAudit,
+    DiagnosticRecovery,
+)
 
 
 class Command(BaseCommand):
@@ -35,18 +40,25 @@ class Command(BaseCommand):
         audit_queryset = DiagnosticOperationAudit.objects.filter(
             created_at__lt=now - datetime.timedelta(days=conf.audit_retention_days())
         )
+        recovery_queryset = DiagnosticRecovery.objects.filter(
+            created_at__lt=now - datetime.timedelta(days=conf.audit_retention_days())
+        )
 
         event_deleted = event_queryset.count()
         case_deleted = case_queryset.count()
         audit_deleted = audit_queryset.count()
+        recovery_deleted = recovery_queryset.count()
 
         event_queryset.delete()
         DiagnosticOperationAudit.objects.filter(case_id__in=case_queryset.values_list("id", flat=True)).update(
             case=None
         )
+        DiagnosticRecovery.objects.filter(case_id__in=case_queryset.values_list("id", flat=True)).update(case=None)
         case_queryset.delete()
         audit_queryset.delete()
+        recovery_queryset.delete()
 
         self.stdout.write("DiagnosticEvent deleted: {}".format(event_deleted))
         self.stdout.write("DiagnosticCase deleted: {}".format(case_deleted))
         self.stdout.write("DiagnosticOperationAudit deleted: {}".format(audit_deleted))
+        self.stdout.write("DiagnosticRecovery deleted: {}".format(recovery_deleted))

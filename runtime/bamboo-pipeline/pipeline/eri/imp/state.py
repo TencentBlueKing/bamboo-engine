@@ -139,6 +139,17 @@ class StateMixin:
         qs = DBState.objects.filter(node_id__in=node_id_list).only("node_id", "name")
         return {state.node_id: state.name for state in qs}
 
+    def batch_get_state_version(self, node_id_list: List[str]) -> Dict[str, str]:
+        """
+        批量获取一批节点的状态版本
+
+        :param node_id_list: 节点 ID 列表
+        :type node_id_list: List[str]
+        :return: 节点ID -> 状态版本，没有状态的节点不在结果中
+        :rtype: Dict[str, str]
+        """
+        return dict(DBState.objects.filter(node_id__in=node_id_list).values_list("node_id", "version"))
+
     def has_state(self, node_id: str) -> bool:
         """
         是否存在某个节点的的状态

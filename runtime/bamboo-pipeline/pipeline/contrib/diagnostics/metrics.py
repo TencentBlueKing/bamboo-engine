@@ -91,3 +91,31 @@ def observe_hit(stuck_type, silent_seconds):
         DIAGNOSTICS_DETECT_LATENCY.labels(stuck_type=stuck_type, hostname=HOST_NAME).observe(max(silent_seconds, 0))
     except Exception:
         logger.exception("[pipeline_diagnostics_scan] observe hit failed: %s", stuck_type)
+
+
+DIAGNOSTICS_RECOVERY = Counter(
+    "pipeline_diagnostics_recovery",
+    "diagnostics replays and their settled results",
+    labelnames=["stuck_type", "trigger", "result", "hostname"],
+)
+
+
+def record_recovery(stuck_type, trigger, result):
+    try:
+        DIAGNOSTICS_RECOVERY.labels(stuck_type=stuck_type, trigger=trigger, result=result, hostname=HOST_NAME).inc()
+    except Exception:
+        logger.exception("[pipeline_diagnostics_recovery] record metric failed: %s", stuck_type)
+
+
+DIAGNOSTICS_RECOVERY_BREAKER_OPEN = Counter(
+    "pipeline_diagnostics_recovery_breaker_open",
+    "recovery rounds that only previewed because too many replayable cases were opened",
+    labelnames=["hostname"],
+)
+
+
+def record_breaker_open():
+    try:
+        DIAGNOSTICS_RECOVERY_BREAKER_OPEN.labels(hostname=HOST_NAME).inc()
+    except Exception:
+        logger.exception("[pipeline_diagnostics_recovery] record breaker metric failed")

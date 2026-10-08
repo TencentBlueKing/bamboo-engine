@@ -550,3 +550,19 @@ class StateMixinTestCase(TransactionTestCase):
                 send_post_set_state_signal=False,
             )
         post_set_state.send.assert_not_called()
+
+    def test_batch_get_state_version(self):
+        other = DBState.objects.create(
+            node_id=unique_id("n"),
+            root_id=self.state.root_id,
+            parent_id=self.state.parent_id,
+            name=states.READY,
+            version=unique_id("v"),
+            started_time=self.started_time,
+            archived_time=self.archived_time,
+        )
+
+        self.assertEqual(
+            self.mixin.batch_get_state_version([self.state.node_id, other.node_id, unique_id("n")]),
+            {self.state.node_id: self.state.version, other.node_id: other.version},
+        )

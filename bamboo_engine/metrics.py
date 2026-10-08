@@ -129,6 +129,12 @@ ENGINE_SCHEDULE_EXCEPTION_COUNT = Counter(
     labelnames=["type", "hostname"],
 )
 
+ENGINE_FENCE_DROP = Counter(
+    name="engine_fence_drop",
+    documentation="count execute and schedule messages dropped (or would be dropped) by fence",
+    labelnames=["kind", "reason", "enforced", "hostname"],
+)
+
 
 ENGINE_PROCESS_RUNNING_TIME = Histogram(
     name="engine_process_running_time",

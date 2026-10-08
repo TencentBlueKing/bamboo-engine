@@ -19,7 +19,7 @@ import time
 from functools import wraps
 from typing import Optional
 
-from . import states, validator
+from . import fence, states, validator
 from .eri import (
     DataInput,
     EngineRuntimeInterface,
@@ -31,6 +31,7 @@ from .eri import (
     ExecuteResult,
 )
 from .exceptions import InvalidOperationError, NotFoundError, RenderInfrastructureError
+from .fence import ExecuteFence, ScheduleFence
 from .handler import HandlerFactory
 from .interrupt import (
     ExecuteInterrupter,
@@ -514,14 +515,8 @@ class Engine:
         )
         children = [d.process_id for d in dispatch_processes]
         self.runtime.join(process_id, children)
-        for d in dispatch_processes:
-            self.runtime.execute(
-                process_id=d.process_id,
-                node_id=d.node_id,
-                root_pipeline_id=process_info.root_pipeline_id,
-                parent_pipeline_id=process_info.top_pipeline_id,
-            )
 
+        # 必须先刷新网关版本再派发：子进程结束时按网关当前版本生成唤醒父进程的令牌，先派发会取到旧版本
         self._add_history(node_id, state)
 
         self.runtime.set_state(
@@ -531,6 +526,14 @@ class Engine:
             refresh_version=True,
             set_archive_time=True,
         )
+
+        for d in dispatch_processes:
+            self.runtime.execute(
+                process_id=d.process_id,
+                node_id=d.node_id,
+                root_pipeline_id=process_info.root_pipeline_id,
+                parent_pipeline_id=process_info.top_pipeline_id,
+            )
 
         self.runtime.post_skip_conditional_parallel_gateway(node_id, flow_ids, converge_gateway_id)
 
@@ -663,7 +666,8 @@ class Engine:
         current_node_id = node_id
         with interrupter():
             process_info = self.runtime.get_process_info(process_id)
-            self.runtime.wake_up(process_id)
+            if not self._wake_up(process_id, node_id, root_pipeline_id, interrupter, headers):
+                return
 
             # 推进循环
             while True:
@@ -692,7 +696,7 @@ class Engine:
                             node_id=process_info.destination_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
-                            headers=headers,
+                            headers=fence.dispatch_headers(headers, self._process_fence(process_info.parent_id)),
                         )
 
                     logger.info(
@@ -927,7 +931,10 @@ class Engine:
                         not interrupter.recover_point or not interrupter.recover_point.set_schedule_done
                     ):
                         self.runtime.schedule(
-                            process_id=process_id, node_id=current_node_id, schedule_id=schedule_id, headers=headers
+                            process_id=process_id,
+                            node_id=current_node_id,
+                            schedule_id=schedule_id,
+                            headers=fence.dispatch_headers(headers, ScheduleFence(schedule.times)),
                         )
 
                     interrupter.check_and_set(ExecuteKeyPoint.EXECUTE_DONE_SET_SCHEDULE_DONE, set_schedule_done=True)
@@ -945,13 +952,14 @@ class Engine:
 
                     self.runtime.join(process_id, children)
 
+                    children_fences = self._children_fences(execute_result.dispatch_processes)
                     for d in execute_result.dispatch_processes:
                         self.runtime.execute(
                             process_id=d.process_id,
                             node_id=d.node_id,
                             root_pipeline_id=process_info.root_pipeline_id,
                             parent_pipeline_id=process_info.top_pipeline_id,
-                            headers=headers,
+                            headers=fence.dispatch_headers(headers, children_fences.get(d.process_id)),
                         )
 
                 if execute_result.should_die:
@@ -1068,7 +1076,9 @@ class Engine:
             if interrupter.recover_point and interrupter.recover_point.lock_get is not None:
                 lock_get = interrupter.recover_point.lock_get
             else:
-                lock_get = self.runtime.apply_schedule_lock(schedule_id)
+                lock_get = self._apply_schedule_lock(schedule_id, node_id, root_pipeline_id, headers)
+                if lock_get is None:
+                    return
             interrupter.check_and_set(ScheduleKeyPoint.APPLY_LOCK_DONE, lock_get=lock_get)
 
             if not lock_get:
@@ -1229,7 +1239,7 @@ class Engine:
                     node_id=node_id,
                     schedule_id=schedule_id,
                     schedule_after=schedule_result.schedule_after,
-                    headers=headers,
+                    headers=fence.dispatch_headers(headers, self._next_schedule_fence(schedule_id)),
                 )
 
             if schedule_result.schedule_done:
@@ -1239,12 +1249,98 @@ class Engine:
                     node_id=schedule_result.next_node_id,
                     root_pipeline_id=process_info.root_pipeline_id,
                     parent_pipeline_id=process_info.top_pipeline_id,
-                    headers=headers,
+                    headers=fence.dispatch_headers(headers, ExecuteFence(node_id, state.version)),
                 )
 
             ENGINE_SCHEDULE_POST_PROCESS_DURATION.labels(type=node.type.value, hostname=self._hostname).observe(
                 time.time() - engine_post_schedule_start_at
             )
+
+    def _wake_up(
+        self, process_id: int, node_id: str, root_pipeline_id: str, interrupter: ExecuteInterrupter, headers: dict
+    ) -> bool:
+        """唤醒进程；消息带令牌时按令牌抢占，返回 False 表示消息应被丢弃"""
+        token = fence.read_execute_fence(headers)
+        # 断点恢复是同一条消息的重试；停在 ENTRY 的恢复还没抢占过进程，仍要校验
+        recover_point = interrupter.recover_point
+        recovering = recover_point is not None and recover_point.name != ExecuteKeyPoint.ENTRY
+        if token is None or recovering:
+            self.runtime.wake_up(process_id)
+            return True
+
+        reason = fence.claim_execute(self.runtime, process_id, token)
+        if reason is None:
+            return True
+
+        enforced = fence.enforce_enabled()
+        fence.record_drop(
+            kind=fence.KIND_EXECUTE,
+            reason=reason,
+            enforced=enforced,
+            root_pipeline_id=root_pipeline_id,
+            process_id=process_id,
+            node_id=node_id,
+            token=token.to_dict(),
+        )
+        if enforced:
+            return False
+        self.runtime.wake_up(process_id)
+        return True
+
+    def _apply_schedule_lock(self, schedule_id, node_id: str, root_pipeline_id: str, headers: dict) -> Optional[bool]:
+        """获取调度锁；消息带令牌时同时校验调度次数，返回 None 表示消息应被丢弃"""
+        token = fence.read_schedule_fence(headers)
+        if token is None:
+            return self.runtime.apply_schedule_lock(schedule_id)
+
+        lock_get = fence.apply_schedule_lock(self.runtime, schedule_id, token)
+        if lock_get is not None:
+            return lock_get
+
+        enforced = fence.enforce_enabled()
+        fence.record_drop(
+            kind=fence.KIND_SCHEDULE,
+            reason=fence.REASON_SCHEDULE_TIMES_MISMATCH,
+            enforced=enforced,
+            root_pipeline_id=root_pipeline_id,
+            schedule_id=schedule_id,
+            node_id=node_id,
+            token=token.to_dict(),
+        )
+        if enforced:
+            return None
+        return self.runtime.apply_schedule_lock(schedule_id)
+
+    def _process_fence(self, process_id: int) -> Optional[ExecuteFence]:
+        """按进程当前所在节点及其状态版本生成令牌，用于唤醒睡在并行网关上的父进程
+
+        调用时子进程已提交 dead=True，读库报错若交给断点恢复，重投的子进程消息会因 child_process_finish
+        返回 False 而不再唤醒父进程，所以读库失败时不带令牌，退回无条件唤醒
+        """
+        if not fence.emit_enabled():
+            return None
+        try:
+            node_id = self.runtime.get_current_node_id(process_id)
+            if not node_id:
+                return None
+            state = self.runtime.get_state_or_none(node_id)
+        except Exception:
+            logger.exception("[fence] build fence for process(%s) failed, dispatch without fence", process_id)
+            return None
+        return ExecuteFence(node_id, state.version if state else None)
+
+    def _children_fences(self, dispatch_processes: list) -> dict:
+        """按子进程起始节点在派发时的状态版本生成令牌；循环流程里起始节点可能留有上一轮的状态"""
+        if not fence.emit_enabled():
+            return {}
+        versions = self.runtime.batch_get_state_version([d.node_id for d in dispatch_processes])
+        return {d.process_id: ExecuteFence(d.node_id, versions.get(d.node_id)) for d in dispatch_processes}
+
+    def _next_schedule_fence(self, schedule_id) -> Optional[ScheduleFence]:
+        """续派令牌取 add_schedule_times 之后的库内次数；断点恢复时内存里的 schedule.times 与库内不一致，必须重读"""
+        if not fence.emit_enabled():
+            return None
+        return ScheduleFence(self.runtime.get_schedule(schedule_id).times)
 
     def _add_history(
         self,

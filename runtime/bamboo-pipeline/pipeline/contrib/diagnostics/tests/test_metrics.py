@@ -58,3 +58,26 @@ class RecordScanReportTest(SimpleTestCase):
         metrics.observe_hit("demo_latency", 90)
         child = metrics.DIAGNOSTICS_DETECT_LATENCY.labels(stuck_type="demo_latency", hostname=metrics.HOST_NAME)
         self.assertEqual(child._sum.get(), 90)
+
+
+class RecordRecoveryTest(SimpleTestCase):
+    def test_counts_by_type_trigger_and_result(self):
+        labels = {"stuck_type": "t_recovery", "trigger": "auto", "result": "applied"}
+        before = _value(metrics.DIAGNOSTICS_RECOVERY, **labels)
+        metrics.record_recovery("t_recovery", "auto", "applied")
+        self.assertEqual(_value(metrics.DIAGNOSTICS_RECOVERY, **labels) - before, 1)
+
+    def test_metric_errors_are_swallowed(self):
+        with mock.patch.object(metrics.DIAGNOSTICS_RECOVERY, "labels", side_effect=RuntimeError("boom")):
+            metrics.record_recovery("t_recovery", "auto", "applied")
+
+
+class RecordBreakerOpenTest(SimpleTestCase):
+    def test_counts_breaker_open(self):
+        before = _value(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN)
+        metrics.record_breaker_open()
+        self.assertEqual(_value(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN) - before, 1)
+
+    def test_metric_errors_are_swallowed(self):
+        with mock.patch.object(metrics.DIAGNOSTICS_RECOVERY_BREAKER_OPEN, "labels", side_effect=RuntimeError("boom")):
+            metrics.record_breaker_open()
