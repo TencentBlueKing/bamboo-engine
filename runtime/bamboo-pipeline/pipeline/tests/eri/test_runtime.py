@@ -34,7 +34,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
         self.assertEqual(self.runtime.node_rerun_limit("1", "2"), 100)
 
     def test_prepare_run_pipeline_simple(self):
-
         # struct
         start = EmptyStartEvent(id="start")
         pg = ParallelGateway(id="pg")

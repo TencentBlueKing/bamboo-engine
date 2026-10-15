@@ -176,6 +176,9 @@ class ProcessMixinTestCase(TransactionTestCase):
         need_ack = 30
 
         process = Process.objects.create(priority=1, queue="queue", ack_num=0, need_ack=need_ack)
+        children = [
+            Process.objects.create(priority=1, queue="queue", parent_id=process.id, dead=False) for _ in range(need_ack)
+        ]
 
         lock = threading.Lock()
         res = {False: 0, True: 0}
@@ -186,7 +189,7 @@ class ProcessMixinTestCase(TransactionTestCase):
             res[success] += 1
             lock.release()
 
-        threads = [threading.Thread(target=target, args=(process.id, i)) for i in range(need_ack)]
+        threads = [threading.Thread(target=target, args=(process.id, child.id)) for child in children]
 
         for t in threads:
             t.start()
@@ -198,6 +201,59 @@ class ProcessMixinTestCase(TransactionTestCase):
         self.assertEqual(process.ack_num, 0)
         self.assertEqual(process.need_ack, -1)
         self.assertEqual(res, {True: 1, False: need_ack - 1})
+        for child in children:
+            child.refresh_from_db()
+            self.assertTrue(child.dead)
+
+    def test_child_process_finish_idempotent(self):
+        """同一子进程的重复 ACK 不得再次增加父进程 ack_num。"""
+        parent = Process.objects.create(priority=1, queue="queue", ack_num=0, need_ack=1)
+        child = Process.objects.create(priority=1, queue="queue", parent_id=parent.id, dead=False)
+
+        first = self.mixin.child_process_finish(parent.id, child.id)
+        parent.refresh_from_db()
+        child.refresh_from_db()
+        self.assertTrue(first)
+        self.assertTrue(child.dead)
+        self.assertEqual(parent.ack_num, 0)
+        self.assertEqual(parent.need_ack, -1)
+
+        # 模拟 broker 重投：子进程已 dead，再次 finish 必须是 no-op
+        second = self.mixin.child_process_finish(parent.id, child.id)
+        parent.refresh_from_db()
+        self.assertFalse(second)
+        self.assertEqual(parent.ack_num, 0)
+        self.assertEqual(parent.need_ack, -1)
+
+    def test_child_process_finish_stale_ack_across_fork_generations(self):
+        """陈旧 ACK 不得计入下一轮 fork 的 need_ack，避免假唤醒。"""
+        parent = Process.objects.create(priority=1, queue="queue", ack_num=0, need_ack=1)
+        child_a = Process.objects.create(priority=1, queue="queue", parent_id=parent.id, dead=False)
+
+        # 第一轮：合法 ACK，唤醒父进程
+        self.assertTrue(self.mixin.child_process_finish(parent.id, child_a.id))
+        parent.refresh_from_db()
+        self.assertEqual(parent.need_ack, -1)
+        self.assertEqual(parent.ack_num, 0)
+
+        # 第二轮：父进程 join 新的子进程 B
+        child_b = Process.objects.create(priority=1, queue="queue", parent_id=parent.id, dead=False)
+        self.mixin.join(parent.id, [child_b.id])
+        parent.refresh_from_db()
+        self.assertEqual(parent.need_ack, 1)
+        self.assertEqual(parent.ack_num, 0)
+
+        # 第一轮消息重投：陈旧 ACK 不得唤醒等待 B 的父进程
+        self.assertFalse(self.mixin.child_process_finish(parent.id, child_a.id))
+        parent.refresh_from_db()
+        self.assertEqual(parent.need_ack, 1)
+        self.assertEqual(parent.ack_num, 0)
+
+        # B 的真实 ACK 仍应正常唤醒
+        self.assertTrue(self.mixin.child_process_finish(parent.id, child_b.id))
+        parent.refresh_from_db()
+        self.assertEqual(parent.need_ack, -1)
+        self.assertEqual(parent.ack_num, 0)
 
     def test_is_frozen(self):
         self.assertFalse(self.mixin.is_frozen(self.process.id))
@@ -256,3 +312,30 @@ class ProcessMixinTestCase(TransactionTestCase):
 
         p = self.mixin.get_process_info_with_root_pipeline("not_exist")
         self.assertEqual(0, len(p))
+
+    def test_wake_up_if_sleeping_at(self):
+        self.process.current_node_id = "n1"
+        self.process.save()
+
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n2"))
+        self.assertTrue(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+        self.process.refresh_from_db()
+        self.assertFalse(self.process.asleep)
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+
+    def test_wake_up_if_sleeping_at_skips_dead_process(self):
+        self.process.current_node_id = "n1"
+        self.process.dead = True
+        self.process.save()
+
+        self.assertFalse(self.mixin.wake_up_if_sleeping_at(self.process.id, "n1"))
+        self.process.refresh_from_db()
+        self.assertTrue(self.process.asleep)
+
+    def test_get_current_node_id(self):
+        self.assertIsNone(self.mixin.get_current_node_id(self.process.id))
+        self.process.current_node_id = "n1"
+        self.process.save()
+
+        self.assertEqual(self.mixin.get_current_node_id(self.process.id), "n1")
+        self.assertIsNone(self.mixin.get_current_node_id(self.process.id + 1))

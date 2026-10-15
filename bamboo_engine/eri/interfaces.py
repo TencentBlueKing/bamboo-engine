@@ -39,7 +39,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "7.1.1"
+__version__ = "7.2.0"
 
 
 def version():
@@ -140,6 +140,16 @@ class Service(metaclass=ABCMeta):
         调度是否完成
 
         :return: 调度是否完成
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def callback_lock_retryable(self, callback_data=None) -> bool:
+        """
+        回调调度锁冲突时是否允许重试
+
+        :param callback_data: 回调数据
+        :return: 是否允许重试
         :rtype: bool
         """
 
@@ -746,6 +756,30 @@ class ProcessMixin:
         """
 
     @abstractmethod
+    def wake_up_if_sleeping_at(self, process_id: int, node_id: str) -> bool:
+        """
+        仅当进程存活、处于休眠且当前节点为 node_id 时将其唤醒，返回是否唤醒成功
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :param node_id: 期望进程当前所在的节点 ID
+        :type node_id: str
+        :return: 是否唤醒成功
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def get_current_node_id(self, process_id: int) -> Optional[str]:
+        """
+        获取进程当前所在的节点 ID
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :return: 节点 ID，进程不存在或尚未设置当前节点时返回 None
+        :rtype: Optional[str]
+        """
+
+    @abstractmethod
     def sleep(self, process_id: int):
         """
         该接口应为幂等接口
@@ -1018,6 +1052,17 @@ class StateMixin:
         """
 
     @abstractmethod
+    def batch_get_state_version(self, node_id_list: List[str]) -> Dict[str, str]:
+        """
+        批量获取一批节点的状态版本
+
+        :param node_id_list: 节点 ID 列表
+        :type node_id_list: List[str]
+        :return: 节点ID -> 状态版本，没有状态的节点不在结果中
+        :rtype: Dict[str, str]
+        """
+
+    @abstractmethod
     def has_state(self, node_id: str) -> bool:
         """
         是否存在某个节点的的状态
@@ -1221,6 +1266,19 @@ class ScheduleMixin:
 
         :param schedule_id: 调度实例 ID
         :type schedule_id: str
+        :return: 是否成功获取锁
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def apply_schedule_lock_with_times(self, schedule_id: str, times: int) -> bool:
+        """
+        仅当调度次数为 times 时获取 Schedule 对象的调度锁，返回是否成功获取锁
+
+        :param schedule_id: 调度实例 ID
+        :type schedule_id: str
+        :param times: 期望的调度次数
+        :type times: int
         :return: 是否成功获取锁
         :rtype: bool
         """

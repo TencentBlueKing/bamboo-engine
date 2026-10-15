@@ -13,9 +13,10 @@ jobs:
       DB_PASSWORD: root
       PYTHON_KEYRING_BACKEND: keyring.backends.null.Keyring
     strategy:
+      fail-fast: false
       matrix:
         python-version: [3.6.12, 3.7.16]
-        django-version: [2.2, 3.0]
+        django-version: ["2.2", "3.2"]
 
     steps:
 
@@ -60,6 +61,7 @@ jobs:
         cd runtime/bamboo-pipeline/test
         "$RUNNER_TEMP/poetry/bin/poetry" run coverage run --source="." manage.py test pipeline.tests
         "$RUNNER_TEMP/poetry/bin/poetry" run coverage report -m
+        "$RUNNER_TEMP/poetry/bin/poetry" run pytest pipeline/contrib/diagnostics/tests --ds=pipeline_sdk_use.settings -q
       env:
         PIPELINE_TEST_DB_TYPE: mysql
         PIPELINE_TEST_DB_NAME: pipeline_test
