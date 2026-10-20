@@ -14,15 +14,17 @@ specific language governing permissions and limitations under the License.
 import inspect
 from typing import Any, Type
 
-from bamboo_engine.eri import Variable as VariableInterface
 from pipeline.core.data.var import Variable
+
+from bamboo_engine.eri import Variable as VariableInterface
 
 
 class VariableProxy:
-    def __init__(self, original_value: Variable, var_cls: Type, pipeline_data: dict):
+    def __init__(self, original_value: Variable, var_cls: Type, pipeline_data: dict, inner_loop: int):
         self.get_value = getattr(var_cls, "get_value")
         self.original_value = original_value
         self.pipeline_data = pipeline_data
+        self.inner_loop = inner_loop
         for name, value in inspect.getmembers(var_cls):
             if not name.startswith("__") and not hasattr(self, name) and inspect.isfunction(value):
                 setattr(self, name, value)
@@ -33,8 +35,10 @@ class VariableProxy:
 
 
 class VariableWrapper(VariableInterface):
-    def __init__(self, original_value: Variable, var_cls: Type, additional_data: dict):
-        self.var = VariableProxy(original_value=original_value, var_cls=var_cls, pipeline_data=additional_data)
+    def __init__(self, original_value: Variable, var_cls: Type, additional_data: dict, inner_loop: int):
+        self.var = VariableProxy(
+            original_value=original_value, var_cls=var_cls, pipeline_data=additional_data, inner_loop=inner_loop
+        )
 
     def get(self) -> Any:
         return self.var.get()

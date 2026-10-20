@@ -22,15 +22,7 @@ class UserStub(object):
         self.is_superuser = is_superuser
 
 
-DIAGNOSTICS_TEMPLATE_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-    "runtime",
-    "bamboo-pipeline",
-    "pipeline",
-    "contrib",
-    "diagnostics",
-    "templates",
-)
+DIAGNOSTICS_TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates")
 
 TEST_TEMPLATES = [
     {

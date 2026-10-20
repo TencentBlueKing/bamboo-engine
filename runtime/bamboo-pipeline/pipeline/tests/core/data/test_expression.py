@@ -13,6 +13,8 @@ specific language governing permissions and limitations under the License.
 
 import copy
 import datetime
+import io
+from unittest import mock
 
 from django.test import TestCase
 
@@ -20,6 +22,29 @@ from pipeline.core.data import expression, mako_safety, sandbox
 from pipeline.core.data.expression import format_constant_key, deformat_constant_key
 from pipeline.utils.mako_utils.checker import check_mako_template_safety
 from pipeline.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
+
+
+_COMMAND_PATCHES = []
+_COMMAND_CALLS = []
+
+
+def setUpModule():
+    def record(*args, **kwargs):
+        _COMMAND_CALLS.append((args, kwargs))
+        return io.StringIO("INERT_COMMAND_MARKER")
+
+    _COMMAND_CALLS[:] = []
+    for target in ("os.system", "os.popen", "subprocess.Popen"):
+        patcher = mock.patch(target, side_effect=record)
+        patcher.start()
+        _COMMAND_PATCHES.append(patcher)
+
+
+def tearDownModule():
+    for patcher in reversed(_COMMAND_PATCHES):
+        patcher.stop()
+    _COMMAND_PATCHES[:] = []
+    assert _COMMAND_CALLS == []
 
 
 class TestConstantTemplate(TestCase):
@@ -226,6 +251,12 @@ class TestConstantTemplate(TestCase):
 
 
 class TestMakoNameWhitelist(TestCase):
+    """``MAKO_TEMPLATE_NAME_WHITELIST_MODE`` 在 legacy ``ConstantTemplate`` 上的覆盖。
+
+    新引擎 ``bamboo_engine.template.Template`` 与 legacy ``ConstantTemplate`` 走的是
+    各自独立的渲染路径。两边都需要白名单 visitor，否则只挡一边等于没挡。
+    """
+
     def setUp(self):
         from bamboo_engine.config import Settings as BambooSettings
 
@@ -281,6 +312,7 @@ class TestMakoNameWhitelist(TestCase):
         self.assertEqual(rendered, payload)
 
     def test_dangerous_attr_chain_blocked(self):
+        """根 Name 是白名单内的导入模块，但 attr 链上出现 os/sys/modules/popen 等危险字段也必须拦。"""
         self._set_mode("enforce")
         original_imports = self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES
         self._BambooSettings.MAKO_SANDBOX_IMPORT_MODULES = {
@@ -354,7 +386,9 @@ class TestMakoNameWhitelist(TestCase):
 
     def test_extra_whitelist_names(self):
         self._set_mode("enforce", extra=("_loop", "_system"))
+        # 单 token 模板：直接返回 context 中原始值
         self.assertEqual(expression.ConstantTemplate("${_loop}").resolve_data({"_loop": 3}), 3)
+        # 表达式：走白名单 visitor，``_loop`` 在 extra 白名单中放行
         self.assertEqual(expression.ConstantTemplate("${_loop + 1}").resolve_data({"_loop": 4}), "5")
 
     def test_unknown_root_name_blocked(self):

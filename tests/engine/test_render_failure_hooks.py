@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Renderer failures in 4.0 lifecycle hooks must survive engine recovery."""
+"""Renderer failures in lifecycle hooks must survive engine recovery."""
 import copy
 import json
 from types import SimpleNamespace

@@ -7,6 +7,7 @@ from mock import MagicMock
 
 from bamboo_engine import states
 from bamboo_engine.eri import Data, ExecutionData, ScheduleType
+from bamboo_engine.eri.models.node import LoopControlConfig
 from bamboo_engine.eri.models.interrupt import (
     ExecuteInterruptPoint,
     HandlerExecuteData,
@@ -25,10 +26,14 @@ schedule_interrupter = service_fixtures.schedule_interrupter
 
 @pytest.mark.parametrize("phase", ["execute", ScheduleType.POLL, ScheduleType.CALLBACK, ScheduleType.MULTIPLE_CALLBACK])
 @pytest.mark.parametrize("infrastructure_failed", [True, False])
+@pytest.mark.parametrize("failure_policy", ["error_ignorable", "loop_fail_skip"])
+@pytest.mark.parametrize("inner_loop", [1, 2])
 def test_recovered_render_failure_is_not_auto_ignored(
-    phase, infrastructure_failed, pi, node, interrupter, schedule, schedule_interrupter
+    phase, infrastructure_failed, failure_policy, inner_loop, pi, node, interrupter, schedule, schedule_interrupter
 ):
-    node.error_ignorable = True
+    node.error_ignorable = failure_policy == "error_ignorable"
+    if failure_policy == "loop_fail_skip":
+        node.loop_config = LoopControlConfig(loop_times=2, fail_skip=True)
     runtime = MagicMock()
     runtime.get_data.return_value = Data({}, {})
     runtime.get_data_inputs.return_value = {}
@@ -62,9 +67,9 @@ def test_recovered_render_failure_is_not_auto_ignored(
     recovered = point_type.from_json(json.dumps(payload))
     handler = ServiceActivityHandler(node, runtime, interrupter)
     if phase == "execute":
-        result = handler.execute(pi, 1, 1, "v1", recovered)
+        result = handler.execute(pi, 1, inner_loop, "v1", recovered)
     else:
-        result = handler.schedule(pi, 1, 1, schedule, recover_point=recovered)
+        result = handler.schedule(pi, 1, inner_loop, schedule, recover_point=recovered)
 
     expected_state = states.FAILED if infrastructure_failed else states.FINISHED
     assert runtime.set_state.call_args.kwargs["to_state"] == expected_state
@@ -77,3 +82,7 @@ def test_recovered_render_failure_is_not_auto_ignored(
             assert result.has_next_schedule is False
             assert result.schedule_done is False
         runtime.upsert_plain_context_values.assert_not_called()
+    else:
+        assert result.next_node_id == (
+            node.id if failure_policy == "loop_fail_skip" and inner_loop < 2 else node.target_nodes[0]
+        )

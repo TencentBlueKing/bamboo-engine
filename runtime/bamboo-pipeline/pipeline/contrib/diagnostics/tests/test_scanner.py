@@ -68,9 +68,7 @@ class ScanStalledRootsTest(DiagnosticsTestCase):
         self._proc("root-old", beat_delta=3 * 3600)
         with self.settings(PIPELINE_DIAGNOSTICS_SCAN_MAX_SILENT_SECONDS=7200):
             self.assertEqual(scanner.scan_stalled_roots(threshold_seconds=1800, confirm_seconds=0), [])
-            cases = scanner.scan_stalled_roots(
-                threshold_seconds=1800, confirm_seconds=0, max_silent_seconds=0
-            )
+            cases = scanner.scan_stalled_roots(threshold_seconds=1800, confirm_seconds=0, max_silent_seconds=0)
 
         self.assertEqual([case.root_pipeline_id for case in cases], ["root-old"])
 
@@ -80,8 +78,6 @@ class ScanStalledRootsTest(DiagnosticsTestCase):
 
         call_command("scan_stuck_cases", "--threshold", "1800", "--confirm", "0", stdout=output)
         self.assertFalse(DiagnosticCase.objects.filter(root_pipeline_id="root-ancient").exists())
-        call_command(
-            "scan_stuck_cases", "--threshold", "1800", "--confirm", "0", "--max-silent", "0", stdout=output
-        )
+        call_command("scan_stuck_cases", "--threshold", "1800", "--confirm", "0", "--max-silent", "0", stdout=output)
 
         self.assertTrue(DiagnosticCase.objects.filter(root_pipeline_id="root-ancient").exists())

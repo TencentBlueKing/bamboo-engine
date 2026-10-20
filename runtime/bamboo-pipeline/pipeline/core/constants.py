@@ -15,6 +15,7 @@ specific language governing permissions and limitations under the License.
 class PipelineElement(object):
     ServiceActivity = "ServiceActivity"
     SubProcess = "SubProcess"
+    SubCanvas = "SubCanvas"
     ExclusiveGateway = "ExclusiveGateway"
     ParallelGateway = "ParallelGateway"
     ConditionalParallelGateway = "ConditionalParallelGateway"
@@ -22,8 +23,8 @@ class PipelineElement(object):
     EmptyStartEvent = "EmptyStartEvent"
     EmptyEndEvent = "EmptyEndEvent"
 
-    Activities = {ServiceActivity}
-    TaskNodes = {ServiceActivity, SubProcess}
+    Activities = {ServiceActivity, SubCanvas}
+    TaskNodes = {ServiceActivity, SubProcess, SubCanvas}
     BranchGateways = {ExclusiveGateway, ParallelGateway, ConditionalParallelGateway}
     Gateways = {ExclusiveGateway, ParallelGateway, ConditionalParallelGateway, ConvergeGateway}
 

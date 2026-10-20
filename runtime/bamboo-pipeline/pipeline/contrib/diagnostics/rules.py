@@ -409,9 +409,7 @@ def _schedule_finished_but_process_not_exited(snapshot, processes_by_id):
 
 
 def _stalled_no_progress_hit(snapshot, stall_seconds):
-    node_id = snapshot.node_id or (
-        snapshot.processes[0].current_node_id if snapshot.processes else ""
-    )
+    node_id = snapshot.node_id or (snapshot.processes[0].current_node_id if snapshot.processes else "")
     return _hit(
         "stalled_no_progress",
         "warning",
@@ -449,9 +447,6 @@ def diagnose_snapshot(snapshot, stall_seconds=None):
         hits = [_stalled_no_progress_hit(snapshot, stall_seconds)]
 
     if stall_seconds is not None:
-        hits = [
-            hit._replace(evidence=dict(hit.evidence, stall_seconds=stall_seconds))
-            for hit in hits
-        ]
+        hits = [hit._replace(evidence=dict(hit.evidence, stall_seconds=stall_seconds)) for hit in hits]
 
     return hits

@@ -144,9 +144,7 @@ def test_no_fallback_when_parked_at_failed_node():
 def test_failed_node_process_not_asleep_still_reported():
     """停在 FAILED 却没睡不是正常停车形态；新增的停车豁免不能把它一起放过。"""
     snapshot = _parked_snapshot(state_name=engine_states.FAILED, asleep=False)
-    assert [hit.type for hit in diagnose_snapshot(snapshot, stall_seconds=7200)] == [
-        "process_alive_but_terminal_state"
-    ]
+    assert [hit.type for hit in diagnose_snapshot(snapshot, stall_seconds=7200)] == ["process_alive_but_terminal_state"]
 
 
 def _gateway_with_failed_branches_snapshot(live_children_failed=2, dead_children=2, ack_num=2, need_ack=4):
@@ -184,9 +182,7 @@ def _gateway_with_failed_branches_snapshot(live_children_failed=2, dead_children
                 frozen=False,
             )
         )
-        states.append(
-            types.SimpleNamespace(id=10 + index, node_id=node, name=engine_states.FAILED, version="v1")
-        )
+        states.append(types.SimpleNamespace(id=10 + index, node_id=node, name=engine_states.FAILED, version="v1"))
     for index in range(dead_children):
         processes.append(
             types.SimpleNamespace(

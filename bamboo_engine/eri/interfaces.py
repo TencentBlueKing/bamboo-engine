@@ -39,7 +39,7 @@ from .models import (
 
 # plugin interface
 
-__version__ = "7.1.1"
+__version__ = "7.2.0"
 
 
 def version():
@@ -224,7 +224,7 @@ class PluginManagerMixin:
     """
 
     @abstractmethod
-    def get_service(self, code: str, version: str, name: str = None) -> Service:
+    def get_service(self, code: str, version: str, name: str = None, inner_loop: int = -1) -> Service:
         """
         根据代号与版本获取特定服务对象实例
 
@@ -234,6 +234,8 @@ class PluginManagerMixin:
         :type version: str
         :param name: 服务名
         :type version: str
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 服务对象实例
         :rtype: Service
         """
@@ -256,6 +258,7 @@ class PluginManagerMixin:
         key: str,
         value: Variable,
         additional_data: dict,
+        inner_loop: int = -1,
     ) -> Variable:
         """
         根据代号获取变量实例
@@ -268,6 +271,8 @@ class PluginManagerMixin:
         :type value: Any
         :param additional_data: 额外数据字典
         :type additional_data: dict
+        :param inner_loop: 内循环次数
+        :type inner_loop: int
         :return: 变量实例
         :rtype: Variable
         """
@@ -751,6 +756,30 @@ class ProcessMixin:
         """
 
     @abstractmethod
+    def wake_up_if_sleeping_at(self, process_id: int, node_id: str) -> bool:
+        """
+        仅当进程存活、处于休眠且当前节点为 node_id 时将其唤醒，返回是否唤醒成功
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :param node_id: 期望进程当前所在的节点 ID
+        :type node_id: str
+        :return: 是否唤醒成功
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def get_current_node_id(self, process_id: int) -> Optional[str]:
+        """
+        获取进程当前所在的节点 ID
+
+        :param process_id: 进程 ID
+        :type process_id: int
+        :return: 节点 ID，进程不存在或尚未设置当前节点时返回 None
+        :rtype: Optional[str]
+        """
+
+    @abstractmethod
     def sleep(self, process_id: int):
         """
         该接口应为幂等接口
@@ -1023,6 +1052,17 @@ class StateMixin:
         """
 
     @abstractmethod
+    def batch_get_state_version(self, node_id_list: List[str]) -> Dict[str, str]:
+        """
+        批量获取一批节点的状态版本
+
+        :param node_id_list: 节点 ID 列表
+        :type node_id_list: List[str]
+        :return: 节点ID -> 状态版本，没有状态的节点不在结果中
+        :rtype: Dict[str, str]
+        """
+
+    @abstractmethod
     def has_state(self, node_id: str) -> bool:
         """
         是否存在某个节点的的状态
@@ -1154,6 +1194,17 @@ class NodeMixin:
         :rtype: Node
         """
 
+    @abstractmethod
+    def update_node_loop_times(self, node_id: str, loop_times: int):
+        """
+        更新节点的循环次数
+
+        :param node_id: 节点 ID
+        :type node_id: str
+        :param loop_times: 循环次数
+        :type loop_times: int
+        """
+
 
 class ScheduleMixin:
     """
@@ -1215,6 +1266,19 @@ class ScheduleMixin:
 
         :param schedule_id: 调度实例 ID
         :type schedule_id: str
+        :return: 是否成功获取锁
+        :rtype: bool
+        """
+
+    @abstractmethod
+    def apply_schedule_lock_with_times(self, schedule_id: str, times: int) -> bool:
+        """
+        仅当调度次数为 times 时获取 Schedule 对象的调度锁，返回是否成功获取锁
+
+        :param schedule_id: 调度实例 ID
+        :type schedule_id: str
+        :param times: 期望的调度次数
+        :type times: int
         :return: 是否成功获取锁
         :rtype: bool
         """
@@ -1331,6 +1395,17 @@ class ContextMixin:
         :type pipeline_id: str
         :return: 输出数据 key
         :rtype: Set[str]
+        """
+
+    def copy_context_values_to_new_pipeline(
+        self, from_pipeline_id: str, to_pipeline_id: str, exclude_keys: Set[str] = None
+    ):
+        """
+        将源流程的所有上下文字段原样复制到新流程 ID 下，支持排除指定 key
+
+        :param from_pipeline_id: 源流程 ID
+        :param to_pipeline_id: 目标流程 ID
+        :param exclude_keys: 不需要复制的变量 key 集合
         """
 
 

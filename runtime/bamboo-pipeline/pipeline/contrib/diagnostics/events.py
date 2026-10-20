@@ -37,16 +37,7 @@ def _event_table_available():
     return _EVENT_TABLE_AVAILABLE
 
 
-def emit_event(
-    event_type,
-    root_pipeline_id,
-    node_id="",
-    version="",
-    result="",
-    reason="",
-    payload=None,
-    **kwargs
-):
+def emit_event(event_type, root_pipeline_id, node_id="", version="", result="", reason="", payload=None, **kwargs):
     if not conf.event_enabled():
         return None
 

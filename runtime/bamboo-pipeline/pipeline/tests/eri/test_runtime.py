@@ -34,7 +34,6 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
         self.assertEqual(self.runtime.node_rerun_limit("1", "2"), 100)
 
     def test_prepare_run_pipeline_simple(self):
-
         # struct
         start = EmptyStartEvent(id="start")
         pg = ParallelGateway(id="pg")
@@ -195,6 +194,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -211,6 +211,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": True,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -269,6 +270,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -285,6 +287,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -338,6 +341,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -354,6 +358,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -409,6 +414,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -427,6 +433,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
@@ -445,6 +452,7 @@ class BambooDjangoRuntimeTestCase(TransactionTestCase):
                 "name": None,
                 "version": "legacy",
                 "error_ignorable": False,
+                "loop_config": {},
             },
         )
         self.assertEqual(
