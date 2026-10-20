@@ -84,6 +84,16 @@ class RuntimeSnapshotCollectorTestCase(TransactionTestCase):
         self.assertEqual([item.id for item in snapshot.schedules], [schedule.id])
         self.assertEqual([item.id for item in snapshot.callback_data], [callback_data.id])
 
+    def test_collect_can_skip_callback_data(self):
+        process = self._create_process(5, root_pipeline_id="root-skip", node_id="node-skip")
+        self._create_state("node-skip", root_pipeline_id="root-skip", version="v1")
+        self._create_callback_data("node-skip", version="v1")
+
+        snapshot = collect_runtime_snapshot(root_pipeline_id="root-skip", include_callback_data=False)
+
+        self.assertEqual([item.id for item in snapshot.processes], [process.id])
+        self.assertEqual(snapshot.callback_data, [])
+
     def test_collect_process_schedule_callback_when_state_missing(self):
         process = self._create_process(2, root_pipeline_id="root-2", node_id="node-missing-state")
         schedule = self._create_schedule(2, process.id, "node-missing-state", version="v1")

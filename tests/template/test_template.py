@@ -12,6 +12,9 @@ specific language governing permissions and limitations under the License.
 """
 
 import datetime
+import io
+import os
+import subprocess
 
 import pytest
 from mako.template import Template as MakoTemplate
@@ -21,6 +24,21 @@ from bamboo_engine.template import Template
 from bamboo_engine.utils import mako_safety
 from bamboo_engine.utils.mako_utils.checker import check_mako_template_safety
 from bamboo_engine.utils.mako_utils.exceptions import ForbiddenMakoTemplateException
+
+
+@pytest.fixture(autouse=True)
+def inert_command_sinks(monkeypatch):
+    calls = []
+
+    def record(*args, **kwargs):
+        calls.append((args, kwargs))
+        return io.StringIO("INERT_COMMAND_MARKER")
+
+    monkeypatch.setattr(os, "system", record)
+    monkeypatch.setattr(os, "popen", record)
+    monkeypatch.setattr(subprocess, "Popen", record)
+    yield
+    assert calls == []
 
 
 def test_get_reference():
@@ -112,7 +130,7 @@ def test_render__with_sandbox():
     Settings.MAKO_SANDBOX_IMPORT_MODULES = {}
 
     r3 = Template("""${exec(print(''))}""").render({})
-    assert r1 == """${exec(print(''))}"""
+    assert r3 == """${exec(print(''))}"""
 
 
 def test_render__built_in_functions__with_args():
@@ -140,8 +158,21 @@ def test_mako_attack():
         assert Template(at).render({}) == at
 
 
+# ---------------------------------------------------------------------------
+# 根标识符白名单（``MAKO_TEMPLATE_NAME_WHITELIST_MODE``）。这套机制覆盖：
+#
+# 1. ``self / context / local / parent / next / caller / pageargs`` 等 Mako
+#    渲染期注入的保留命名空间（堵 ``self.module.cache.util.os.popen`` SSTI 链路）。
+# 2. attr 链路上的危险字段 / 单下划线 attr，堵 ``${os.path.os.popen(...)}``、
+#    ``${datetime.sys.modules['os']...}``、``${context._kwargs}`` 这类反向引用。
+# 3. 业务正常用法（字符串方法、``datetime.datetime.now().strftime(...)``、
+#    ``os.path.join`` / 列表推导 / lambda）必须照常渲染。
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def whitelist_mode():
+    """在 ``Settings`` 上切换 ``MAKO_TEMPLATE_NAME_WHITELIST_MODE``，测试结束后还原。"""
     original_mode = Settings.MAKO_TEMPLATE_NAME_WHITELIST_MODE
     original_extra = Settings.MAKO_TEMPLATE_NAME_EXTRA_WHITELIST
 
@@ -166,8 +197,48 @@ def test_mako_self_module_namespace_blocked_in_all_modes(whitelist_mode, mode):
 
 
 def test_mako_whitelist_default_blocks_self_module_namespace():
+    """默认配置必须阻断 ``self.module.*`` SSTI 链路。"""
     payload = '${self.module.cache.util.os.popen("echo PWNED").read()}'
     assert Template(payload).render({}) == payload
+
+
+def _assert_forbidden_template(payload):
+    with pytest.raises(ForbiddenMakoTemplateException):
+        check_mako_template_safety(
+            payload,
+            mako_safety.SingleLineNodeVisitor(),
+            mako_safety.SingleLinCodeExtractor(),
+        )
+
+
+def test_mako_filter_side_effect_expression_is_blocked():
+    payload = "${'x'|((side_effect() or str))}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_filter_dunder_chain_is_blocked():
+    payload = "${'x'|().__class__.__bases__[0].__subclasses__}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_subscript_dunder_key_is_blocked():
+    payload = "${a['__class__']}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_filter_list_blocks_any_malicious_item():
+    payload = "${'x'|h, (side_effect() or str)}"
+
+    _assert_forbidden_template(payload)
+
+
+def test_mako_decode_filter_private_attribute_is_blocked():
+    payload = "${'x'|decode.__class__}"
+
+    _assert_forbidden_template(payload)
 
 
 @pytest.mark.parametrize(
@@ -189,14 +260,33 @@ def test_mako_whitelist_blocks_reserved_namespaces(whitelist_mode, payload):
 @pytest.mark.parametrize(
     "payload",
     [
+        '<%page expression_filter="(side_effect() or str)"/>${name}',
+        '<%def name="render_name(name)" filter="(side_effect() or str)">${name}</%def>${render_name("x")}',
+        '<%block filter="(side_effect() or str)">x</%block>',
+        '<%text filter="(side_effect() or str)">x</%text>',
+    ],
+)
+def test_mako_tag_filter_callables_are_blocked(payload):
+    _assert_forbidden_template(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # ``os.path`` 内部 ``import os``：os.path.os is os
         '${os.path.os.popen("echo PWNED").read()}',
+        # 嵌套子模块：os.path.genericpath.os 同样指向真实 os
         '${os.path.genericpath.os.popen("echo PWNED").read()}',
+        # ``datetime`` import 了 sys，再走 sys.modules 拿 os
         '${datetime.sys.modules["os"].popen("echo PWNED").read()}',
+        # ``re`` 重新 export ``enum``，``enum`` 内部 import sys
         '${re.enum.sys.modules["os"].popen("echo PWNED").read()}',
+        # 直接调用 popen / system 也要拦
         '${os.path.os.system("echo PWNED")}',
     ],
 )
 def test_mako_whitelist_blocks_dangerous_attr_chain(whitelist_mode, payload):
+    """白名单根名（``os / datetime / re``）必须挡得住 attr 链反向引用。"""
     whitelist_mode("enforce")
     original_imports = Settings.MAKO_SANDBOX_IMPORT_MODULES
     Settings.MAKO_SANDBOX_IMPORT_MODULES = {
@@ -206,6 +296,9 @@ def test_mako_whitelist_blocks_dangerous_attr_chain(whitelist_mode, payload):
     }
     try:
         rendered = Template({"x": payload}).render({})
+        # ``rendered["x"] == payload`` 已经证明被拦后原样回显——不再用字面 PWNED 字符串
+        # 二次断言（payload 本身就含 ``echo PWNED``，字符串包含关系无法区分"被拦的原文"
+        # 和"被执行的输出"）。
         assert rendered["x"] == payload
     finally:
         Settings.MAKO_SANDBOX_IMPORT_MODULES = original_imports
@@ -259,7 +352,9 @@ def test_mako_whitelist_allows_imported_modules(whitelist_mode):
         "hashlib": "hashlib",
     }
     try:
+        # os.path.join 仍可用（join 不在 DANGEROUS_ATTR_NAMES）
         assert Template('${os.path.join("a", "b")}').render({}) == "a/b"
+        # datetime.datetime.now().strftime 链路全程合法
         out = Template('${datetime.datetime.now().strftime("%Y")}').render({})
         assert len(out) == 4 and out.isdigit()
         assert Template("${json.dumps({'a': 1})}").render({})
@@ -284,7 +379,9 @@ def test_mako_whitelist_datetime_now_requires_configured_class_alias(whitelist_m
 
 def test_mako_whitelist_extra_names_allowed(whitelist_mode):
     whitelist_mode("enforce", extra=("_loop", "_system"))
-    assert Template("${_loop}").render({"_loop": 7}) == 7
+    out = Template("${_loop}").render({"_loop": 7})
+    # 单 token 模板会直接返回 context 中的原始值；当不存在时则按白名单评估表达式。
+    assert out == 7
     assert Template("${_loop + 1}").render({"_loop": 2}) == "3"
 
 
@@ -294,50 +391,17 @@ def test_mako_whitelist_unknown_root_name_is_blocked(whitelist_mode):
     assert Template(payload).render({}) == payload
 
 
-def _assert_forbidden_template(payload):
-    with pytest.raises(ForbiddenMakoTemplateException):
-        check_mako_template_safety(
-            payload,
-            mako_safety.SingleLineNodeVisitor(),
-            mako_safety.SingleLinCodeExtractor(),
-        )
-
-
-def test_mako_filter_side_effect_expression_is_blocked():
-    payload = "${'x'|((side_effect() or str))}"
-
-    _assert_forbidden_template(payload)
-
-
-def test_mako_filter_dunder_chain_is_blocked():
-    payload = "${'x'|().__class__.__bases__[0].__subclasses__}"
-
-    _assert_forbidden_template(payload)
-
-
-def test_mako_filter_list_blocks_any_malicious_item():
-    payload = "${'x'|h, (side_effect() or str)}"
-
-    _assert_forbidden_template(payload)
-
-
-def test_mako_decode_filter_private_attribute_is_blocked():
-    payload = "${'x'|decode.__class__}"
-
-    _assert_forbidden_template(payload)
-
-
-@pytest.mark.parametrize(
-    "payload",
-    [
-        '<%page expression_filter="(side_effect() or str)"/>${name}',
-        '<%def name="render_name(name)" filter="(side_effect() or str)">${name}</%def>${render_name("x")}',
-        '<%block filter="(side_effect() or str)">x</%block>',
-        '<%text filter="(side_effect() or str)">x</%text>',
-    ],
-)
-def test_mako_tag_filter_callables_are_blocked(payload):
-    _assert_forbidden_template(payload)
+def test_mako_whitelist_warn_mode_does_not_block_but_logs(whitelist_mode, caplog):
+    whitelist_mode("warn")
+    payload = "${self.module}"
+    with caplog.at_level("WARNING"):
+        # warn 模式下 visitor 自身不抛——但 Mako 渲染保留命名空间 ``self.module``
+        # 时仍会在渲染层失败，因此结果取决于运行期；本测试只确认日志被打到。
+        try:
+            Template(payload).render({})
+        except Exception:
+            pass
+    assert any("name not in whitelist" in r.getMessage() or "self" in r.getMessage() for r in caplog.records)
 
 
 @pytest.mark.parametrize(

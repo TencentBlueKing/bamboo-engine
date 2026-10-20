@@ -258,7 +258,7 @@ class TemplateManager(models.Manager):
         id_maps = replace_all_id(pipeline_data)
         activities = pipeline_data[PE.activities]
         for act_id, act in list(activities.items()):
-            if act[PE.type] == PE.SubProcess:
+            if act[PE.type] in [PE.SubProcess, PE.SubCanvas]:
                 subproc_data = act[PE.pipeline]
                 sub_id_maps = self.replace_id(subproc_data)
                 # act_id is new id

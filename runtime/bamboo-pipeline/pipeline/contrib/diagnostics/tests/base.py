@@ -3,11 +3,17 @@
 from django.db import connection
 from django.test import TransactionTestCase
 
-from pipeline.contrib.diagnostics.models import DiagnosticCase, DiagnosticEvent, DiagnosticOperationAudit
+from pipeline.contrib.diagnostics.models import (
+    DiagnosticCase,
+    DiagnosticEvent,
+    DiagnosticOperationAudit,
+    DiagnosticRecovery,
+    DiagnosticScanCursor,
+)
 
 
 class DiagnosticsTestCase(TransactionTestCase):
-    models = (DiagnosticEvent, DiagnosticCase, DiagnosticOperationAudit)
+    models = (DiagnosticEvent, DiagnosticCase, DiagnosticOperationAudit, DiagnosticScanCursor, DiagnosticRecovery)
 
     @classmethod
     def setUpClass(cls):

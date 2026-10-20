@@ -14,7 +14,6 @@ specific language governing permissions and limitations under the License.
 from copy import deepcopy
 
 from django.utils.module_loading import import_string
-
 from pipeline import exceptions
 from pipeline.component_framework.library import ComponentLibrary
 from pipeline.core.constants import PE
@@ -175,6 +174,22 @@ class PipelineParser(object):
                             root_pipeline_data=root_pipeline_data,
                             root_pipeline_params=root_pipeline_params,
                             params=params,
+                            is_subprocess=True,
+                            parent_context=context,
+                        ),
+                        name=act[PE.name],
+                    )
+                )
+            elif act[PE.type] == PE.SubCanvas:
+                sub_tree = act[PE.pipeline]
+                sub_parser = PipelineParser(pipeline_tree=sub_tree, cycle_tolerate=self.cycle_tolerate)
+                act_objs.append(
+                    act_cls(
+                        id=act[PE.id],
+                        pipeline=sub_parser._parse(
+                            root_pipeline_data=root_pipeline_data,
+                            root_pipeline_params=root_pipeline_params,
+                            params={},
                             is_subprocess=True,
                             parent_context=context,
                         ),

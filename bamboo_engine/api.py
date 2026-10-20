@@ -171,7 +171,9 @@ def resume_node_appoint(runtime: EngineRuntimeInterface, node_id: str) -> Engine
 
 
 @_ensure_return_api_result
-def retry_node(runtime: EngineRuntimeInterface, node_id: str, data: Optional[dict] = None) -> EngineAPIResult:
+def retry_node(
+    runtime: EngineRuntimeInterface, node_id: str, data: Optional[dict] = None, loop_retry: bool = False
+) -> EngineAPIResult:
     """
     重试某个执行失败的节点
 
@@ -181,10 +183,12 @@ def retry_node(runtime: EngineRuntimeInterface, node_id: str, data: Optional[dic
     :type node_id: str
     :param data: 重试时使用的节点执行输入
     :type data: dict
+    :param loop_retry: 是否循环重试
+    :type loop_retry: bool
     :return: 执行结果
     :rtype: EngineAPIResult
     """
-    Engine(runtime).retry_node(node_id, data)
+    Engine(runtime).retry_node(node_id, data, loop_retry)
 
 
 @_ensure_return_api_result
@@ -203,7 +207,7 @@ def retry_subprocess(runtime: EngineRuntimeInterface, node_id: str) -> EngineAPI
 
 
 @_ensure_return_api_result
-def skip_node(runtime: EngineRuntimeInterface, node_id: str) -> EngineAPIResult:
+def skip_node(runtime: EngineRuntimeInterface, node_id: str, loop_skip: bool = False) -> EngineAPIResult:
     """
     跳过某个执行失败的节点（仅限 event，activity）
 
@@ -211,10 +215,12 @@ def skip_node(runtime: EngineRuntimeInterface, node_id: str) -> EngineAPIResult:
     :type runtime: EngineRuntimeInterface
     :param node_id: 失败的节点 id
     :type node_id: str
+    :param loop_skip: 是否循环跳过
+    :type loop_skip: bool
     :return: 执行结果
     :rtype: EngineAPIResult
     """
-    Engine(runtime).skip_node(node_id)
+    Engine(runtime).skip_node(node_id, loop_skip)
 
 
 @_ensure_return_api_result
@@ -509,6 +515,7 @@ def get_node_histories(runtime: EngineRuntimeInterface, node_id: str, loop: int 
             "node_id": h.node_id,
             "started_time": h.started_time,
             "archived_time": h.archived_time,
+            "retry": h.retry,
             "loop": h.loop,
             "skip": h.skip,
             "version": h.version,
@@ -632,14 +639,20 @@ def preview_node_inputs(
 
     if subprocess_stack:
         subprocess = subprocess_stack[0]
-        child_pipeline = pipeline["activities"][subprocess]["pipeline"]
-        param_data = {key: info["value"] for key, info in pipeline["activities"][subprocess]["params"].items()}
+        child_pipeline = pipeline["activities"][subprocess]
+        sub_pipeline = child_pipeline["pipeline"]
+        if child_pipeline["type"] == NodeType.SubProcess.value:
+            param_data = {key: info["value"] for key, info in pipeline["activities"][subprocess]["params"].items()}
+        elif child_pipeline["type"] == NodeType.SubCanvas.value:
+            param_data = {key: info["value"] for key, info in pipeline["data"]["inputs"].items()}
+        else:
+            raise InvalidOperationError(f"can not preview inputs for node type: {child_pipeline['type']}")
         hydrated_context = context.hydrate(deformat=True)
         hydrated_param_data = Template(param_data).render(hydrated_context)
         formatted_param_data = {key: {"value": value, "type": "plain"} for key, value in hydrated_param_data.items()}
         return preview_node_inputs(
             runtime=runtime,
-            pipeline=child_pipeline,
+            pipeline=sub_pipeline,
             node_id=node_id,
             subprocess_stack=subprocess_stack[1:],
             root_pipeline_data=root_pipeline_data,

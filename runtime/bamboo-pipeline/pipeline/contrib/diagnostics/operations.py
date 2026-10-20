@@ -203,9 +203,7 @@ def resend_schedule(schedule_id, operator="", mode=MODE_DRY_RUN):
         blockers.append("requires dispatcher/runtime integration")
 
     message = (
-        "Schedule resend precheck finished."
-        if mode == MODE_DRY_RUN
-        else "Schedule resend apply is not integrated."
+        "Schedule resend precheck finished." if mode == MODE_DRY_RUN else "Schedule resend apply is not integrated."
     )
     result = OperationResult(
         result=not blockers,

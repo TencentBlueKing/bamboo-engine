@@ -35,6 +35,7 @@ __skeleton = {
 __node_type = {
     "ServiceActivity": "activities",
     "SubProcess": "activities",
+    "SubCanvas": "activities",
     "EmptyEndEvent": "end_event",
     "EmptyStartEvent": "start_event",
     "ParallelGateway": "gateways",
@@ -55,6 +56,7 @@ __multiple_incoming_type = {
     "ConditionalParallelGateway",
     "ExclusiveGateway",
     "SubProcess",
+    "SubCanvas",
 }
 
 __incoming = "__incoming"
@@ -141,7 +143,7 @@ def _get_all_nodes(pipeline_tree: dict, with_subprocess: bool = False) -> dict:
     )
     if with_subprocess:
         for act in pipeline_tree["activities"].values():
-            if act["type"] == "SubProcess":
+            if act["type"] in ("SubProcess", "SubCanvas"):
                 all_nodes.update(_get_all_nodes(act["pipeline"], with_subprocess=True))
     return all_nodes
 
@@ -200,7 +202,7 @@ def _acyclic(pipeline):
 def _acyclic_flow(tree):
     _acyclic(tree)
     for node in tree["activities"].values():
-        if node["type"] == "SubProcess":
+        if node["type"] in ("SubProcess", "SubCanvas"):
             _acyclic_flow(node["pipeline"])
 
 
@@ -267,7 +269,7 @@ def inject_pipeline_token(node, pipeline_tree, node_token_map, token):
     if node["type"] in ["EmptyEndEvent", "ExecutableEndEvent"]:
         return node
 
-    if node["type"] == "SubProcess":
+    if node["type"] in ("SubProcess", "SubCanvas"):
         subprocess_pipeline_tree = node["pipeline"]
         subprocess_start_node = subprocess_pipeline_tree["start_event"]
         subprocess_start_node_token = unique_id("t")
@@ -344,6 +346,23 @@ def __grow(tree, elem):
         }
 
         subprocess["pipeline"] = build_tree(start_elem=elem.start, id=elem.id, data=elem.data)
+
+        tree["activities"][elem.id] = subprocess
+
+        next_elem = elem.outgoing[0]
+        __grow_flow(tree, outgoing, elem, next_elem)
+
+    elif elem.type() == "SubCanvas":
+        outgoing = unique_id("f")
+
+        subprocess = {
+            "id": elem.id,
+            "incoming": tree[__incoming][elem.id],
+            "name": elem.name,
+            "outgoing": outgoing,
+            "type": elem.type(),
+            "pipeline": build_tree(start_elem=elem.start, id=elem.id, data=elem.data),
+        }
 
         tree["activities"][elem.id] = subprocess
 

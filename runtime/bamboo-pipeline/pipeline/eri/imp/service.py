@@ -29,8 +29,9 @@ from bamboo_engine.eri import Service as ServiceInterface
 
 
 class ServiceWrapper(ServiceInterface):
-    def __init__(self, service: Service):
+    def __init__(self, service: Service, inner_loop: int = -1):
         self.service = service
+        self.inner_loop = inner_loop
 
     def execute(self, data: ExecutionData, root_pipeline_data: ExecutionData) -> bool:
         """

@@ -21,6 +21,4 @@ class Command(BaseCommand):
             node_id=options.get("node_id") or "",
             process_id=options.get("process_id"),
         )
-        self.stdout.write(
-            json.dumps([hit._asdict() for hit in hits], ensure_ascii=False, indent=2, sort_keys=True)
-        )
+        self.stdout.write(json.dumps([hit._asdict() for hit in hits], ensure_ascii=False, indent=2, sort_keys=True))
