@@ -39,8 +39,8 @@ FAST_WINDOW_GRACE_SECONDS = 60
 
 
 def _candidates():
-    # 存活进程只看睡眠中的（运行中的由窗口扫描兜底）；已结束的子进程用来发现父进程没被唤醒
-    return Process.objects.defer("pipeline_stack").filter(Q(dead=False, asleep=True) | Q(dead=True, parent_id__gt=0))
+    alive = Q(dead=False) if conf.sync_advance_enabled() else Q(dead=False, asleep=True)
+    return Process.objects.defer("pipeline_stack").filter(alive | Q(dead=True, parent_id__gt=0))
 
 
 def _confirm(found, confirm_seconds, now):

@@ -84,3 +84,5 @@ class Settings:
     #   FENCE_ENFORCE      - 令牌不符时丢弃消息；关闭时只记"本应丢弃"的日志和指标，照常执行
     FENCE_EMIT_ENABLED = False
     FENCE_ENFORCE = False
+    # Optional runtime extension. Migrate and upgrade all workers before enabling.
+    SYNC_ADVANCE_CHECKPOINT_ENABLED = False

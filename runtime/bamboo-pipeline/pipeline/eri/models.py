@@ -34,6 +34,21 @@ class Process(models.Model):
     pipeline_stack = models.TextField(_("流程栈"), default="[]", null=False)
 
 
+class SyncAdvanceCheckpoint(models.Model):
+    """One continuation per process; never reset a released/claimed node version."""
+
+    READY = "READY"
+    CLAIMED = "CLAIMED"
+    RELEASED = "RELEASED"
+    # Application-side cascade; older runtime versions must still be able to delete Process.
+    process = models.OneToOneField(Process, primary_key=True, on_delete=models.CASCADE, db_constraint=False)
+    from_node = models.CharField(max_length=33)
+    from_version = models.CharField(max_length=33)
+    to_node = models.CharField(max_length=33)
+    phase = models.CharField(max_length=16)
+    prepared_at = models.DateTimeField(default=timezone.now)
+
+
 class Node(models.Model):
     id = models.BigAutoField(_("ID"), primary_key=True)
     node_id = models.CharField(_("节点 ID"), null=False, max_length=33, db_index=True)

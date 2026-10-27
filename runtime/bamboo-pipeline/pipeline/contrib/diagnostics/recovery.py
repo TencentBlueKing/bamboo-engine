@@ -18,6 +18,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from bamboo_engine import fence
+from bamboo_engine.config import Settings
 from bamboo_engine.fence import ExecuteFence, ScheduleFence
 
 from pipeline.contrib.diagnostics import conf
@@ -26,6 +27,7 @@ from pipeline.contrib.diagnostics.case_types import (
     CALLBACK_DISPATCH_LOST,
     CHILD_START_LOST,
     EXECUTE_DISPATCH_LOST,
+    SYNC_ADVANCE_STALLED,
     PARENT_WAKEUP_LOST,
     REPLAYABLE_CASE_TYPES,
 )
@@ -99,11 +101,21 @@ def _signature_message(case):
     process_id, node_id = related["process_id"], related["node_id"]
     version = evidence.get("state_version", "")
     fingerprint = "{}:{}:{}:{}".format(case.stuck_type, process_id, node_id, version)
-    if case.stuck_type == EXECUTE_DISPATCH_LOST:
+    if case.stuck_type in (EXECUTE_DISPATCH_LOST, SYNC_ADVANCE_STALLED):
         targets = related.get("next_node_ids") or []
         if len(targets) != 1:
             return fingerprint, None, [BLOCKER_SUCCESSOR]
-        return fingerprint, _execute_message(process_id, targets[0], node_id, version), []
+        if case.stuck_type == SYNC_ADVANCE_STALLED:
+            if not Settings.SYNC_ADVANCE_CHECKPOINT_ENABLED or not (fence.emit_enabled() and fence.enforce_enabled()):
+                return fingerprint, None, ["sync advance checkpoint and both fence switches must be enabled"]
+            if evidence.get("checkpoint_phase") not in ("READY", "RELEASED"):
+                return fingerprint, None, ["no unclaimed output checkpoint; manual investigation required"]
+            if evidence.get("checkpoint_target") != targets[0] or evidence.get("skip") or evidence.get("error_ignored"):
+                return fingerprint, None, ["sync advance checkpoint is not safe to replay"]
+        message = _execute_message(process_id, targets[0], node_id, version)
+        if case.stuck_type == SYNC_ADVANCE_STALLED:
+            message["sync_advance"] = True
+        return fingerprint, message, []
     if case.stuck_type == PARENT_WAKEUP_LOST:
         return fingerprint, _execute_message(process_id, related["converge_gateway_id"], node_id, version), []
     if case.stuck_type == CHILD_START_LOST:
@@ -196,6 +208,23 @@ def plan_replay(case, trigger=DiagnosticRecovery.TRIGGER_MANUAL, confirm_risk=Fa
 def dispatch(message):
     headers = {} if message.get("fence") is None else {fence.FENCE_HEADER: dict(message["fence"])}
     runtime = _runtime()
+    if message.get("sync_advance"):
+        if not (
+            conf.sync_advance_enabled()
+            and Settings.SYNC_ADVANCE_CHECKPOINT_ENABLED
+            and fence.emit_enabled()
+            and fence.enforce_enabled()
+        ):
+            raise ValueError("sync advance recovery switches are off")
+        token = message["fence"]
+        if not runtime.release_sync_advance(
+            message["process_id"],
+            token["from_node"],
+            token["from_version"],
+            message["node_id"],
+            conf.signature_fast_threshold_seconds(),
+        ):
+            raise ValueError("sync advance checkpoint takeover rejected")
     if message["kind"] == KIND_EXECUTE:
         runtime.execute(
             process_id=message["process_id"],

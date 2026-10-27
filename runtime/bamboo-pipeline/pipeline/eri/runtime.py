@@ -29,6 +29,7 @@ from pipeline.eri.utils import caculate_final_references, CONTEXT_VALUE_TYPE_MAP
 from pipeline.eri.imp.plugin_manager import PipelinePluginManagerMixin
 from pipeline.eri.imp.hooks import HooksMixin
 from pipeline.eri.imp.process import ProcessMixin
+from pipeline.eri.imp.sync_advance import SyncAdvanceMixin
 from pipeline.eri.imp.node import NodeMixin
 from pipeline.eri.imp.state import StateMixin
 from pipeline.eri.imp.schedule import ScheduleMixin
@@ -52,6 +53,7 @@ class BambooDjangoRuntime(
     StateMixin,
     NodeMixin,
     ProcessMixin,
+    SyncAdvanceMixin,
     PipelinePluginManagerMixin,
     HooksMixin,
     InterruptMixin,
