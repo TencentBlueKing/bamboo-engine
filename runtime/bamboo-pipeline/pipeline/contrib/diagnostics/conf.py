@@ -94,6 +94,10 @@ def signature_fast_threshold_seconds():
     return _get_setting("SIGNATURE_FAST_THRESHOLD_SECONDS", 300)
 
 
+def sync_advance_enabled():
+    return _get_setting("SYNC_ADVANCE_ENABLED", False)
+
+
 def signature_slow_threshold_seconds():
     return _get_setting("SIGNATURE_SLOW_THRESHOLD_SECONDS", 1800)
 

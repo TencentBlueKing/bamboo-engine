@@ -20,6 +20,7 @@ from functools import wraps
 from typing import Optional
 
 from . import fence, states, validator
+from .config import Settings
 from .eri import (
     DataInput,
     EngineRuntimeInterface,
@@ -115,6 +116,11 @@ class Engine:
     def __init__(self, runtime: EngineRuntimeInterface):
         self.runtime = runtime
         self._hostname = get_hostname()
+        if Settings.SYNC_ADVANCE_CHECKPOINT_ENABLED and not all(
+            callable(getattr(runtime, method, None))
+            for method in ("prepare_sync_advance", "claim_sync_advance", "wake_sync_recovery")
+        ):
+            raise RuntimeError("runtime does not support sync advance checkpoints")
 
     def _schedule_lock_retry_count(self, headers: Optional[dict]) -> int:
         if not headers:
@@ -147,7 +153,7 @@ class Engine:
         root_pipeline_data: Optional[dict] = None,
         root_pipeline_context: Optional[dict] = None,
         subprocess_context: Optional[dict] = None,
-        **options
+        **options,
     ):
         """
         运行流程
@@ -666,7 +672,13 @@ class Engine:
         current_node_id = node_id
         with interrupter():
             process_info = self.runtime.get_process_info(process_id)
-            if not self._wake_up(process_id, node_id, root_pipeline_id, interrupter, headers):
+            recovery_version = getattr(interrupter.recover_point, "running_node_version", None)
+            if Settings.SYNC_ADVANCE_CHECKPOINT_ENABLED and recovery_version:
+                # A delayed database-interrupt retry must not wake a released process or
+                # re-enter an already persisted handler. Let checkpoint recovery handle it.
+                if not self.runtime.wake_sync_recovery(process_id, node_id, recovery_version):
+                    return
+            elif not self._wake_up(process_id, node_id, root_pipeline_id, interrupter, headers):
                 return
 
             # 推进循环
@@ -970,6 +982,18 @@ class Engine:
                         time.time() - engine_post_execute_start_at
                     )
                     return
+
+                # The handler has persisted context outputs AND execution data. FINISHED alone
+                # is earlier than that boundary and must never authorize continuation recovery.
+                if Settings.SYNC_ADVANCE_CHECKPOINT_ENABLED and node.type == NodeType.ServiceActivity:
+                    prepared = self.runtime.prepare_sync_advance(
+                        process_id, current_node_id, version, execute_result.next_node_id
+                    )
+                    if prepared is False or (
+                        prepared is True and not self.runtime.claim_sync_advance(process_id, current_node_id, version)
+                    ):
+                        logger.info("sync advance ownership lost: process=%s node=%s", process_id, current_node_id)
+                        return
 
                 current_node_id = execute_result.next_node_id
                 interrupter.to_node(current_node_id)
