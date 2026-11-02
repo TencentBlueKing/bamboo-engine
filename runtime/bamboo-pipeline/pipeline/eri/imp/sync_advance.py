@@ -10,7 +10,7 @@ from bamboo_engine import states
 from pipeline.eri.models import Node, Process, Schedule, State, SyncAdvanceCheckpoint
 
 
-def _locked_context(process_id, node_id, version):
+def _locked_context(process_id, node_id, version, require_running_root=True):
     # All checkpoint writers use the same lock order: process, states, checkpoint.
     process = Process.objects.select_for_update().filter(id=process_id).first()
     if process is None or process.dead or process.suspended or process.frozen or process.current_node_id != node_id:
@@ -22,7 +22,11 @@ def _locked_context(process_id, node_id, version):
         .order_by("node_id")
     }
     root, state = state_map.get(process.root_pipeline_id), state_map.get(node_id)
-    if root is None or root.name != states.RUNNING or state is None:
+    if root is None or state is None:
+        return None
+    # Only recovery requires a running root. The normal worker keeps its loop while the root is
+    # paused or revoked so that the loop-top check marks the process suspended/dead as before.
+    if require_running_root and root.name != states.RUNNING:
         return None
     if state.name != states.FINISHED or state.version != version:
         return None
@@ -47,17 +51,21 @@ class SyncAdvanceMixin:
                 or process.frozen
             ):
                 return False
-            checkpoint = SyncAdvanceCheckpoint.objects.filter(process_id=process_id).first()
-            if _matches(checkpoint, node_id, version):
+            checkpoint = SyncAdvanceCheckpoint.objects.select_for_update().filter(process_id=process_id).first()
+            # RELEASED: recovery owns the successor dispatch. CLAIMED: a worker already continued.
+            # READY: the previous attempt was interrupted before claiming; this retry may compete.
+            if _matches(checkpoint, node_id, version) and checkpoint.phase != SyncAdvanceCheckpoint.READY:
                 return False
             process.asleep = False
-            process.save(update_fields=["asleep"])
+            # Refresh the heartbeat under the same lock so recovery cannot release READY meanwhile.
+            process.last_heartbeat = timezone.now()
+            process.save(update_fields=["asleep", "last_heartbeat"])
             return True
 
     def prepare_sync_advance(self, process_id, node_id, version, to_node):
         """Called ONLY after handler output persistence. None means an excluded legacy path."""
         with transaction.atomic():
-            context = _locked_context(process_id, node_id, version)
+            context = _locked_context(process_id, node_id, version, require_running_root=False)
             if context is None:
                 return False
             process, state, checkpoint = context
@@ -87,7 +95,7 @@ class SyncAdvanceMixin:
     def claim_sync_advance(self, process_id, node_id, version):
         """Only the winning worker may continue its local execute loop."""
         with transaction.atomic():
-            context = _locked_context(process_id, node_id, version)
+            context = _locked_context(process_id, node_id, version, require_running_root=False)
             if context is None:
                 return False
             process, state, checkpoint = context

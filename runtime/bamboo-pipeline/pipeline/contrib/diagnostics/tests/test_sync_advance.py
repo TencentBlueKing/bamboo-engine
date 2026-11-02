@@ -117,8 +117,37 @@ class SyncAdvanceTest(DiagnosticsTestCase):
             Process.objects.filter(id=self.p.id).update(**{field: True})
             self.assertFalse(self.release())
             Process.objects.filter(id=self.p.id).update(**{field: False})
-        State.objects.filter(node_id=self.p.root_pipeline_id).update(name="REVOKED")
+        for root_state in ("SUSPENDED", "REVOKED"):
+            State.objects.filter(node_id=self.p.root_pipeline_id).update(name=root_state)
+            self.assertFalse(self.release())
+
+    def test_paused_or_revoked_root_keeps_local_continuation_with_worker(self):
+        # The worker must reach the loop-top check to mark the process suspended/dead.
+        for root_state in ("SUSPENDED", "REVOKED"):
+            SyncAdvanceCheckpoint.objects.filter(process_id=self.p.id).delete()
+            State.objects.filter(node_id=self.p.root_pipeline_id).update(name=root_state)
+            self.assertTrue(self.runtime.prepare_sync_advance(self.p.id, "a", "v1", "a-next"))
+            self.assertTrue(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
+            self.assertEqual(SyncAdvanceCheckpoint.objects.get(process_id=self.p.id).phase, "CLAIMED")
+            self.assertFalse(self.release())
+
+    def test_pause_between_prepare_and_claim_cannot_hand_ready_to_recovery(self):
+        self.prepare()
+        State.objects.filter(node_id=self.p.root_pipeline_id).update(name="SUSPENDED")
         self.assertFalse(self.release())
+        self.assertTrue(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
+        self.assertFalse(Process.objects.get(id=self.p.id).asleep)
+
+    def test_parked_root_does_not_reopen_released_or_claimed_checkpoint(self):
+        self.prepare()
+        self.assertTrue(self.release())
+        State.objects.filter(node_id=self.p.root_pipeline_id).update(name="SUSPENDED")
+        self.assertFalse(self.runtime.prepare_sync_advance(self.p.id, "a", "v1", "a-next"))
+        self.assertFalse(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
+        SyncAdvanceCheckpoint.objects.filter(process_id=self.p.id).update(phase="CLAIMED")
+        Process.objects.filter(id=self.p.id).update(asleep=False)
+        self.assertFalse(self.runtime.prepare_sync_advance(self.p.id, "a", "v1", "a-next"))
+        self.assertFalse(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
 
     def test_schedule_skip_and_ignored_errors_cannot_be_recovered(self):
         self.prepare()
@@ -180,6 +209,43 @@ class SyncAdvanceTest(DiagnosticsTestCase):
         self.assertTrue(self.release())
         self.assertFalse(self.runtime.wake_sync_recovery(self.p.id, "a", "v1"))
         self.assertTrue(Process.objects.get(id=self.p.id).asleep)
+
+    def test_interrupt_retry_after_ready_competes_for_claim(self):
+        # A database error after READY was committed must not drop the retried message.
+        self.prepare()
+        self.assertTrue(self.runtime.wake_sync_recovery(self.p.id, "a", "v1"))
+        self.assertFalse(Process.objects.get(id=self.p.id).asleep)
+        # Waking refreshes the heartbeat, so recovery cannot release READY under the retry.
+        self.assertFalse(self.release())
+        self.assertTrue(self.runtime.prepare_sync_advance(self.p.id, "a", "v1", "a-next"))
+        self.assertTrue(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
+        self.assertFalse(self.release())
+
+    def test_interrupt_retry_and_recovery_on_ready_have_exactly_one_winner(self):
+        if connection.vendor != "mysql":
+            self.skipTest("requires production-like row locks")
+        self.prepare()
+        barrier = threading.Barrier(2)
+
+        def compete(recovery):
+            try:
+                barrier.wait(timeout=5)
+                return self.release() if recovery else self.runtime.wake_sync_recovery(self.p.id, "a", "v1")
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(compete, flag) for flag in (False, True)]
+            woke, released = [future.result(timeout=10) for future in futures]
+        self.assertEqual([woke, released].count(True), 1)
+        self.assertEqual(Process.objects.get(id=self.p.id).asleep, released)
+        claimed = self.runtime.claim_sync_advance(self.p.id, "a", "v1")
+        self.assertEqual(claimed, woke)
+
+    def test_interrupt_retry_after_claim_is_refused(self):
+        self.prepare()
+        self.assertTrue(self.runtime.claim_sync_advance(self.p.id, "a", "v1"))
+        self.assertFalse(self.runtime.wake_sync_recovery(self.p.id, "a", "v1"))
 
     def test_old_runtime_can_delete_process_without_knowing_checkpoint_model(self):
         self.prepare()
