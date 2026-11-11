@@ -24,6 +24,7 @@ def test_sync_advance_boundary(
     node_id, pi, interrupter, node, state, enabled, prepared, claimed, continues  # noqa: F811
 ):
     runtime = MagicMock()
+    runtime.get_config.return_value = False  # disable rollback path on LTS lines that check it
     runtime.get_process_info.return_value = pi
     runtime.batch_get_state_name.return_value = {"root": states.RUNNING}
     runtime.get_node.return_value = node
@@ -82,6 +83,7 @@ def test_interrupt_retry_reuses_result_and_competes_again(node_id, pi, interrupt
         execute_result=result,
     )
     runtime = MagicMock()
+    runtime.get_config.return_value = False  # disable rollback path on LTS lines that check it
     runtime.get_process_info.return_value = pi
     runtime.batch_get_state_name.return_value = {"root": states.RUNNING}
     runtime.get_node.return_value = node
