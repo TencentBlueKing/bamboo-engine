@@ -86,13 +86,13 @@ tests-no-zope = ["cloudpickle", "cloudpickle", "hypothesis", "hypothesis", "mypy
 
 [[package]]
 name = "bamboo-engine"
-version = "2.11.3"
+version = "2.11.6"
 description = "Bamboo-engine is a general-purpose workflow engine"
 optional = false
 python-versions = "<4,>=3.6"
 files = [
-    {file = "bamboo_engine-2.11.3-py3-none-any.whl", hash = "sha256:7ee240a801bb866acd3788fd0b73137c3472b9e4e1f7cd4499f3dffd7f84b796"},
-    {file = "bamboo_engine-2.11.3.tar.gz", hash = "sha256:9b10b85a64c04ec4a03eb4f443c705e855a31b75ac9c9061e892baa7715c1298"},
+    {file = "bamboo_engine-2.11.6-py3-none-any.whl", hash = "sha256:a8ec07ce8ca983fddae0693c7377db97e557a8601c95efaad3c34340aca51468"},
+    {file = "bamboo_engine-2.11.6.tar.gz", hash = "sha256:5e6d31381dc451611fb93a9fa9c7cceb393bcaa60c50a0ad65331acf02120958"},
 ]
 
 [package.dependencies]
@@ -1320,4 +1320,4 @@ testing = ["func-timeout", "jaraco.itertools", "pytest (>=4.6)", "pytest-black (
 [metadata]
 lock-version = "2.0"
 python-versions = ">= 3.6, < 4"
-content-hash = "7330f0747c3872874a90caa40db25232986ee9400a31857cbaf9a17064a3fbd7"
+content-hash = "55ba9d637328e7b7d5dc242d6d9fc65e95db3cc49c9eb61fb44ca9286c073173"
