@@ -52,3 +52,22 @@
 - 本次不引入 `pipeline.contrib.reliable_events` 的 SHADOW/ACTIVE 回调补偿功能。
 - 本次不修改包版本和依赖锁定；出包版本由后续独立发布提交维护。
 - 诊断规则不执行流程表达式；当前 3.29 LTS 的 Mako 安全实现保持不变。
+
+## 补充：同步节点推进中断（S7）治理
+
+在上述三期主体已同步的基础上，本次再把 3.24 LTS 已发布的 S7 能力补齐到 3.29 LTS。标准运维 master 当前运行时为 `bamboo-pipeline==3.24.22`（精确依赖 `bamboo-engine==2.6.9`），S7 由 3.24 LTS 的发布 PR #319、#321、#322 提供。
+
+移植提交（cherry-pick，保留原始提交信息）：
+
+- `a747b7e` feat: 增加 S7 同步节点推进中断检测与安全恢复
+- `3ba392a` fix: S7 同步推进在运行中暂停/撤销后正确标记进程，READY 后数据库中断重试不丢消息
+
+新增能力：`SYNC_ADVANCE_CHECKPOINT_ENABLED` 开关（默认 `False`）、`SyncAdvanceCheckpoint` 模型与 `eri/0006_syncadvancecheckpoint.py` 迁移、引擎同步节点输出检查点与推进权竞争、`sync_advance_stalled` 诊断判据与快档检测、安全恢复接管，以及对应的引擎/诊断/ERI 测试。
+
+与 3.24 LTS 的差异：
+
+- `runtime.py` 的导入按 3.29 LTS 现有分组解析，仅新增 `SyncAdvanceMixin` 的 import 与基类。
+- 3.29 LTS 的 `engine.py` 在节点成功后多了「预约回滚」分支（`runtime.get_config(PIPELINE_ENABLE_ROLLBACK)`）；S7 引擎单测的 `MagicMock` 默认对它返回真值会提前 `die()`，测试中显式设 `get_config.return_value = False`，使单测聚焦 S7 边界，不改变生产逻辑。
+- `eri` 迁移编号 `0006` 在 3.29 LTS 下未被占用，依赖沿用 `0005_auto_20220422_1048`。
+
+接入要求：完成 `eri/0006` 迁移后再启动新版 worker/cleaner；所有相关 worker 升级到含本改动的包后才可打开检查点开关；自动恢复类型名为 `sync_advance_stalled`。本次仍不引入 `reliable_events`，不修改包版本与依赖锁定，不覆盖生产部署、开关灰度与容量验证。

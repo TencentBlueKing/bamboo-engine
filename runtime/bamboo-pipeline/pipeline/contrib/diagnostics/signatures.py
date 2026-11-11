@@ -24,6 +24,7 @@ from pipeline.contrib.diagnostics import conf
 from pipeline.contrib.diagnostics.case_types import (
     CHILD_START_LOST,
     EXECUTE_DISPATCH_LOST,
+    SYNC_ADVANCE_STALLED,
     PARENT_WAKEUP_LOST,
     POLL_DISPATCH_LOST,
 )
@@ -33,13 +34,13 @@ from pipeline.contrib.diagnostics.models import DiagnosticCase
 from pipeline.contrib.diagnostics.progress import root_states
 from pipeline.contrib.diagnostics.types import DiagnosticHit
 from pipeline.engine import states
-from pipeline.eri.models import Node, Process, Schedule, State
+from pipeline.eri.models import Node, Process, Schedule, State, SyncAdvanceCheckpoint
 
 POLL = ScheduleType.POLL.value
 FORK_GATEWAY_TYPES = ("ParallelGateway", "ConditionalParallelGateway")
 
 SignatureContext = namedtuple(
-    "SignatureContext", ["now", "roots", "states", "schedules", "nodes", "parents", "live_children"]
+    "SignatureContext", ["now", "roots", "states", "schedules", "nodes", "parents", "live_children", "sync_advances"]
 )
 
 
@@ -75,7 +76,15 @@ def build_context(processes, now=None):
     roots = {}
     for chunk in chunks({process.root_pipeline_id for process in processes}):
         roots.update(root_states(chunk))
-    return SignatureContext(now or timezone.now(), roots, state_map, schedule_map, node_map, parents, live_children)
+    checkpoints = {}
+    if conf.sync_advance_enabled():
+        for chunk in chunks({process.id for process in processes}):
+            checkpoints.update(
+                {row.process_id: row for row in SyncAdvanceCheckpoint.objects.filter(process_id__in=chunk)}
+            )
+    return SignatureContext(
+        now or timezone.now(), roots, state_map, schedule_map, node_map, parents, live_children, checkpoints
+    )
 
 
 def _cutoff(ctx, seconds):
@@ -140,6 +149,9 @@ def detect_execute_dispatch_lost(process, ctx):
         return None
     if state is None or state.name != states.FINISHED or state.archived_time is None:
         return None
+    checkpoint = ctx.sync_advances.get(process.id)
+    if checkpoint and (checkpoint.from_node, checkpoint.from_version) == (node_id, state.version):
+        return None  # Released synchronous continuation remains S7, not a second S1 case.
     # 调度在置完成前会先刷新心跳，所以正常情况下完成时间严格晚于心跳；相等时无法与上一轮循环残留区分，不判
     if state.archived_time <= process.last_heartbeat:
         return None
@@ -158,6 +170,54 @@ def detect_execute_dispatch_lost(process, ctx):
         message="节点已完成，但后继节点的执行消息没有被消费",
         extra_evidence={"archived_time": state.archived_time.isoformat()},
         related_extra={"next_node_ids": targets},
+    )
+
+
+def detect_sync_advance_stalled(process, ctx):
+    """S7: finished synchronous activity with no local continuation; evidence gates recovery separately."""
+    if not conf.sync_advance_enabled() or process.dead or _parked(process):
+        return None
+    node_id = process.current_node_id
+    detail, state = ctx.nodes.get(node_id) or {}, ctx.states.get(node_id)
+    if detail.get("type") != "ServiceActivity" or detail.get("reserve_rollback"):
+        return None
+    if state is None or state.name != states.FINISHED or state.archived_time is None:
+        return None
+    if state.archived_time > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
+        return None
+    if (node_id, state.version) in ctx.schedules:
+        return None
+    checkpoint = ctx.sync_advances.get(process.id)
+    if checkpoint and (checkpoint.from_node, checkpoint.from_version) != (node_id, state.version):
+        checkpoint = None
+    # A current checkpoint proves this round and refreshes the scan heartbeat after a long plugin.
+    # Without it, require the historical completion to be later than this process's heartbeat.
+    if checkpoint is None and state.archived_time <= process.last_heartbeat:
+        return None
+    if process.last_heartbeat > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
+        return None
+    phase = checkpoint.phase if checkpoint else "MISSING"
+    if process.asleep and phase != SyncAdvanceCheckpoint.RELEASED:
+        return None
+    if checkpoint and checkpoint.prepared_at > _cutoff(ctx, conf.signature_fast_threshold_seconds()):
+        return None
+    return _hit(
+        SYNC_ADVANCE_STALLED,
+        "S7",
+        "critical",
+        process,
+        node_id,
+        state.version,
+        derived_message="continue only after atomic checkpoint takeover",
+        message="同步节点已完成，但后继未推进；恢复必须核验输出检查点",
+        extra_evidence={
+            "archived_time": state.archived_time.isoformat(),
+            "checkpoint_phase": phase,
+            "checkpoint_target": checkpoint.to_node if checkpoint else "",
+            "skip": state.skip,
+            "error_ignored": state.error_ignored,
+        },
+        related_extra={"next_node_ids": list((detail.get("targets") or {}).values())},
     )
 
 
@@ -272,6 +332,7 @@ def evaluate(processes, ctx, slow):
         else:
             found = [
                 detect_execute_dispatch_lost(process, ctx),
+                detect_sync_advance_stalled(process, ctx),
                 detect_poll_dispatch_lost(process, ctx, continuation=False),
                 detect_child_start_lost(process, ctx),
             ]

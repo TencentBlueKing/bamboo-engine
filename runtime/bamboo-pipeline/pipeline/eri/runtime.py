@@ -32,6 +32,7 @@ from pipeline.eri.imp.process import ProcessMixin
 from pipeline.eri.imp.rollback import RollbackMixin
 from pipeline.eri.imp.schedule import ScheduleMixin
 from pipeline.eri.imp.state import StateMixin
+from pipeline.eri.imp.sync_advance import SyncAdvanceMixin
 from pipeline.eri.imp.task import TaskMixin
 from pipeline.eri.models import (
     ContextOutputs,
@@ -64,6 +65,7 @@ class BambooDjangoRuntime(
     StateMixin,
     NodeMixin,
     ProcessMixin,
+    SyncAdvanceMixin,
     PipelinePluginManagerMixin,
     HooksMixin,
     InterruptMixin,
